@@ -1,0 +1,1307 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
+  public: {
+    Tables: {
+      bookings: {
+        Row: {
+          attributes: Json
+          business_id: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          channel: string
+          code: string
+          created_at: string
+          created_by: string
+          currency: string
+          customer_id: string
+          customer_note: string | null
+          deposit_required_minor: number | null
+          ends_at: string
+          id: string
+          owner_note: string | null
+          party_size: number
+          price_minor: number
+          quantity: number
+          reminder_1h_at: string | null
+          reminder_24h_at: string | null
+          resource_id: string
+          service_id: string
+          slot: unknown
+          starts_at: string
+          status: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          attributes?: Json
+          business_id: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          channel?: string
+          code?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          customer_id: string
+          customer_note?: string | null
+          deposit_required_minor?: number | null
+          ends_at: string
+          id?: string
+          owner_note?: string | null
+          party_size?: number
+          price_minor: number
+          quantity?: number
+          reminder_1h_at?: string | null
+          reminder_24h_at?: string | null
+          resource_id: string
+          service_id: string
+          slot?: unknown
+          starts_at: string
+          status?: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          attributes?: Json
+          business_id?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          channel?: string
+          code?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          customer_id?: string
+          customer_note?: string | null
+          deposit_required_minor?: number | null
+          ends_at?: string
+          id?: string
+          owner_note?: string | null
+          party_size?: number
+          price_minor?: number
+          quantity?: number
+          reminder_1h_at?: string | null
+          reminder_24h_at?: string | null
+          resource_id?: string
+          service_id?: string
+          slot?: unknown
+          starts_at?: string
+          status?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "bookings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      businesses: {
+        Row: {
+          address: string | null
+          attributes: Json
+          business_type: string
+          category: string
+          created_at: string
+          default_currency: string
+          hours: Json
+          id: string
+          locale: string
+          name: string
+          owner_user_id: string | null
+          parse_model: string | null
+          parsed_at: string | null
+          phone: string | null
+          plan: string
+          province: string | null
+          quota_txn_month: number
+          raw_description: string | null
+          slug: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          attributes?: Json
+          business_type?: string
+          category?: string
+          created_at?: string
+          default_currency?: string
+          hours?: Json
+          id?: string
+          locale?: string
+          name: string
+          owner_user_id?: string | null
+          parse_model?: string | null
+          parsed_at?: string | null
+          phone?: string | null
+          plan?: string
+          province?: string | null
+          quota_txn_month?: number
+          raw_description?: string | null
+          slug: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          attributes?: Json
+          business_type?: string
+          category?: string
+          created_at?: string
+          default_currency?: string
+          hours?: Json
+          id?: string
+          locale?: string
+          name?: string
+          owner_user_id?: string | null
+          parse_model?: string | null
+          parsed_at?: string | null
+          phone?: string | null
+          plan?: string
+          province?: string | null
+          quota_txn_month?: number
+          raw_description?: string | null
+          slug?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      channel_connections: {
+        Row: {
+          business_id: string
+          channel: string
+          connected_at: string | null
+          display_name: string | null
+          external_id: string | null
+          id: string
+          last_error: string | null
+          secret_ref: string | null
+          status: string
+        }
+        Insert: {
+          business_id: string
+          channel: string
+          connected_at?: string | null
+          display_name?: string | null
+          external_id?: string | null
+          id?: string
+          last_error?: string | null
+          secret_ref?: string | null
+          status?: string
+        }
+        Update: {
+          business_id?: string
+          channel?: string
+          connected_at?: string | null
+          display_name?: string | null
+          external_id?: string | null
+          id?: string
+          last_error?: string | null
+          secret_ref?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_connections_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_connections_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "channel_connections_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "channel_connections_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      closures: {
+        Row: {
+          business_id: string
+          ends_at: string
+          id: string
+          reason: string | null
+          starts_at: string
+        }
+        Insert: {
+          business_id: string
+          ends_at: string
+          id?: string
+          reason?: string | null
+          starts_at: string
+        }
+        Update: {
+          business_id?: string
+          ends_at?: string
+          id?: string
+          reason?: string | null
+          starts_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closures_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "closures_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "closures_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "closures_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          business_id: string
+          channel: string
+          created_at: string
+          customer_id: string
+          id: string
+          last_message_at: string
+          needs_owner_reason: string | null
+          status: string
+        }
+        Insert: {
+          business_id: string
+          channel: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          last_message_at?: string
+          needs_owner_reason?: string | null
+          status?: string
+        }
+        Update: {
+          business_id?: string
+          channel?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          last_message_at?: string
+          needs_owner_reason?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "conversations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "conversations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "conversations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_identities: {
+        Row: {
+          channel: string
+          created_at: string
+          customer_id: string
+          external_id: string
+          id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          customer_id: string
+          external_id: string
+          id?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          customer_id?: string
+          external_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_identities_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          business_id: string
+          display_name: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          locale: string | null
+          no_show_count: number
+          notes: string | null
+          phone: string | null
+        }
+        Insert: {
+          business_id: string
+          display_name?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          locale?: string | null
+          no_show_count?: number
+          notes?: string | null
+          phone?: string | null
+        }
+        Update: {
+          business_id?: string
+          display_name?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          locale?: string | null
+          no_show_count?: number
+          notes?: string | null
+          phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "customers_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "customers_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          action: string
+          actor: string
+          actor_label: string | null
+          after: Json | null
+          before: Json | null
+          business_id: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: number
+        }
+        Insert: {
+          action: string
+          actor: string
+          actor_label?: string | null
+          after?: Json | null
+          before?: Json | null
+          business_id: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: number
+        }
+        Update: {
+          action?: string
+          actor?: string
+          actor_label?: string | null
+          after?: Json | null
+          before?: Json | null
+          business_id?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          audio_url: string | null
+          body: string
+          booking_id: string | null
+          business_id: string
+          conversation_id: string
+          cost_micro_usd: number | null
+          created_at: string
+          id: number
+          lang: string | null
+          payment_id: string | null
+          role: string
+          tokens_in: number | null
+          tokens_out: number | null
+          tool_calls: Json | null
+          transcribed_by: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          body: string
+          booking_id?: string | null
+          business_id: string
+          conversation_id: string
+          cost_micro_usd?: number | null
+          created_at?: string
+          id?: number
+          lang?: string | null
+          payment_id?: string | null
+          role: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tool_calls?: Json | null
+          transcribed_by?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          body?: string
+          booking_id?: string | null
+          business_id?: string
+          conversation_id?: string
+          cost_micro_usd?: number | null
+          created_at?: string
+          id?: number
+          lang?: string | null
+          payment_id?: string | null
+          role?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tool_calls?: Json | null
+          transcribed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings_agent"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "messages_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "messages_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_events: {
+        Row: {
+          created_at: string
+          id: number
+          payment_id: string
+          raw: Json | null
+          source: string
+          status_reported: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          payment_id: string
+          raw?: Json | null
+          source: string
+          status_reported?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          payment_id?: string
+          raw?: Json | null
+          source?: string
+          status_reported?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount_minor: number
+          booking_id: string | null
+          business_id: string
+          check_count: number
+          created_at: string
+          currency: string
+          customer_id: string | null
+          expires_at: string | null
+          id: string
+          idempotency_key: string
+          kind: string
+          last_checked_at: string | null
+          paid_at: string | null
+          provider: string
+          provider_account: string | null
+          provider_ref: string | null
+          provider_txn_id: string | null
+          qr_payload: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_minor: number
+          booking_id?: string | null
+          business_id: string
+          check_count?: number
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          expires_at?: string | null
+          id?: string
+          idempotency_key: string
+          kind?: string
+          last_checked_at?: string | null
+          paid_at?: string | null
+          provider?: string
+          provider_account?: string | null
+          provider_ref?: string | null
+          provider_txn_id?: string | null
+          qr_payload?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_minor?: number
+          booking_id?: string | null
+          business_id?: string
+          check_count?: number
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          expires_at?: string | null
+          id?: string
+          idempotency_key?: string
+          kind?: string
+          last_checked_at?: string | null
+          paid_at?: string | null
+          provider?: string
+          provider_account?: string | null
+          provider_ref?: string | null
+          provider_txn_id?: string | null
+          qr_payload?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings_agent"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "payments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "payments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_services: {
+        Row: {
+          resource_id: string
+          service_id: string
+        }
+        Insert: {
+          resource_id: string
+          service_id: string
+        }
+        Update: {
+          resource_id?: string
+          service_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_services_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resources: {
+        Row: {
+          active: boolean
+          attributes: Json
+          business_id: string
+          created_at: string
+          id: string
+          kind: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          attributes?: Json
+          business_id: string
+          created_at?: string
+          id?: string
+          kind?: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          attributes?: Json
+          business_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resources_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resources_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "resources_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "resources_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          active: boolean
+          attributes: Json
+          buffer_min: number
+          business_id: string
+          capacity: number
+          created_at: string
+          currency: string
+          deposit_minor: number | null
+          description: string | null
+          duration_min: number
+          id: string
+          name: string
+          name_en: string | null
+          price_minor: number
+          requires_deposit: boolean
+          sort_order: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          attributes?: Json
+          buffer_min?: number
+          business_id: string
+          capacity?: number
+          created_at?: string
+          currency?: string
+          deposit_minor?: number | null
+          description?: string | null
+          duration_min?: number
+          id?: string
+          name: string
+          name_en?: string | null
+          price_minor: number
+          requires_deposit?: boolean
+          sort_order?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          attributes?: Json
+          buffer_min?: number
+          business_id?: string
+          capacity?: number
+          created_at?: string
+          currency?: string
+          deposit_minor?: number | null
+          description?: string | null
+          duration_min?: number
+          id?: string
+          name?: string
+          name_en?: string | null
+          price_minor?: number
+          requires_deposit?: boolean
+          sort_order?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "services_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "services_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      v_agent_business: {
+        Row: {
+          address: string | null
+          business_id: string | null
+          business_type: string | null
+          category: string | null
+          default_currency: string | null
+          hours: Json | null
+          locale: string | null
+          name: string | null
+          phone: string | null
+          resources: Json | null
+          services: Json | null
+          slug: string | null
+          timezone: string | null
+          upcoming_closures: Json | null
+        }
+        Insert: {
+          address?: string | null
+          business_id?: string | null
+          business_type?: string | null
+          category?: string | null
+          default_currency?: string | null
+          hours?: Json | null
+          locale?: string | null
+          name?: string | null
+          phone?: string | null
+          resources?: never
+          services?: never
+          slug?: string | null
+          timezone?: string | null
+          upcoming_closures?: never
+        }
+        Update: {
+          address?: string | null
+          business_id?: string | null
+          business_type?: string | null
+          category?: string | null
+          default_currency?: string | null
+          hours?: Json | null
+          locale?: string | null
+          name?: string | null
+          phone?: string | null
+          resources?: never
+          services?: never
+          slug?: string | null
+          timezone?: string | null
+          upcoming_closures?: never
+        }
+        Relationships: []
+      }
+      v_bookings_agent: {
+        Row: {
+          balance_minor: number | null
+          business_id: string | null
+          channel: string | null
+          code: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          customer_name: string | null
+          customer_note: string | null
+          customer_phone: string | null
+          ends_at: string | null
+          id: string | null
+          no_show_count: number | null
+          owner_note: string | null
+          paid_minor: number | null
+          party_size: number | null
+          price_minor: number | null
+          quantity: number | null
+          resource_kind: string | null
+          resource_name: string | null
+          service_name: string | null
+          service_name_en: string | null
+          starts_at: string | null
+          status: string | null
+          unit: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      v_month_stats: {
+        Row: {
+          booked_revenue_minor: number | null
+          business_id: string | null
+          collected_minor: number | null
+          completed: number | null
+          currency: string | null
+          month: string | null
+          no_shows: number | null
+          upcoming: number | null
+        }
+        Relationships: []
+      }
+      v_month_usage: {
+        Row: {
+          business_id: string | null
+          conversations_this_month: number | null
+          plan: string | null
+          quota_txn_month: number | null
+          txn_left: number | null
+          txn_used: number | null
+        }
+        Relationships: []
+      }
+      v_schema_doc: {
+        Row: {
+          column_comment: string | null
+          column_name: unknown
+          data_type: string | null
+          table_comment: string | null
+          table_name: unknown
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

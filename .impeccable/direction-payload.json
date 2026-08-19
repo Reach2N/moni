@@ -1,0 +1,114 @@
+{
+  "title": "Choose the visual world for Moni",
+  "question": "The roll assigned The Engraved Ledger. Keep it, take an alternate, or re-roll. Your pinned palette rides every card.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Engraved Ledger",
+      "kicker": "THE ROLL",
+      "lineage": "Cambodian riel banknote intaglio",
+      "thesis": "The one graphic system in her world whose entire job is to make an amount unmistakable at a glance, in bad light, in a hurry. She handles these notes dozens of times a day. Moni has exactly that job, so it borrows that grammar instead of the SaaS dashboard's.",
+      "palette": ["#0F172A", "#F8FAFC", "#059669", "#475569"],
+      "materials": ["intaglio plate ink", "note paper", "hairline guilloche", "struck rubber seal"],
+      "viewport": "Portrait phone. A slim engraved header carries the shop name in Khmer over a hairline rule. Below it a full width money band in security green owns the top third, holding today's takings as one engraved numeral at display scale with Khmer numerals at half scale beneath. Under that the ledger runs as ruled panel rows: time in a left denomination box, customer and service in the centre field, a struck seal at the right. Hairline rules between rows, never shadows. One full width engraved primary button sits at the thumb line, three engraved tabs below it.",
+      "risk": "Banknote engraving tips into kitsch or crypto-fintech the moment guilloche becomes decorative swirls. The discipline is that engraving lives only in hairlines, rules, and one low contrast micro texture. Second risk, fine line work disappears on a cheap LCD in sunlight, so every structural line must clear 3:1 rather than looking delicate.",
+      "raised": [
+        { "from": "Studio Dumbar modular identity", "raise": "A strict visible module now governs the page. The note's panel grid rules every element and nothing floats free of it." },
+        { "from": "Seedbed floating lobes", "raise": "Colour owns a whole region at page scale. The security green is a full width money band, never a tint sprinkled onto buttons." },
+        { "from": "Alphabet storm", "raise": "The parse is a visible transformation of her own words into ruled ledger rows, not a spinner with a caption." },
+        { "from": "Drawcord cape", "raise": "One primary control per screen, and pressing it visibly restructures the surface rather than opening a menu." }
+      ],
+      "board": "https://impeccable.style/worlds/cards/studio-dumbar-identity.webp"
+    },
+    {
+      "id": "model-pick",
+      "label": "The Painted Shopfront",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "hand painted Cambodian shop signboards",
+      "thesis": "Her shop already has a user interface: the painted board above the door. Flat saturated fields, huge Khmer lettering, the service list as a price board, the phone number oversized. The app becomes her signboard, held in the hand.",
+      "palette": ["#059669", "#F8FAFC", "#0F172A", "#475569"],
+      "materials": ["enamel paint on tin", "hand lettered Khmer", "flat colour fields"],
+      "viewport": "Portrait phone. A painted field fills the screen edge to edge, the shop name hand lettered at the top, services stacked as a painted price list, today's takings painted largest of all.",
+      "risk": "This is the most familiar answer and the one most runs would ship for a Cambodian small business product. It ranked first on my list, which is exactly why the roll moved past it. A signboard is built to shout at ten metres, and that boldness becomes shouting at thirty centimetres."
+    },
+    {
+      "id": "challenger-drum-machine",
+      "label": "The Step Row",
+      "verdict": "competitive",
+      "lineage": "early 80s rhythm machine step row",
+      "thesis": "The day is one unbroken row of time slots you write into place, with a running light that always says where now is.",
+      "palette": ["#0F172A", "#059669", "#475569", "#F8FAFC"],
+      "materials": ["charcoal panel", "lit step keys", "silkscreen caps"],
+      "viewport": "The day as sixteen lit steps that never wrap, only scale. An empty day is a row of dark keys of invitation.",
+      "case": "Wins on product clarity. A booked day genuinely is a step sequence, the chase light is the best model of now I have seen for this screen, and a row that scales instead of wrapping is ideal on a phone. Loses on audience identification: a drum machine is nowhere in a Takeo shop owner's world.",
+      "risk": "Charcoal ground fails the daylight test that decided this product's whole palette.",
+      "board": "https://impeccable.style/worlds/cards/signals-instruments-drum-machine-step-row.webp",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-drum-machine-step-row-hero.webp"
+    },
+    {
+      "id": "challenger-hypercard",
+      "label": "The Shoebox Stack",
+      "verdict": "competitive",
+      "lineage": "HyperCard one bit card stacks",
+      "thesis": "Every booking is a card you can edit in place. The tool for reading is the same tool for making, one keypress apart.",
+      "palette": ["#0F172A", "#F8FAFC", "#475569"],
+      "materials": ["one bit black on white", "stipple dither", "hand drawn borders"],
+      "viewport": "A stack of black and white cards, each booking a card, the pressed button inverting to solid black.",
+      "case": "Wins on product clarity twice over. One bit black on white is the most daylight legible system that exists, and browse and author being two modes of one object is precisely Moni's premise that there is no separate settings screen. Loses on audience identification: HyperCard is not in this audience's world at all, though a stack of cards you flip through maps onto the notebook it replaces.",
+      "risk": "Pure one bit reads as a retro exercise, and it leaves no room for the pinned green.",
+      "board": "https://impeccable.style/worlds/cards/medium-native-hypercard-stack-shoebox.webp",
+      "hero": "https://impeccable.style/worlds/cards/medium-native-hypercard-stack-shoebox-hero.webp"
+    },
+    {
+      "id": "challenger-dumbar",
+      "label": "Modular Identity Blocks",
+      "verdict": "declined",
+      "lineage": "Studio Dumbar identity systems",
+      "palette": ["#00A0E0", "#E5007D", "#FFE500", "#6E7B8B"],
+      "materials": ["saturated vector bars", "photographic mid tones"],
+      "case": "Loses both axes. Dutch studio identity language is foreign to this audience and reads as advertising rather than as her ledger, and blend mode overlaps actively destroy legibility in daylight while coding meaning by colour alone.",
+      "kept": "A strict visible module that survives content being thrown anywhere."
+    },
+    {
+      "id": "challenger-seedbed",
+      "label": "Floating Lobes",
+      "verdict": "declined",
+      "lineage": "saturated field with floating capsule chrome",
+      "palette": ["#82CC5C", "#F2EFE3", "#2F3130", "#F0574C"],
+      "materials": ["capsule chrome", "rounded slabs"],
+      "case": "Loses both axes. Pills and 48px radius slabs are the current global app default, so she recognises it only as generic app, and a saturated field at that coverage is worse than paper white under direct sun. It is also the exact house style you asked me to avoid.",
+      "kept": "Colour owning a whole region at page scale instead of being an accent."
+    },
+    {
+      "id": "challenger-alphabet-storm",
+      "label": "Alphabet Storm",
+      "verdict": "declined",
+      "lineage": "letters as weather and landscape",
+      "palette": ["#FFFFFF", "#000000", "#C0C0C0"],
+      "materials": ["type as matter", "procedural particles"],
+      "case": "Loses both axes hard. Beautiful, and it obliterates an Operate surface where the task, state and affordance may never be obscured.",
+      "kept": "Making the transformation from language into structure visible rather than hiding it behind a loading state."
+    },
+    {
+      "id": "challenger-cape",
+      "label": "Drawcord Cape",
+      "verdict": "declined",
+      "lineage": "silk cape with hidden drawcord channels",
+      "palette": ["#111111", "#C8A24A", "#3A3F45"],
+      "materials": ["matte black silk", "gold cord"],
+      "case": "Loses both axes. Textile is genuinely in her world through the krama, but couture is not, matte black fails the daylight test, and a pull to transform gesture is one she would never discover.",
+      "kept": "One control that visibly restructures the entire surface."
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "The SaaS dashboard, executed impeccably. Sidebar, white cards on a grey field, muted slate type, a stat row, a chart.",
+    "palette": ["#FFFFFF", "#0F172A", "#059669", "#F1F5F9"],
+    "materials": ["clean grid", "card shadows"],
+    "viewport": "The arrangement every judge has seen a hundred times, at full craft.",
+    "risk": "Indistinguishable from the other ninety nine applications by design."
+  },
+  "steer": true
+}

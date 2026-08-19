@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/* ── fonts ──────────────────────────────────────────────────────────────────
+   Busra: SIL, OFL, real Khmer engineering based on Khmer Mondulkiri, so coeng
+   subscripts stack correctly rather than approximately. Licence ships at
+   /fonts/OFL-Busra.txt as the OFL requires.
+
+   Kantumruy Pro was removed after the finish review: next/font names the family
+   itself, --font-sans never matched that name, so five weights downloaded and none
+   rendered. Busra carries Khmer and Latin as one family.
+
+   Futura 100 Khmer is the brand face. It is licensed for web use ONLY through
+   an Adobe Fonts web project, and its EULA forbids converting it to a web font
+   format, so it is never self hosted. Paste the project link into layout.tsx
+   and it takes the first slot below with nothing else changing.
+
+   One family across the whole product. Operate surfaces do not need a display
+   and body pairing, and a second face here would only add noise. */
+@font-face { font-family: 'Busra'; src: url('/fonts/Busra-ExtraLight.woff2') format('woff2'); font-weight: 200; font-display: swap; }
+@font-face { font-family: 'Busra'; src: url('/fonts/Busra-Light.woff2') format('woff2');      font-weight: 300; font-display: swap; }
+@font-face { font-family: 'Busra'; src: url('/fonts/Busra-Regular.woff2') format('woff2');    font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Busra'; src: url('/fonts/Busra-Medium.woff2') format('woff2');     font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Busra'; src: url('/fonts/Busra-SemiBold.woff2') format('woff2');   font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Busra'; src: url('/fonts/Busra-Bold.woff2') format('woff2');       font-weight: 700; font-display: swap; }
+
+@theme {
+  --font-sans: 'futura-100-khmer', 'Busra', ui-sans-serif, system-ui, sans-serif;
+
+  /* ── the four pinned inks, measured against the ground they actually sit on
+     paper  ground, the note stock
+     ink    plate ink. body text 17.06:1, and the one committed dark region
+     rule   ruled ornament and secondary text. 7.24:1 on paper, past 3:1 as structure
+     seal   the single metallic ink. 4.74:1 on ink, 3.6:1 on paper
+
+     seal green is 3.6:1 on paper, under the 4.5:1 body text floor. That is not a
+     compromise in the design, it is the design: colour lands on structure, never
+     on text meaning, so green is only ever a struck seal, a fill, or ink on the
+     dark panel. sealText exists for the rare case green must carry small text. */
+  --color-paper:     #F8FAFC;
+  --color-ink:       #0F172A;
+  --color-rule:      #475569;
+  --color-seal:      #059669;
+  --color-seal-text: #04845D;
+  --color-on-ink:    #F8FAFC;
+  --color-on-ink-dim:#94A3B8;
+  --color-hairline:  #CBD5E1;
+
+  /* Khmer coeng subscripts clip below 1.75, and Tailwind v4 pairs a line height
+     with every text utility, so the defaults are raised at the source. */
+  --text-xs--line-height: 1.75;
+  --text-sm--line-height: 1.75;
+  --text-base--line-height: 1.75;
+  --text-lg--line-height: 1.6;
+  --text-xl--line-height: 1.45;
+  --text-2xl--line-height: 1.3;
+  --text-4xl--line-height: 1.15;
+  --text-5xl--line-height: 1.1;
+
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Unlayered on purpose. Tailwind emits utilities inside @layer utilities and
+   unlayered rules beat layered ones by cascade layer, which is how this defeats
+   the leading-none that shadcn hardcodes into CardTitle, DialogTitle and Label
+   without !important and without patching generated files. */
+:is(:lang(km), .km),
+:is(:lang(km), .km) :is(p, span, h1, h2, h3, h4, h5, li, td, th, label, button, a, input, textarea) {
+  line-height: 1.75;
+}
+
+/* ── browser surfaces ───────────────────────────────────────────────────────
+   The parts nobody draws still carry the design. Left at their defaults they
+   belong to no design system at all. */
+::selection            { background: var(--color-seal); color: var(--color-paper); }
+:root                  { caret-color: var(--color-seal); accent-color: var(--color-seal); }
+:focus-visible         { outline: 2px solid var(--color-seal); outline-offset: 2px; border-radius: 1px; }
+::-webkit-scrollbar         { width: 10px; height: 10px; }
+::-webkit-scrollbar-track   { background: var(--color-paper); }
+::-webkit-scrollbar-thumb   { background: var(--color-hairline); border: 3px solid var(--color-paper); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-rule); }
+* { scrollbar-color: var(--color-hairline) var(--color-paper); scrollbar-width: thin; }
+
+html, body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  /* clip, not hidden: a descendant must never be able to widen the document and
+     push the centred column off axis. hidden would create a scroll container. */
+  overflow-x: clip;
+  max-width: 100vw;
+}
+
+/* Amounts and times are quantities, so they align as columns of digits rather
+   than reflowing as prose. This is the discipline the nixie counter donated. */
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

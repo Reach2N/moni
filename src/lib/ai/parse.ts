@@ -1,0 +1,152 @@
+/**
+ * Turn a shop owner's plain language description into structured rows.
+ *
+ * This is the one call the whole product rests on: it is the demo moment and the
+ * only onboarding step. So it is defensive in three specific places, each of
+ * which is a bug that would show up on stage rather than in a log.
+ */
+import { generateText, Output } from 'ai'
+import { z } from 'zod'
+import { BOOKING_UNITS, BUSINESS_TYPES, CURRENCIES } from '@/lib/types.ts'
+import { costMicroUsd, withFallback } from './models.ts'
+
+const CURRENCY_CODES = Object.keys(CURRENCIES) as [string, ...string[]]
+const TYPE_IDS = BUSINESS_TYPES.map((t) => t.id) as [string, ...string[]]
+
+const ParsedService = z.object({
+  name: z.string().min(1).describe("service name exactly as the owner wrote it, Khmer included"),
+  name_en: z.string().nullable().describe('English name if the owner did not already write one'),
+  price_minor: z
+    .number()
+    .int()
+    .min(0)
+    .describe('integer MINOR units. KHR has no decimals so 15000 riel is 15000. USD has 2 so $15 is 1500'),
+  currency: z.enum(CURRENCY_CODES),
+  duration_min: z.number().int().positive().describe('minutes. "one and a half hours" is 90'),
+  buffer_min: z.number().int().min(0).describe('cleanup or turnaround time after, 0 if not stated'),
+  unit: z.enum(BOOKING_UNITS as unknown as [string, ...string[]]),
+})
+
+const ParsedHours = z.object({
+  dow: z.number().int().min(0).max(6).describe('0 is Sunday'),
+  open: z.string().regex(/^\d{2}:\d{2}$/),
+  close: z.string().regex(/^\d{2}:\d{2}$/),
+})
+
+export const ParsedShop = z.object({
+  business_type: z.enum(TYPE_IDS).describe('closest match from the list'),
+  default_currency: z.enum(CURRENCY_CODES),
+  services: z.array(ParsedService).min(1),
+  hours: z.array(ParsedHours).describe('omit a day entirely if the shop is closed that day'),
+  resource_count: z
+    .number()
+    .int()
+    .min(1)
+    .describe('how many staff, rooms, chairs or bays were mentioned. 1 if not stated'),
+  notes: z.string().nullable().describe('anything said that did not fit a field above'),
+})
+export type ParsedShop = z.infer<typeof ParsedShop>
+
+const SYSTEM = `You read how a small business owner in Cambodia describes their shop, and turn it into structured data. You are not a chatbot and you never address the user.
+
+Money, and this is the rule that matters most:
+- Output integer MINOR units with the currency alongside.
+- KHR has NO decimal places. "15000៛" and "15,000 riel" are both price_minor 15000, currency KHR.
+- USD has 2. "$15" and "15 dollars" are both price_minor 1500, currency USD.
+- Never convert between currencies. Record what was written.
+- A shop that names riel anywhere is a KHR shop unless it clearly prices in dollars.
+
+Khmer:
+- Khmer numerals are digits: ០១២៣៤៥៦៧៨៩ map to 0123456789. "១៥០០០" is 15000.
+- Keep the service name in the owner's own words and script. Fill name_en yourself.
+- Read Khmer durations properly: "១ម៉ោង" is 60, "១ម៉ោងកន្លះ" is 90, "៣០ នាទី" is 30.
+- Khmer weekday names: អាទិត្យ Sunday, ចន្ទ Monday, អង្គារ Tuesday, ពុធ Wednesday, ព្រហស្បតិ៍ Thursday, សុក្រ Friday, សៅរ៍ Saturday.
+
+Durations and units:
+- Guess a sensible duration if none is stated, based on the kind of service.
+- unit is "night" for hotel and guesthouse rooms, "hour" for anything hired by the hour, "day" for jobs collected another day such as tailoring, "walk_in" where there is no appointment, otherwise "session".
+- buffer_min is only for stated cleanup or turnaround time. Otherwise 0.
+
+Hours:
+- 24 hour "HH:MM". "8am to 7pm" is 08:00 to 19:00.
+- Leave a closed day out of the array entirely rather than setting equal times.
+- If no hours are given at all, return an empty array. Do not invent them.
+
+Never use an em dash in any text you output. Use a comma or a full stop.
+Do not invent services, prices or opening hours that were not stated or clearly implied.`
+
+/** Everything that looked wrong enough for a human to check. */
+export type ParseWarning = { field: string; issue: string }
+
+/**
+ * Guard the failures a schema cannot catch. All three have the same shape: the
+ * output is valid JSON and completely wrong.
+ */
+export function sanityCheck(shop: ParsedShop): ParseWarning[] {
+  const w: ParseWarning[] = []
+  for (const [i, s] of shop.services.entries()) {
+    const at = `services[${i}] "${s.name}"`
+    // the 100x bug. 40 riel is not a haircut, and 4,500,000 dollars is not a perm.
+    if (s.currency === 'KHR' && s.price_minor > 0 && s.price_minor < 500) {
+      w.push({ field: at, issue: `${s.price_minor} KHR is implausibly low, dollars may have been read as riel` })
+    }
+    if (s.currency === 'USD' && s.price_minor > 100_000) {
+      w.push({ field: at, issue: `${s.price_minor} cents is implausibly high, riel may have been read as dollars` })
+    }
+    if (s.currency !== shop.default_currency) {
+      w.push({ field: at, issue: `priced in ${s.currency} but the shop default is ${shop.default_currency}` })
+    }
+    if (s.duration_min > 24 * 60 && s.unit === 'session') {
+      w.push({ field: at, issue: `${s.duration_min} minutes is over a day but the unit is "session"` })
+    }
+  }
+  for (const [i, h] of shop.hours.entries()) {
+    if (h.open >= h.close) {
+      w.push({ field: `hours[${i}]`, issue: `opens ${h.open} and closes ${h.close}` })
+    }
+  }
+  const days = shop.hours.map((h) => h.dow)
+  if (new Set(days).size !== days.length) {
+    w.push({ field: 'hours', issue: 'the same weekday appears more than once' })
+  }
+  return w
+}
+
+export type ParseResult = {
+  shop: ParsedShop
+  warnings: ParseWarning[]
+  model: string
+  cost_micro_usd: number
+  tokens_in: number
+  tokens_out: number
+}
+
+export async function parseShop(text: string): Promise<ParseResult> {
+  const trimmed = text.trim()
+  if (trimmed.length < 8) throw new Error('too short to parse')
+  if (trimmed.length > 8000) throw new Error('too long, keep it under 8000 characters')
+
+  const { result, ref } = await withFallback('parse', (model) =>
+    generateText({
+      model,
+      system: SYSTEM,
+      prompt: trimmed,
+      output: Output.object({ schema: ParsedShop }),
+      temperature: 0,
+      maxRetries: 1,
+    }),
+  )
+
+  const shop = result.output
+  const tokens_in = result.usage?.inputTokens ?? 0
+  const tokens_out = result.usage?.outputTokens ?? 0
+
+  return {
+    shop,
+    warnings: sanityCheck(shop),
+    model: ref,
+    tokens_in,
+    tokens_out,
+    cost_micro_usd: costMicroUsd(ref, tokens_in, tokens_out),
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "title": "Choose the visual world for Moni",
+  "question": "Fresh hand. The roll assigned The Invitation. Everything from round one is eliminated. Your pinned palette rides every card.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "The Invitation",
+      "kicker": "THE ROLL",
+      "lineage": "Khmer wedding invitation, សំបុត្រអញ្ជើញ",
+      "thesis": "A booking already is an invitation. A name, a time, a place, and a person who will receive you. The invitation is the most carefully designed piece of paper in Cambodian daily life and every household receives many, so its grammar is known by heart. Borrowing it turns a row in a database into someone the owner has invited, and turns the customer's confirmation into something she is glad to receive.",
+      "palette": ["#0F172A", "#059669", "#F8FAFC", "#475569"],
+      "materials": ["ruled frame with corner brackets", "one metallic ink", "deep ceremonial ground", "struck seal"],
+      "viewport": "Portrait phone, the screen is one invitation. A ruled border with kbach corner brackets in slate holds the whole surface. The shop name sits centred in Khmer under a hairline rule. A deep plate ink panel owns the upper third carrying today's takings in security green at display scale, Khmer numerals beneath at half scale, digit positions fixed so the number never reflows. Below it the day runs as compressed invitation rows: time in a bracket at the left, the customer's name largest in the centre field, service beneath it, a struck seal at the right. One full width primary button sits at the thumb line, three tabs under it.",
+      "risk": "Ceremony becomes decoration the moment the kbach turns floral or the ornament thickens, and then it reads as a wedding app rather than a working tool at six in the morning with a customer waiting. The discipline is ornament only as ruled corner brackets and one hairline frame, never more than twice per screen. Second risk, an invitation is a one off artifact and twenty of them stacked would feel heavy, so rows must be a compressed variant of the frame rather than twenty full cards.",
+      "raised": [
+        { "from": "Nixie laboratory counter", "raise": "Quantities are the interface. The takings figure owns a fixed region with fixed digit positions, so it never reflows as it grows through the day." },
+        { "from": "CRT arcade pixel glow", "raise": "State is a law of the system, not a one off style. Paid, waiting and cancelled render identically everywhere they appear, with no exceptions per screen." },
+        { "from": "Emigre bitmap specimen", "raise": "One face at decisive size steps, specimen style, so hierarchy comes from scale alone and never from adding another typeface." },
+        { "from": "Iridescent cloud edge", "raise": "The text field stays achromatic. Colour lands on structure, never on text meaning, so nothing on this surface is conveyed by colour alone." }
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "The Receipt Book",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "carbon duplicate receipt book, បង្កាន់ដៃ",
+      "thesis": "She writes one for every sale already. A booking is a numbered stub, the paid mark is the rubber stamp, and the customer's confirmation is the carbon copy she tears off and hands over.",
+      "palette": ["#F8FAFC", "#0F172A", "#059669", "#475569"],
+      "materials": ["perforated stub", "carbon ghost", "rubber stamp", "sequential numbering"],
+      "viewport": "Portrait phone. A numbered stub per booking, perforation running down the left, the stamp landing at the right when paid.",
+      "risk": "It ranked first on my list, which is exactly why the roll moved past it. It is the most literal answer available for a bookings and money product, and perforations plus carbon ghosting are one step from skeuomorphic pastiche."
+    },
+    {
+      "id": "challenger-labanotation",
+      "label": "The Score",
+      "verdict": "competitive",
+      "lineage": "Labanotation dance score",
+      "thesis": "The day as a vertical score read upward, where a block's height is exactly its duration and simultaneous work sits in parallel columns.",
+      "palette": ["#F8FAFC", "#0F172A", "#475569", "#059669"],
+      "materials": ["score paper", "shaded symbol blocks", "centre staff"],
+      "viewport": "Time flows bottom to top so the future is always above. Each booking is a block whose height is its length. Two chairs are two columns side by side. The current moment is a pale band across the staff.",
+      "case": "Wins product clarity outright and it is the best structural match in either hand. Duration as literal block height is exactly the resource calendar this product needs, parallel columns are exactly two chairs or twenty hotel rooms, columns thinning but never merging is exactly the mobile behaviour, and white paper with black blocks is both daylight legible and already your palette. Loses audience identification completely: dance notation is nowhere in a shop owner's world.",
+      "risk": "Reads as an engineering diagram. A non technical owner may not recognise it as her day at all.",
+      "board": "https://impeccable.style/worlds/cards/notation-diagram-systems-labanotation.webp",
+      "hero": "https://impeccable.style/worlds/cards/notation-diagram-systems-labanotation-hero.webp"
+    },
+    {
+      "id": "challenger-industrial",
+      "label": "Quoted Labels",
+      "verdict": "competitive",
+      "lineage": "industrial streetwear quote grammar",
+      "thesis": "Wayfinding is reading. Every zone carries its literal name in straight quotes, and anything cancelled takes a diagonal stripe across it.",
+      "palette": ["#F8FAFC", "#0F172A", "#059669", "#475569"],
+      "materials": ["hazard diagonal", "stencil label plates", "zip tie tag"],
+      "viewport": "Every region names itself in quotes. Cancelled bookings are struck through with a 45 degree stripe rather than turned red.",
+      "case": "Holds product clarity for the two things this audience needs most. Labelling everything literally is the right answer for a non technical user who may not read English, and striping a disabled item is a state marker that works without colour, which is exactly what the accessibility requirement demands. Loses audience identification: streetwear is globally legible but it is not her world, and the irony in the quotation marks does not translate.",
+      "risk": "The quotes read as a joke nobody in the room is in on.",
+      "board": "https://impeccable.style/worlds/cards/textiles-weave-drape-fashion-industrial-quote-grammar.webp",
+      "hero": "https://impeccable.style/worlds/cards/textiles-weave-drape-fashion-industrial-quote-grammar-hero.webp"
+    },
+    {
+      "id": "challenger-nixie",
+      "label": "Nixie Counter",
+      "verdict": "declined",
+      "lineage": "nixie tube laboratory counter",
+      "palette": ["#FF7A18", "#101014", "#8A8F98"],
+      "materials": ["glass envelope", "blackened steel chassis"],
+      "case": "Loses both axes. Nixie tubes are nowhere in this audience's world, and a blackened steel chassis with an orange glow fails the daylight test that decided this product's palette.",
+      "kept": "Quantities are the interface, with fixed digit positions that never reflow."
+    },
+    {
+      "id": "challenger-crt",
+      "label": "Arcade Phosphor",
+      "verdict": "declined",
+      "lineage": "CRT arcade pixel glow",
+      "palette": ["#0A0A0A", "#FFD700", "#38BDF8"],
+      "materials": ["scanline gaps", "sixteen colour sprite palette"],
+      "case": "Loses both axes. Phosphor black is unreadable in the sun, and encoding rarity and damage as palette law is the opposite of what a shop owner needs to read at a glance.",
+      "kept": "State as a law of the system, applied identically everywhere, never a one off."
+    },
+    {
+      "id": "challenger-emigre",
+      "label": "Bitmap Specimen",
+      "verdict": "declined",
+      "lineage": "Emigre bitmap type specimen",
+      "palette": ["#FFFFFF", "#111111", "#FF00A0"],
+      "materials": ["coarse bitmap letterforms", "halftone"],
+      "case": "Loses both axes, and one failure is disqualifying: Khmer coeng subscripts in a coarse bitmap face are unreadable at body size. A Khmer first product cannot ship a pixel display face.",
+      "kept": "Specimen repetition, one face at decisive size steps so hierarchy comes from scale rather than variety."
+    },
+    {
+      "id": "challenger-cloud",
+      "label": "Iridescent Edge",
+      "verdict": "declined",
+      "lineage": "diffracting cloud edge",
+      "palette": ["#FFFFFF", "#64748B", "#A7F3D0", "#C4B5FD"],
+      "materials": ["pastel spectral fringe", "wide white margins"],
+      "case": "Loses both axes. Pastel mint and violet fringes wash out entirely in direct sun and contradict the pinned palette, and an atmospheric optics metaphor says nothing to a shop owner.",
+      "kept": "The text field stays achromatic, colour touches structure only."
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "The SaaS dashboard, executed impeccably. Sidebar, white cards on a grey field, muted slate type, a stat row, a chart.",
+    "palette": ["#FFFFFF", "#0F172A", "#059669", "#F1F5F9"],
+    "materials": ["clean grid", "card shadows"],
+    "viewport": "The arrangement every judge has seen a hundred times, at full craft.",
+    "risk": "Indistinguishable from the other ninety nine applications by design."
+  },
+  "steer": true
+}
