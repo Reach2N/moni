@@ -2,6 +2,11 @@
 Local-business ops assistant. Owner types their shop in plain language; an AI assistant
 sells, books, and logs on their behalf.
 
+> **Note, 27 August 2026.** PLAN.md now defines the MVP and build order. The tiering in
+> Part 2 described the pre-submission demo; in the current plan Messenger is in the MVP
+> (dev mode first, Meta review in parallel). Parts 1, 3 and 4 (the failure-mode list,
+> competitor position, payment rails) remain accurate and load-bearing.
+
 Naming: application draft says **Danit**, this doc says **Moni**. Pick one before the demo
 video, the video, the domain, and the application field must match.
 

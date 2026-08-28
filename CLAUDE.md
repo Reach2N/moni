@@ -7,6 +7,11 @@ voice. Everything else is derived from that.
 Built for the AI in Motion program application. Deadline driven, so scope discipline
 beats feature count.
 
+**PLAN.md is the build order.** Read it after this file. It defines the MVP, the
+phases, and each phase's acceptance check. A session works on one phase and states
+which. FEATURES.md, UI-PLAN.md and DESIGN.md describe the earlier demo iteration
+and are superseded where they conflict with PLAN.md.
+
 ## Hard rules
 
 1. **No em dashes.** Not in UI copy, not in marketing text, not in AI output, not in
@@ -52,6 +57,15 @@ beats feature count.
 - **21st.dev is not blanket MIT.** Licence is per component and often blank, which means
   default copyright, not permissive. Only install components whose metadata says `mit` and
   credit the author. Free tier is 2 installs per day.
+- **Clerk supports Next 16 from `@clerk/nextjs` 7.2.5.** On Next 16 the middleware file
+  is `proxy.ts`, not `middleware.ts` (same contents). Scaffold with `npx clerk@latest init`,
+  keys via `clerk env pull`. `auth()` is async, always awaited.
+- **OpenRouter is the only LLM gateway** (decided 27 August 2026). `@openrouter/ai-sdk-provider`
+  plugs into the Vercel AI SDK; model refs are `openrouter:google/gemini-2.5-flash` style
+  slugs and live only in `src/lib/ai/models.ts`. Audio goes up as base64 `input_audio`
+  (`wav` and `webm` are reliable; `audio/mp4` was silently ignored per provider issue #393,
+  so never label voice notes mp4). Pure transcription can use
+  `POST /api/v1/audio/transcriptions`. Env: `OPENROUTER_API_KEY`.
 
 ## Component sourcing rule
 
@@ -114,6 +128,19 @@ its own default styling inside a committed design is a lapse, not a shortcut.
   compiler strips it. The impeccable direction contract has to survive the production build,
   so it is emitted through `dangerouslySetInnerHTML` on a `hidden` div in the root layout.
   Audit it with `curl -s localhost:3000/app | grep "seed f1fef148"`.
+- **Node and Chrome swap the km-KH number separators.** With
+  `{ numberingSystem: 'khmr' }`, Node (ICU 78) formats 15000 as `១៥.០០០` and 5.00 as `៥,០០`;
+  Chrome 151 formats them as `១៥,០០០` and `៥.០០`. On a server rendered page that is a
+  hydration mismatch on every money string and a decimal point that moves between SSR and
+  hydration. Never format a user facing quantity through a `km-KH` locale: group through
+  `en-US` and transliterate with `toKhmerDigits`. All of it lives in
+  `src/lib/format/khmer.ts` and nowhere else.
+- **shadcn's Tabs pins its active mark at `bottom-[-5px]`**, an offset tuned to its own
+  `p-[3px]` list. Any list that draws its own bottom border instead gets the mark floating
+  five pixels below that border as a stray rectangle in the content underneath. Its `h-9` is
+  also applied through a `group-data-*` variant, which tailwind-merge cannot dedupe against a
+  plain `h-*` utility, so a caller cannot set its own touch target height. Both are patched in
+  `src/components/ui/tabs.tsx`.
 - `noUncheckedIndexedAccess` is deliberately OFF for now. It is worth turning on after the
   demo ships, not during.
 
@@ -121,9 +148,11 @@ its own default styling inside a committed design is a lapse, not a shortcut.
 
 - **Supabase project `Moni`**, ref `roorkzxyoyacychgrktt`, region `ap-southeast-1`
   (Singapore, closest to Cambodia and matching the other projects on the account).
-  Schema applied as tracked migration `supabase/migrations/20260819000001_moni_schema.sql`,
-  seed applied over MCP. Verified live: 2 businesses, 7 services, 5 bookings, 2 payments,
-  9 messages, 14 tables, 5 views.
+  Schema applied as tracked migrations (`20260819000001_moni_schema`, then on 27 August
+  `20260827171639_platform_waitlist_channels` and `20260827172045_security_lockdown`),
+  seed applied over MCP. Live: 16 tables, 5 views, RLS on everywhere with zero policies.
+  The free tier PAUSES the project after ~a week idle (hit 27 August, status INACTIVE);
+  restore over MCP or the dashboard and wait for ACTIVE_HEALTHY, about three minutes.
 - The db password is in `.env.local` as `SUPABASE_DB_PASSWORD` and nowhere else. Supabase
   shows it once. It belongs in a password manager.
 - **The Supabase access token lives in the macOS Keychain**, service `Supabase CLI`, not in
@@ -143,20 +172,30 @@ its own default styling inside a committed design is a lapse, not a shortcut.
 ## Commands
 
 ```bash
-npm run db:test     # applies schema.sql + seed.sql to a real Postgres (PGlite/WASM)
-                    # and runs 68 assertions. Run this after ANY schema change.
+npm run db:test       # applies schema.sql + seed.sql to a real Postgres (PGlite/WASM)
+                      # and runs 80 assertions. Run this after ANY schema change.
+npm run test:signals  # the notice board's rules, including the first-run and
+                      # channel-down states no seed data can ever show. No server.
+npm run shoot         # desktop + mobile + mobile-viewport captures via CDP
 ```
 
 ## Layout
 
 ```
-db/schema.sql       14 tables, 5 views, RLS written and commented out until auth lands
+db/schema.sql       16 tables, 5 views. RLS ON everywhere with zero policies (deny by
+                    default, service role only); Clerk member policies commented until Phase 2
 db/seed.sql         two demo businesses: a salon (sessions) and a guesthouse (nights)
-db/test.mjs         the proof. 68 assertions, no server required
+db/test.mjs         the proof. 80 assertions, no server required
+src/lib/format/khmer.ts   every user facing quantity. One implementation, on purpose
+src/lib/queries/signals.ts what the shop needs from its owner, ranked. Pure, and tested
+src/components/app/panel.tsx  the panel grammar: header, rows, note, count badge
 src/lib/types.ts    source of truth: money, taxonomies, row types, tool surface, plans
 src/lib/payments.ts KHQR provider adapter interface. Provider choice is config
-FEATURES.md         feature tiers, the unglamorous feature list, competitor position
-UI-PLAN.md          page by page build plan and component inventory
+src/lib/ai/models.ts the only file allowed to name a model or provider
+PLAN.md             THE build order: MVP definition, phases, acceptance checks
+FEATURES.md         feature tiers and competitor position (pre-plan, still useful)
+UI-PLAN.md          earlier iteration's UI plan, superseded where it conflicts
+DESIGN.md           earlier "Invitation" design system, superseded by PLAN.md section 3
 ```
 
 ## Things already decided, do not relitigate
@@ -179,7 +218,30 @@ UI-PLAN.md          page by page build plan and component inventory
   plus a unique constraint permanently strands any customer whose QR lapsed unpaid.
 - Free tier is 100 transactions per month, where a transaction is a booking that reached
   confirmed or completed, plus standalone paid sales. Metered in `v_month_usage`.
-- Auth and RLS are deferred, not forgotten. The policies are written in schema.sql.
+  Revenue model is per successful transaction: free to use, charged when the shop gets paid.
+- Auth is **Clerk** (PLAN.md Phase 2). Customers never log in, only owners. Since
+  27 August 2026 **RLS is ON for every table with zero policies**: deny by default, the
+  service role is the only way in, so the open-Data-API hole is closed before anything
+  public deploys. Phase 2 adds the member policies (written and commented in schema.sql,
+  keyed on `auth.jwt()->>'sub'` because Clerk user ids are text, not uuid). Views are
+  `security_invoker` and `moni_touch` has a pinned search_path, per Supabase advisors.
+- **OpenRouter** is the LLM gateway, decided 27 August 2026. Gemini-family models stay the
+  default because they handle Khmer, voice and instruction-following well. Nothing outside
+  `src/lib/ai/models.ts` may name a provider or model.
+- The domain is **moni.cam**, RDAP-verified unregistered on 27 August 2026, NOT yet
+  purchased. Everything runs on vercel.app URLs until it is bought, so it gates launch,
+  not work. Wildcard `*.moni.cam` is reserved in planning for future generated shop sites.
+- Design direction is **black and white with a single green accent, Apple-native style**
+  (PLAN.md section 3). Tokens use Apple semantic names so a future SwiftUI app maps 1:1.
+  The earlier "Invitation" system is retired.
+- **API-first**: every capability is an HTTP endpoint under `src/app/api/` with a JSON
+  contract, so a native Swift client can later do everything the web app does. No server
+  actions for business operations.
+- The landing page ships first, with a waitlist positioned as a founding-shops application.
+  The public site shows ONLY the waitlist. The product lives on the app subdomain
+  (app.moni.cam once bought, vercel.app until then) behind a gate: after Clerk sign-in,
+  the email must be in `waitlist` or manually approved (`approved_at`). The gate is one
+  `requireMember()` helper so launch is deleting one call site.
 - Hotels, courts and tailoring jobs need no new tables. Resource plus range covers them.
 
 ## Known gaps
@@ -202,7 +264,10 @@ UI-PLAN.md          page by page build plan and component inventory
   - If self hosting ever becomes a requirement, TypeTogether must be contacted for a
     perpetual webfont quote. Desktop prices are published: complete 12-font package
     USD 567.53, individual styles from about USD 74. Webfont tier prices are not published.
-- Domain, checked by RDAP on 19 August 2026. Bare `moni` and bare `mony` are gone on
+- Domain, settled: **moni.cam**, verified unregistered by RDAP on 27 August 2026
+  (CentralNic registry), not yet purchased. The 19 August survey below stands as the
+  record of what else was open:
+  bare `moni` and bare `mony` are gone on
   .com, .app, .dev, .io, .co, .me, .cc, .asia, .tech, .pro and .systems.
   **Available .com:** `monikhmer.com`, `monykh.com`, `monykhmer.com`.
   **Available other:** `moni.shop`, `moni.biz`, `moni.site`, `moni.online`, `moni.link`,

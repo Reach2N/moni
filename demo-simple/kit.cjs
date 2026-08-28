@@ -1,0 +1,73 @@
+// Four one-idea explainers, 1440 square. Light register: warm paper, ink, one
+// gilt accent, green only for the moment something lands. Three beats each,
+// nothing on screen that is not the point.
+const S = 1440;
+
+const CSSFOR = () => `
+@font-face{font-family:Busra;src:url("assets/fonts/Busra-Regular.woff2") format("woff2");font-weight:400}
+@font-face{font-family:Busra;src:url("assets/fonts/Busra-Medium.woff2") format("woff2");font-weight:500}
+@font-face{font-family:Busra;src:url("assets/fonts/Busra-SemiBold.woff2") format("woff2");font-weight:600}
+@font-face{font-family:Busra;src:url("assets/fonts/Busra-Bold.woff2") format("woff2");font-weight:700}
+:root{--paper:#f6f4ef;--ink:#14181c;--dim:#6b6862;--line:#ddd7c9;--gold:#8f6316;--goldL:#c99a3c;--goldS:#f6eeda;--green:#1b6b45;--greenS:#e6f0ea;
+  --sans:-apple-system,"SF Pro Display","Helvetica Neue",Arial,sans-serif;--km:Busra,-apple-system,sans-serif;--dp:-apple-system,"SF Pro Display","Khmer OS Muol Light",sans-serif}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+html,body{width:${S}px;height:${S}px;overflow:hidden;background:var(--paper)}
+body{font-family:var(--sans);color:var(--ink)}
+.km{font-family:var(--km);line-height:1.75}
+.dp{font-family:var(--dp)}
+.tn{font-variant-numeric:tabular-nums}
+#root{position:relative;width:${S}px;height:${S}px;overflow:hidden;background:var(--paper)}
+.clip{position:absolute;inset:0}
+.frame{position:absolute;inset:44px;border:1px solid var(--line)}
+.idx{position:absolute;left:92px;top:88px;display:flex;align-items:center;gap:16px;font-size:26px;color:var(--dim);opacity:0}
+.h1{position:absolute;left:92px;right:92px;top:168px;font-size:78px;line-height:1.5;opacity:0}
+.stage{position:absolute;left:92px;right:92px;top:330px;height:660px}
+.layer{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;opacity:0}
+.lead{font-size:30px;color:var(--dim);text-align:center}
+.cap{position:absolute;left:92px;right:92px;bottom:190px;font-size:42px;line-height:1.7;color:var(--ink);opacity:0}
+.sub{position:absolute;left:92px;right:92px;bottom:128px;font-size:30px;color:var(--dim);opacity:0}
+.foot{position:absolute;left:92px;bottom:74px;display:flex;align-items:center;gap:16px;opacity:0}
+.foot .w{font-size:28px;letter-spacing:7px;color:var(--gold)}
+.card{background:#fff;border:1px solid var(--line);padding:28px}
+.bub{max-width:82%;padding:32px 40px;font-size:46px;border:1px solid var(--line);background:#fff;opacity:0}
+.bub.me{margin-left:auto;background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.stamp{display:inline-flex;align-items:center;gap:14px;background:var(--greenS);border:1px solid rgba(27,107,69,.35);color:var(--green);font-size:28px;font-weight:600;padding:14px 24px;opacity:0}
+.big{font-size:96px;font-weight:600;letter-spacing:-2px;line-height:1.15}
+.big small{font-size:44px;color:var(--dim)}
+`;
+
+const I = {
+  mark: (s = 44) => `<svg width="${s}" height="${s}" viewBox="0 0 36 36"><rect width="36" height="36" rx="9" fill="#14181c"/><rect x="3" y="3" width="30" height="30" rx="6.5" fill="none" stroke="#8f6316" stroke-width="1"/><path d="M10.4 25.6V10.4h3.9l4.2 7.4 4.2-7.4h3.9v15.2h-3.6v-8.9l-3.6 6.3h-1.8l-3.6-6.3v8.9Z" fill="#c99a3c"/></svg>`,
+  check: (c = '#1b6b45', s = 30) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+  arrow: (c = '#8f6316', w = 120) => `<svg width="${w}" height="40" viewBox="0 0 120 40" fill="none" stroke="${c}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h108"/><path d="M96 8l16 12-16 12"/></svg>`,
+};
+
+const page = ({ id, duration, extraCss = '', body, script }) => `<!doctype html>
+<html lang="km">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=${S}, height=${S}" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"><\/script>
+    <style>${CSSFOR()}${extraCss}</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="${id}" data-start="0" data-width="${S}" data-height="${S}" data-duration="${duration}" data-fps="30">
+      <div id="scene" class="clip" data-start="0" data-duration="${duration}" data-track-index="0" data-layout-allow-overlap>
+        <div class="frame"></div>
+${body}
+      </div>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const E = "power3.out";
+      const rise = (sel, t, d = 0.6, y = 26) => tl.fromTo(sel, { y, opacity: 0 }, { y: 0, opacity: 1, duration: d, ease: E }, t);
+      const pop = (sel, t, d = 0.6) => tl.fromTo(sel, { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: d, ease: E }, t);
+${script}
+      window.__timelines["${id}"] = tl;
+    <\/script>
+  </body>
+</html>
+`;
+
+module.exports = { S, I, page };

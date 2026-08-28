@@ -1,11 +1,17 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Moni',
   description:
-    'Describe your shop in plain language. Moni answers your customers, books them in, and takes payment by KHQR.',
+    'Run a Cambodian shop in plain language. Moni organizes the catalogue, plans the day, books customers, and hands uncertain conversations to the owner.',
   metadataBase: new URL('https://monikhmer.com'),
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 /**
@@ -46,18 +52,15 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           hidden
           dangerouslySetInnerHTML={{
             __html: `<!--
-  THESIS: A booking already is an invitation, a name and a time and someone who will
-  receive you. Refuses the SaaS dashboard's card grid and stat row.
+  THESIS: The owner sees what requires her now, tells Moni what to handle, and watches
+  the shop plan change. Refuses a revenue CMS and a customer-booking-only dashboard.
   OWN-WORLD: Khmer wedding invitation. Note paper #F8FAFC as the single ground, plate
   ink #0F172A, ruled ornament #475569, one metallic ink #059669. Ruled frame, kbach
   corner brackets, centred plate, struck seals. One family, Busra.
-  STORY: She sees what was collected, who she has invited today, then what needs her.
-  FIRST VIEWPORT: the shop plate framed and centred at display scale under a
-  hairline; the compose box that turns a paragraph into a price list; then the ink
-  panel carrying takings in metallic ink at fixed digit positions; then the ruled
-  ledger, time bracket left, name largest, seal right; then what needs her. Two
-  rule weights: the frame is the light course, the kbach bracket the heavy one in
-  plate ink. Bottom nav pinned to the viewport, not to the document end.
+  STORY: She sees what needs her now, gives Moni one task, then reads the changed day.
+  FIRST VIEWPORT: a compact framed shop plate; one ink region for what needs her;
+  one task-oriented Moni control; then the ruled day ledger with appointments and
+  meaningful gaps. Bottom nav is Moni, Day, Inbox and stays pinned to the viewport.
   FORM: The Invitation, candidate 4 of the grounded list, seed f1fef148.
   FINISH: unreviewed and undocumented is unfinished; this build ends with the finish
   review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.

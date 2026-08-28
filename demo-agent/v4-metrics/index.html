@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="km">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=2560, height=1440" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+@font-face { font-family: Busra; src: url("assets/fonts/Busra-Regular.woff2") format("woff2"); font-weight: 400 }
+@font-face { font-family: Busra; src: url("assets/fonts/Busra-Medium.woff2") format("woff2"); font-weight: 500 }
+@font-face { font-family: Busra; src: url("assets/fonts/Busra-SemiBold.woff2") format("woff2"); font-weight: 600 }
+@font-face { font-family: Busra; src: url("assets/fonts/Busra-Bold.woff2") format("woff2"); font-weight: 700 }
+:root{
+  --ink:#14181c; --ink2:#1b2126; --paper:#f6f4ef; --dim:#c3bdb0; --dim2:#9a958b;
+  --gold:#e8b455; --gold-d:#a9761e; --green:#4bbd85; --green-d:#1b6b45; --clay:#e07a63;
+  --line:rgba(232,180,85,.2); --line2:rgba(246,244,239,.11);
+  --sans:-apple-system,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  --km:Busra,-apple-system,sans-serif;
+  --dp:-apple-system,"SF Pro Display","Khmer OS Muol Light",sans-serif;
+  --mono:"SF Mono","JetBrains Mono",ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+html,body{width:2560px;height:1440px;overflow:hidden;background:#0b0e11}
+body{font-family:var(--sans);color:var(--paper)}
+.km{font-family:var(--km);line-height:1.75}
+.dp{font-family:var(--dp);letter-spacing:.4px}
+.mono{font-family:var(--mono);letter-spacing:-.2px}
+.tn{font-variant-numeric:tabular-nums}
+#root{position:relative;width:2560px;height:1440px;overflow:hidden}
+.clip{position:absolute;inset:0}
+
+.bg{position:absolute;inset:0;background:var(--ink)}
+.bg-wash{position:absolute;inset:0;background:radial-gradient(1500px 1000px at 70% 10%,rgba(232,180,85,.10),transparent 60%)}
+.bg-grid{position:absolute;inset:0;opacity:.45;background-image:linear-gradient(rgba(246,244,239,.032) 1px,transparent 1px),linear-gradient(90deg,rgba(246,244,239,.032) 1px,transparent 1px);background-size:160px 160px}
+
+/* header */
+.hdr{position:absolute;left:80px;right:80px;top:56px;height:80px;display:flex;align-items:center;gap:22px;opacity:0}
+.hdr .ttl{font-size:38px}
+.hdr .sub{font-size:22px;color:var(--dim2);margin-top:2px}
+.chip{margin-left:auto;display:flex;align-items:center;gap:14px;border:1px solid var(--line);padding:14px 24px;font-size:24px;color:var(--gold)}
+.chip .pulse{width:14px;height:14px;border-radius:50%;background:var(--gold)}
+.chip.ok{border-color:rgba(75,189,133,.55);color:var(--green)}
+.chip.ok .pulse{background:var(--green)}
+.chipdone{position:absolute;right:80px;top:56px;height:80px;display:flex;align-items:center;gap:14px;border:1px solid rgba(75,189,133,.55);padding:14px 24px;font-size:24px;color:var(--green);opacity:0}
+
+/* panes */
+.pane{position:absolute;border:1px solid var(--line2);background:rgba(246,244,239,.028);opacity:0}
+.pane-h{height:84px;display:flex;align-items:center;gap:16px;padding:0 30px;border-bottom:1px solid var(--line2);font-size:24px;color:var(--dim)}
+.pane-b{padding:30px}
+
+/* conversation */
+.who{display:flex;align-items:center;gap:14px;font-size:22px;color:var(--dim2);margin-bottom:12px}
+.owner{border:1px solid var(--line2);background:rgba(246,244,239,.05);padding:24px 28px;font-size:28px;opacity:0}
+.agent{padding:0 4px;font-size:28px;line-height:1.85}
+.tok{opacity:0}
+.caret{display:inline-block;width:4px;height:32px;background:var(--gold);vertical-align:-6px;margin-left:6px;opacity:0}
+.attach{display:flex;align-items:center;gap:16px;margin-top:18px;border:1px solid var(--line2);padding:14px 18px}
+.attach img{width:64px;height:64px;object-fit:cover}
+.attach .t{font-size:22px;color:var(--dim)}
+
+/* tool calls */
+.tool{display:flex;align-items:center;gap:18px;padding:20px 0;border-bottom:1px solid var(--line2);opacity:0}
+.tool:last-child{border-bottom:0}
+.tool .ic{width:40px;height:40px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;position:relative}
+.tool .nm{font-size:24px;color:var(--paper)}
+.tool .st{margin-left:auto;font-size:21px;color:var(--dim2);position:relative;min-width:250px;height:34px}
+.tool .st .run{position:absolute;right:0;top:0;white-space:nowrap}
+.tool .st .fin{position:absolute;right:0;top:0;white-space:nowrap;color:var(--green);opacity:0;display:flex;align-items:center;gap:10px}
+.tprog{position:absolute;left:0;bottom:0;height:2px;background:var(--gold);width:100%;transform-origin:left center}
+
+/* rows landing in a table */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-size:21px;font-weight:500;color:var(--dim2);padding:0 0 16px;border-bottom:1px solid var(--line2)}
+.tbl td{font-size:25px;padding:19px 0;border-bottom:1px solid var(--line2)}
+.tbl tr.r{opacity:0}
+.tbl td.g{color:var(--gold)}
+.tbl td.d{color:var(--dim)}
+
+/* warning */
+.warn{display:flex;align-items:center;gap:20px;border:1px solid rgba(224,122,99,.5);background:rgba(224,122,99,.1);padding:22px 26px;font-size:24px;color:var(--clay);opacity:0}
+.warn.fixed{border-color:rgba(75,189,133,.5);background:rgba(75,189,133,.1);color:var(--green)}
+.warnfix{display:flex;align-items:center;gap:20px;border:1px solid rgba(75,189,133,.5);background:rgba(75,189,133,.1);padding:22px 26px;font-size:24px;color:var(--green);opacity:0}
+
+/* result strip */
+.done{display:flex;align-items:center;gap:20px;border:1px solid rgba(75,189,133,.5);background:rgba(75,189,133,.1);padding:26px 30px;font-size:28px;color:var(--green);opacity:0}
+
+/* numbers and bars */
+.stat{border:1px solid var(--line2);padding:26px 28px;opacity:0}
+.stat .k{font-size:21px;color:var(--dim2)}
+.stat .v{font-size:56px;font-weight:600;letter-spacing:-1.5px;margin-top:6px}
+.stat .v small{font-size:26px;color:var(--dim)}
+.foot{position:absolute;left:80px;right:80px;top:1206px;padding-top:26px;border-top:1px solid var(--line2);display:flex;align-items:center;gap:20px;font-size:26px;color:var(--dim);opacity:0}
+.foot .tag{color:var(--gold)}
+.ph{font-size:28px;color:var(--dim2);display:flex;align-items:center;gap:14px}
+.bars{display:flex;align-items:flex-end;gap:20px;height:250px}
+.barcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:14px}
+.bar{width:100%;background:var(--gold);transform-origin:bottom center}
+.barcol .lb{font-size:20px;color:var(--dim2)}
+
+.stats{display:flex;gap:26px}
+.stats .stat{flex:1}
+.chartwrap{margin-top:38px;border:1px solid var(--line2);padding:30px;opacity:0}
+.chartwrap .ttl{font-size:22px;color:var(--dim2);margin-bottom:26px}
+.rec{display:flex;align-items:center;gap:20px;border:1px solid var(--line);background:rgba(232,180,85,.08);padding:24px 28px;font-size:26px;color:var(--gold);margin-top:32px;opacity:0}</style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="v4" data-start="0" data-width="2560" data-height="1440" data-duration="19" data-fps="30">
+      <div id="bg" class="clip" data-start="0" data-duration="19" data-track-index="0">
+        <div class="bg"></div><div class="bg-grid"></div><div class="bg-wash"></div>
+      </div>
+      <div id="scene" class="clip" data-start="0" data-duration="19" data-track-index="1" data-layout-allow-overlap>
+
+
+        <div class="hdr" id="hdr">
+          <svg width="64" height="64" viewBox="0 0 36 36"><rect width="36" height="36" rx="9" fill="#1b2126"/><rect x="3" y="3" width="30" height="30" rx="6.5" fill="none" stroke="#a9761e" stroke-width="1"/><path d="M10.4 25.6V10.4h3.9l4.2 7.4 4.2-7.4h3.9v15.2h-3.6v-8.9l-3.6 6.3h-1.8l-3.6-6.3v8.9Z" fill="#e8b455"/></svg>
+          <div><div class="ttl km">មើលលទ្ធផល</div><div class="sub km">ភ្នាក់ងារវិភាគរាយការណ៍អ្វីដែលកើតឡើងសប្តាហ៍នេះ</div></div>
+          <div class="chip km" id="chip"><span class="pulse" id="pulse"></span>កំពុងដំណើរការ</div>
+        </div>
+        <div class="chipdone km" id="chipdone"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4bbd85" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> រួចរាល់</div>
+        <div class="pane" id="paneL" style="left:80px;top:180px;width:900px;height:960px">
+          <div class="pane-h km"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#e8b455" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.8-.9L3 20.5l1.5-4.7A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/></svg> ការសន្ទនាជាមួយ Moni</div>
+          <div class="pane-b">
+            <div class="owner km" id="o1">សប្តាហ៍នេះលក់បានយ៉ាងម៉េចដែរបង?</div>
+            <div style="margin-top:28px"><div class="agent km" id="a1"><span class="tok">ខ្ញុំកំពុងអានទិន្នន័យ</span> <span class="tok">៧</span> <span class="tok">ថ្ងៃចុងក្រោយ</span><span class="caret" id="a1-c"></span></div></div>
+            <div style="margin-top:24px">
+              
+<div class="tool" id="t1">
+  <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e8b455" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg><div class="tprog" id="t1-p"></div></div>
+  <div class="nm mono">metrics.query(range: 7d)</div>
+  <div class="st km"><span class="run" id="t1-run">កំពុងអាន</span><span class="fin" id="t1-fin"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4bbd85" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ១៦៨ សារ · ២៣ ការកម្មង់</span></div>
+</div>
+              
+<div class="tool" id="t2">
+  <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e8b455" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v2.6M12 18.8v2.6M21.4 12h-2.6M5.2 12H2.6M18.6 5.4l-1.9 1.9M7.3 16.7l-1.9 1.9M18.6 18.6l-1.9-1.9M7.3 7.3 5.4 5.4"/></svg><div class="tprog" id="t2-p"></div></div>
+  <div class="nm mono">analyze.trends()</div>
+  <div class="st km"><span class="run" id="t2-run">កំពុងវិភាគ</span><span class="fin" id="t2-fin"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4bbd85" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ថ្ងៃសៅរ៍ខ្ពស់បំផុត</span></div>
+</div>
+              
+<div class="tool" id="t3">
+  <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e8b455" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><div class="tprog" id="t3-p"></div></div>
+  <div class="nm mono">stock.forecast(7d)</div>
+  <div class="st km"><span class="run" id="t3-run">កំពុងព្យាករ</span><span class="fin" id="t3-fin"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4bbd85" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ទំហំ ៣៨ ជិតអស់</span></div>
+</div>
+            </div>
+            <div style="margin-top:26px"><div class="agent km" id="a2"><span class="tok">សារ</span> <span class="tok">១៦៨</span> <span class="tok">ត្រូវបានឆ្លើយ</span> <span class="tok">៩៤%</span> <span class="tok">ដោយស្វ័យប្រវត្តិ។</span> <span class="tok">ថ្ងៃសៅរ៍មានអតិថិជនច្រើនជាងថ្ងៃធម្មតា</span> <span class="tok">៣</span> <span class="tok">ដង។</span><span class="caret" id="a2-c"></span></div></div>
+            <div class="warn km" id="warn" style="margin-top:26px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#e07a63" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18.4A2 2 0 0 0 3.5 21.4h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9.4v4.4M12 17.4h.01"/></svg> ស្តុកទំហំ ៣៨ នៅ ២ គូ · នឹងអស់ក្នុង ៣ ថ្ងៃ</div>
+          </div>
+        </div>
+        <div class="pane" id="paneR" style="left:1020px;top:180px;width:1460px;height:960px">
+          <div class="pane-h km"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#e8b455" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg> លទ្ធផល ៧ ថ្ងៃចុងក្រោយ</div>
+          <div class="pane-b">
+            <div class="stats">
+              <div class="stat" id="s1"><div class="k km">សារបានឆ្លើយ</div><div class="v km tn">១៦៨</div></div>
+              <div class="stat" id="s2"><div class="k km">ឆ្លើយស្វ័យប្រវត្តិ</div><div class="v km tn">៩៤<small>%</small></div></div>
+              <div class="stat" id="s3"><div class="k km">ចំណូល</div><div class="v km tn">៨៤២.៥០<small>$</small></div></div>
+            </div>
+            <div class="chartwrap" id="chart">
+              <div class="ttl km">សារដែលបានឆ្លើយក្នុងមួយថ្ងៃ</div>
+              <div class="bars">
+                <div class="barcol"><div class="bar" id="b1" style="height:96px"></div><div class="lb km">ច</div></div><div class="barcol"><div class="bar" id="b2" style="height:128px"></div><div class="lb km">អ</div></div><div class="barcol"><div class="bar" id="b3" style="height:112px"></div><div class="lb km">ព</div></div><div class="barcol"><div class="bar" id="b4" style="height:150px"></div><div class="lb km">ព្រ</div></div><div class="barcol"><div class="bar" id="b5" style="height:176px"></div><div class="lb km">សុ</div></div><div class="barcol"><div class="bar" id="b6" style="height:232px"></div><div class="lb km">ស</div></div><div class="barcol"><div class="bar" id="b7" style="height:188px"></div><div class="lb km">អា</div></div>
+              </div>
+            </div>
+            <div class="rec km" id="rec"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e8b455" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ស្នើ៖ បញ្ជាទិញបន្ថែម ១០ គូ ទំហំ ៣៨ មុនថ្ងៃសៅរ៍</div>
+          </div>
+        </div>
+        <div class="foot km" id="foot"><svg width="38" height="38" viewBox="0 0 36 36"><rect width="36" height="36" rx="9" fill="#1b2126"/><rect x="3" y="3" width="30" height="30" rx="6.5" fill="none" stroke="#a9761e" stroke-width="1"/><path d="M10.4 25.6V10.4h3.9l4.2 7.4 4.2-7.4h3.9v15.2h-3.6v-8.9l-3.6 6.3h-1.8l-3.6-6.3v8.9Z" fill="#e8b455"/></svg><span class="tag">ភ្នាក់ងារវិភាគ</span><span>មិនត្រឹមរាយការណ៍ វាស្នើអ្វីដែលត្រូវធ្វើបន្ត</span></div>
+      </div>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const E = "power3.out";
+      const say = (sel, t, step = 0.055) => tl.to(sel + " .tok", { opacity: 1, duration: 0.01, stagger: step, ease: "none" }, t);
+      const rise = (sel, t, d = 0.55, y = 22) => tl.fromTo(sel, { y, opacity: 0 }, { y: 0, opacity: 1, duration: d, ease: E }, t);
+      const runTool = (id, t, len) => {
+        tl.fromTo("#" + id, { x: -16, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: E }, t)
+          .set("#" + id + "-p", { scaleX: 0 }, 0)
+          .to("#" + id + "-p", { scaleX: 1, duration: len, ease: "power1.inOut" }, t + 0.15)
+          .to("#" + id + "-run", { opacity: 0, duration: 0.25 }, t + len + 0.1)
+          .to("#" + id + "-fin", { opacity: 1, duration: 0.35 }, t + len + 0.15)
+          .to("#" + id + "-p", { opacity: 0, duration: 0.3 }, t + len + 0.2);
+      };
+
+      rise("#hdr", 0.2, 0.6, 14);
+      tl.fromTo("#pulse", { scale: 1 }, { scale: 0.45, duration: 0.55, repeat: 12, yoyo: true, ease: "sine.inOut" }, 0.6);
+      tl.fromTo("#paneL", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.55)
+        .fromTo("#paneR", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.7);
+      rise("#o1", 1.0);
+      say("#a1", 1.9); tl.fromTo("#a1-c", { opacity: 0 }, { opacity: 1, duration: 0.3, repeat: 5, yoyo: true, ease: "none" }, 2.0);
+      runTool("t1", 2.9, 1.3);
+      ["#s1","#s2","#s3"].forEach((s, i) => rise(s, 4.4 + i * 0.3, 0.5, 18));
+      runTool("t2", 5.6, 1.4);
+      tl.fromTo("#chart", { opacity: 0 }, { opacity: 1, duration: 0.5 }, 6.4);
+      tl.set("#b1", { scaleY: 0 }, 0).to("#b1", { scaleY: 1, duration: 0.55, ease: "power2.out" }, 6.70);
+      tl.set("#b2", { scaleY: 0 }, 0).to("#b2", { scaleY: 1, duration: 0.55, ease: "power2.out" }, 6.84);
+      tl.set("#b3", { scaleY: 0 }, 0).to("#b3", { scaleY: 1, duration: 0.55, ease: "power2.out" }, 6.98);
+      tl.set("#b4", { scaleY: 0 }, 0).to("#b4", { scaleY: 1, duration: 0.55, ease: "power2.out" }, 7.12);
+      tl.set("#b5", { scaleY: 0 }, 0).to("#b5", { scaleY: 1, duration: 0.55, ease: "power2.out" }, 7.26);
+      tl.set("#b6", { scaleY: 0 }, 0).to("#b6", { scaleY: 1, duration: 0.55, ease: "power2.out" }, 7.40);
+      tl.set("#b7", { scaleY: 0 }, 0).to("#b7", { scaleY: 1, duration: 0.55, ease: "power2.out" }, 7.54);
+      runTool("t3", 8.4, 1.5);
+      say("#a2", 9.6, 0.07);
+      tl.fromTo("#a2-c", { opacity: 0 }, { opacity: 1, duration: 0.3, repeat: 9, yoyo: true, ease: "none" }, 9.7);
+      rise("#warn", 12.4, 0.55, 14);
+      rise("#rec", 13.4, 0.6, 16);
+      tl.to("#chip", { opacity: 0, duration: 0.3 }, 13.8).to("#chipdone", { opacity: 1, duration: 0.4 }, 14.0);
+      rise("#foot", 14.4, 0.6, 14);
+      window.__timelines["v4"] = tl;
+    </script>
+  </body>
+</html>

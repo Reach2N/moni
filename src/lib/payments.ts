@@ -117,10 +117,15 @@ const minorToMajor = (minor: number, currency: CurrencyCode): number =>
 const majorToMinor = (major: unknown, currency: CurrencyCode): number =>
   Math.round(Number(major) * 10 ** CURRENCIES[currency].decimals)
 
-async function readJson(res: Response): Promise<Record<string, any>> {
+type JsonRecord = Record<string, unknown>
+
+const jsonRecord = (value: unknown): JsonRecord | null =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as JsonRecord) : null
+
+async function readJson(res: Response): Promise<JsonRecord> {
   const text = await res.text()
   try {
-    return text ? JSON.parse(text) : {}
+    return jsonRecord(text ? JSON.parse(text) : {}) ?? { _unparseable: text.slice(0, 500) }
   } catch {
     return { _unparseable: text.slice(0, 500) }
   }
@@ -278,11 +283,17 @@ export function localKhqrAdapter(cfg: {
         if (!res.ok) throw new ProviderError(`relay returned ${res.status}`, res.status)
         // Bakong convention: responseCode 0 means found and settled.
         if (raw.responseCode !== 0) return { status: 'pending', raw }
-        const amount_minor = majorToMinor(raw.data?.amount, currency)
+        const data = jsonRecord(raw.data)
+        const amount_minor = majorToMinor(data?.amount, currency)
         if (!amountsMatch(expected_minor, amount_minor)) {
           return { status: 'pending', amount_minor, raw }
         }
-        return { status: 'paid', provider_txn_id: raw.data?.hash, amount_minor, raw }
+        return {
+          status: 'paid',
+          provider_txn_id: typeof data?.hash === 'string' ? data.hash : undefined,
+          amount_minor,
+          raw,
+        }
       } finally {
         clearTimeout(t)
       }

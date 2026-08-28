@@ -1,0 +1,84 @@
+<!doctype html><html lang="km"><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+html,body{width:1080px;height:1440px;overflow:hidden;background:#000}
+body{font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,"Khmer Sangam MN",sans-serif}
+.km{font-family:-apple-system,"SF Pro Text","Helvetica Neue","Khmer Sangam MN",sans-serif;line-height:1.75}
+.screen{position:absolute;top:0;left:0;width:540px;height:720px;transform:scale(2);transform-origin:0 0;overflow:hidden;background:#fff}
+.sb{height:54px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 6px;font-size:15px;font-weight:600;letter-spacing:.2px}
+.sb .r{display:flex;align-items:center;gap:5px}
+.spacer{flex:1}
+img{display:block}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Regular.woff2") format("woff2");font-weight:400}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Medium.woff2") format("woff2");font-weight:500}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-SemiBold.woff2") format("woff2");font-weight:600}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Bold.woff2") format("woff2");font-weight:700}
+
+.hd{height:56px;background:#00B14F;display:flex;align-items:center;gap:12px;padding:0 16px;color:#fff}
+.hd .t{font-size:16px;font-weight:600}
+.map{position:relative;height:262px;background:#EAEFE8;overflow:hidden}
+.sheet{position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -6px 22px rgba(0,0,0,.12);padding:15px 17px 18px}
+.grab{width:38px;height:5px;border-radius:3px;background:#DCDFE3;margin:0 auto 13px}
+.st{font-size:16px;font-weight:700;color:#1C1C1C}
+.sub{font-size:12px;color:#6B7280;margin-top:2px}
+.drv{display:flex;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid #EEF0F2}
+.drv .nm{font-size:14.5px;font-weight:600}
+.drv .pl{font-size:12px;color:#6B7280}
+.plate{margin-left:auto;background:#F2F4F6;border-radius:7px;padding:6px 11px;font-size:13px;font-weight:700;letter-spacing:.4px}
+.ord{display:flex;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid #EEF0F2}
+.stops{margin-top:14px;padding-top:14px;border-top:1px solid #EEF0F2}
+.stop{display:flex;gap:11px;font-size:12.5px}
+.stop .dotc{width:16px;display:flex;flex-direction:column;align-items:center;padding-top:5px}
+.stop .l1{font-weight:600}
+.stop .l2{color:#6B7280;font-size:11.5px}
+</style></head><body><div class="screen" style="background:#fff">
+<div style="background:#00B14F"><div class="sb" style="color:#fff">
+  <span>10:24</span>
+  <span class="r">
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.2A10.5 10.5 0 0 1 15 4.2" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><path d="M3.6 7A6.8 6.8 0 0 1 12.4 7" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="10" r="1.4" fill="#fff"/></svg>
+    <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".7" y=".7" width="21" height="10.6" rx="3" stroke="#fff" stroke-opacity=".4" stroke-width="1.2"/><rect x="2.4" y="2.4" width="15" height="7.2" rx="1.8" fill="#fff"/><path d="M23.4 4.2v3.6c1.1-.3 1.6-.9 1.6-1.8s-.5-1.5-1.6-1.8Z" fill="#fff" fill-opacity=".5"/></svg>
+  </span>
+</div></div>
+<div class="hd"><svg width="13" height="22.099999999999998" viewBox="0 0 12 20" fill="none"><path d="M10 2 2 10l8 8" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t km">GrabExpress</span><span style="margin-left:auto;font-size:12px" class="km">#១០៤៣</span></div>
+<div class="map">
+  <svg width="540" height="262" viewBox="0 12 540 262">
+    <rect width="540" height="286" fill="#EAEFE8"/>
+    <g fill="#DFE6DC"><rect x="26" y="24" width="120" height="76"/><rect x="182" y="14" width="150" height="66"/><rect x="372" y="30" width="132" height="86"/><rect x="40" y="150" width="136" height="96"/><rect x="212" y="140" width="118" height="70"/><rect x="366" y="160" width="140" height="92"/></g>
+    <g stroke="#fff" stroke-width="15" stroke-linecap="square"><path d="M0 128h540"/><path d="M176 0v286"/><path d="M348 0v286"/><path d="M0 262h540"/></g>
+    <g stroke="#F4F7F3" stroke-width="6"><path d="M0 60h540"/><path d="M262 0v286"/><path d="M448 0v286"/></g>
+    <path d="M96 210 L176 210 L176 128 L348 128 L348 66 L440 66" fill="none" stroke="#00B14F" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="96" cy="210" r="11" fill="#fff" stroke="#00B14F" stroke-width="5"/>
+    <g transform="translate(440 66)">
+      <path d="M0-30c11 0 20 9 20 20 0 13-20 32-20 32S-20 3-20-10c0-11 9-20 20-20z" fill="#1C1C1C"/>
+      <circle cx="0" cy="-10" r="7" fill="#fff"/>
+    </g>
+    <g transform="translate(268 128)">
+      <circle r="17" fill="#fff"/><circle r="14" fill="#00B14F"/>
+      <path d="M-7 3h3l1-4h6l1 4h3M-4 3a2.6 2.6 0 1 0 5.2 0M2.8 3A2.6 2.6 0 1 0 8 3" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+    </g>
+  </svg>
+</div>
+<div class="sheet">
+  <div class="grab"></div>
+  <div class="st km">អ្នកដឹកជញ្ជូនកំពុងទៅយកទំនិញ</div>
+  <div class="sub km">មកដល់ហាងក្នុងរយៈពេល ៦ នាទី · ដល់អតិថិជន ម៉ោង ១១:២០</div>
+  <div class="drv">
+    <div style="width:44px;height:44px;border-radius:50%;background:#0E7A3C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600" class="km">វ</div>
+    <div><div class="nm km">វិរៈ ស.</div><div class="pl km">Honda Dream · ★ ៤.៩</div></div>
+    <div class="plate tn">1BM-4821</div>
+  </div>
+  <div class="ord">
+    <img src="../assets/shoe-hero.jpg" style="width:44px;height:44px;object-fit:cover;border-radius:8px">
+    <div><div class="nm km" style="font-size:13.5px;font-weight:600">ស្បែកជើងស Crystal White</div><div class="pl km" style="font-size:11.5px;color:#6B7280">បង់រួចរាល់តាម KHQR · ៤៦.៥០$</div></div>
+  </div>
+  <div class="stops">
+    <div class="stop">
+      <div class="dotc"><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="none" stroke="#00B14F" stroke-width="2.6"/></svg><div style="width:2px;height:22px;background:#E1E4E8;margin-top:3px"></div></div>
+      <div><div class="l1 km">ហាងស្បែកជើង សុភា</div><div class="l2 km">ផ្សារទួលទំពូង ភ្នំពេញ</div></div>
+    </div>
+    <div class="stop" style="margin-top:5px">
+      <div class="dotc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 21.5s7-6.1 7-11a7 7 0 1 0-14 0c0 4.9 7 11 7 11Z" stroke="#1C1C1C" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="10.2" r="2.6" stroke="#1C1C1C" stroke-width="1.9"/></svg></div>
+      <div><div class="l1 km">រតនា</div><div class="l2 km">ផ្ទះ ២៤ ផ្លូវ ២៧១ សង្កាត់ទួលទំពូង</div></div>
+    </div>
+  </div>
+</div></div></body></html>

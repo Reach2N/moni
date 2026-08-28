@@ -115,6 +115,11 @@ components:
 
 # Design System: Moni
 
+> **Retired, 27 August 2026.** The "Invitation" system below styled the earlier demo
+> iteration. The committed direction is now black and white with a single green accent
+> in an Apple-native style, defined in PLAN.md section 3. Do not style new surfaces
+> from this file.
+
 ## Overview
 
 **Creative North Star: "The Invitation"**
@@ -242,20 +247,37 @@ before and 139px after.
 
 **The One Numeral System Rule.** The surface does not mix numeral systems. Every quantity
 renders in Khmer numerals, without exception: times, counts, quota, prices, the nav badge,
-and the 2.5rem takings figure itself. Two mechanisms, and both are the rule: `toKhmerDigits`
-transliterates a formatted string, and `khmerNumber` / `moneyKm` format through Intl with the
-shared `KM_LOCALE` and `KM_NUM` options exported from the demo module. Currency decimals come
-from the currency table, so KHR stays at 0 places and USD at 2.
+and the 2.5rem takings figure itself. One mechanism, in one module: every quantity is grouped
+by Intl and then transliterated by `toKhmerDigits`, and `khmerNumber`, `moneyKm`, `moneyTotalKm`
+and `moneyPartsKm` all live in `src/lib/format/khmer.ts`. Currency decimals come from the
+currency table, so KHR stays at 0 places and USD at 2.
 
-*Implementation note, and it is a trap.* The numbering system must be passed as an Intl
-**option**, never as a `-u-nu-khmr` locale extension. Chrome ignores the extension and
-silently resolves to `latn`, while Node's ICU honours it, so the extension form passes a unit
-test and renders Latin digits in the browser. The extension form also changes the group
-separator to a period, breaking the comma the rest of the surface uses. The shipped form is
-locale `km-KH` plus `{ useGrouping: true, numberingSystem: 'khmr' }`. The rule now holds in the
-render as well as on paper, including the largest element on the screen: the animated takings
-figure reads ៣៨,០០០ with a matching `aria-label`, and zero Latin digits appear in visible body
-text anywhere.
+*Implementation note, three traps, all paid for.* The first is the `-u-nu-khmr` locale
+extension: Chrome ignores it and silently resolves to `latn`, while Node's ICU honours it, so
+the extension form passes a unit test and renders Latin digits in the browser.
+
+The second is the fix for the first. Passing `numberingSystem: 'khmr'` as an Intl **option**
+does give Khmer digits in both runtimes, and it makes Node and Chrome disagree about what
+km-KH separators are. They do not merely differ, they are **swapped**:
+
+| value | Node, ICU 78 | Chrome 151 |
+|---|---|---|
+| `15000` | `១៥.០០០` | `១៥,០០០` |
+| `5.00` | `៥,០០` | `៥.០០` |
+
+On a server rendered page that prints `$៥,០០` into the HTML and `$៥.០០` after hydration: a
+decimal point that moves depending on which runtime drew it, on a surface whose promise is
+that the owner sees exactly what was charged. It is also a guaranteed React hydration
+mismatch on every money string, and it was one, live, until 19 August.
+
+So the shipped form takes grouping from `en-US`, whose separators are identical in every ICU
+build, and transliterates the digits afterwards. Khmer numerals with the comma this surface
+uses, deterministic on both runtimes. **Never format a user facing quantity through a
+`km-KH` locale.**
+
+The third trap is that a verification asserting the *absence* of Latin digits passes when the
+digits are absent entirely. Assert the positive: glyphs present, correct script, correct
+separator, and box width stable across a value change.
 
 *Implementation note, two traps, both paid for.* First, no third-party transitioning-digit
 component can carry this rule: their digit tracks are built from ASCII 0 to 9, so a Khmer
@@ -475,8 +497,10 @@ is not one of the three earned exceptions. Left at their defaults these belong t
 - **Don't** let colour be the only carrier of a state, a status, or a category.
 - **Don't** add a second typeface, and don't substitute a system display face for the brand
   face. Don't convert Futura 100 Khmer to a web font under any circumstances.
-- **Don't** mix Khmer and Latin numerals inside one figure or one column, and don't reach for
-  a `-u-nu-khmr` locale extension to get Khmer digits. Chrome resolves it to `latn`.
+- **Don't** mix Khmer and Latin numerals inside one figure or one column, and don't format a
+  user facing quantity through a `km-KH` locale at all. The `-u-nu-khmr` extension resolves to
+  `latn` in Chrome, and the `numberingSystem` option makes Node and Chrome swap the group and
+  decimal separators. Group through `en-US`, then transliterate.
 - **Don't** rebuild this as a card grid or a stat row. The ledger and the one committed
   region are the answer to both.
 - **Don't** add a second animation. The seal press is the authored moment and it stays the

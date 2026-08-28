@@ -1,0 +1,107 @@
+<!doctype html><html lang="km"><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+html,body{width:1080px;height:1440px;overflow:hidden;background:#000}
+body{font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,"Khmer Sangam MN",sans-serif}
+.km{font-family:-apple-system,"SF Pro Text","Helvetica Neue","Khmer Sangam MN",sans-serif;line-height:1.75}
+.screen{position:absolute;top:0;left:0;width:540px;height:720px;transform:scale(2);transform-origin:0 0;overflow:hidden;background:#fff}
+.sb{height:54px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 6px;font-size:15px;font-weight:600;letter-spacing:.2px}
+.sb .r{display:flex;align-items:center;gap:5px}
+.spacer{flex:1}
+img{display:block}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Regular.woff2") format("woff2");font-weight:400}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Medium.woff2") format("woff2");font-weight:500}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-SemiBold.woff2") format("woff2");font-weight:600}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Bold.woff2") format("woff2");font-weight:700}
+
+body{background:#F6F4EF}
+.screen{background:#F6F4EF;color:#1B1F24}
+.km{font-family:Busra,-apple-system,"Helvetica Neue",sans-serif;line-height:1.75}
+.dp{font-family:-apple-system,"SF Pro Display","Khmer OS Muol Light",sans-serif;letter-spacing:-.1px}
+.tn{font-variant-numeric:tabular-nums}
+.top{background:#14181C;padding:0 18px 18px;color:#F6F4EF}
+.top .sb{margin:0 -18px}
+.brandrow{display:flex;align-items:center;gap:11px;padding:4px 0 13px}
+.brandrow .nm{font-size:15px;font-weight:600;letter-spacing:.2px;color:#E8B455}
+.brandrow .sh{font-size:12px;color:#B8B2A4;margin-top:1px}
+.brandrow .rt{margin-left:auto;display:flex;align-items:center;gap:15px}
+.bdot{position:relative}
+.bdot:after{content:"";position:absolute;top:-1px;right:-1px;width:8px;height:8px;border-radius:50%;background:#E8B455;border:2px solid #14181C}
+.kpis{display:flex;border:1px solid rgba(232,180,85,.28);background:rgba(232,180,85,.07)}
+.kpi{flex:1;padding:9px 13px;border-right:1px solid rgba(232,180,85,.22)}
+.kpi:last-child{border-right:0}
+.kpi .k{font-size:10.5px;color:#B8B2A4}
+.kpi .v{font-size:21px;font-weight:600;letter-spacing:-.4px;margin-top:1px;color:#F6F4EF}
+.kpi .v small{font-size:13px;opacity:.7}
+.sec{display:flex;align-items:baseline;gap:9px;padding:13px 18px 7px}
+.sec .t{font-size:13.5px;font-weight:400;font-family:-apple-system,"SF Pro Display","Khmer OS Muol Light",sans-serif;letter-spacing:.1px}
+.sec .n{font-size:11px;color:#6D6A62}
+.sec .a{margin-left:auto;font-size:11.5px;color:#A9761E;font-weight:600;display:flex;align-items:center;gap:3px;align-self:center}
+.card{background:#FFFFFF;border:1px solid #E5E0D6;margin:0 18px 12px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 15px;border-bottom:1px solid #E5E0D6}
+.row:last-child{border-bottom:0}
+.row.hot{background:#F7EEDC}
+.av{position:relative;flex:none}
+.av .bdg{position:absolute;right:-3px;bottom:-3px;border-radius:50%;border:2px solid #FFFFFF;line-height:0}
+.hot .av .bdg{border-color:#F7EEDC}
+.nm{font-size:14px;font-weight:600;letter-spacing:-.1px}
+.sn{font-size:12px;color:#6D6A62;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:236px}
+.rt{margin-left:auto;text-align:right;flex:none}
+.tm{font-size:10.5px;color:#6D6A62}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:3px 8px;margin-top:5px}
+.pill.ok{background:#E7F1EA;color:#1B6B45}
+.pill.wn{background:#F8EAE7;color:#A93B2B}
+.pill.gd{background:#14181C;color:#E8B455}
+.nav{position:absolute;bottom:0;left:0;right:0;height:78px;background:#FFFFFF;border-top:1px solid #E5E0D6;display:flex;align-items:flex-start;padding:9px 0 14px}
+.nav div{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:9.5px;color:#6D6A62}
+.nav div.on{color:#14181C;font-weight:600}
+.homebtn{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);width:60px;height:60px;border-radius:50%;background:#14181C;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(20,24,28,.34);border:3px solid #FFFFFF}
+.homelb{position:absolute;left:0;right:0;bottom:16px;text-align:center;font-size:9.5px;font-weight:600;color:#14181C}
+.btn{display:flex;align-items:center;justify-content:center;gap:9px;background:#14181C;color:#E8B455;font-size:14.5px;font-weight:600;height:50px;margin:0 18px 10px}
+.btn2{display:flex;align-items:center;justify-content:center;gap:8px;background:#FFFFFF;border:1px solid #E5E0D6;color:#1B1F24;font-size:13.5px;font-weight:600;height:46px;margin:0 18px 12px}
+.kv{display:flex;justify-content:space-between;gap:14px;padding:11px 15px;border-bottom:1px solid #E5E0D6;font-size:12.5px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:#6D6A62}
+.kv .v{font-weight:600;text-align:right}
+</style></head><body><div class="screen" style="background:#fff">
+<div class="sb" style="color:#000">
+  <span>10:24</span>
+  <span class="r">
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="#000"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.2A10.5 10.5 0 0 1 15 4.2" stroke="#000" stroke-width="1.8" stroke-linecap="round"/><path d="M3.6 7A6.8 6.8 0 0 1 12.4 7" stroke="#000" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="10" r="1.4" fill="#000"/></svg>
+    <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".7" y=".7" width="21" height="10.6" rx="3" stroke="#000" stroke-opacity=".4" stroke-width="1.2"/><rect x="2.4" y="2.4" width="15" height="7.2" rx="1.8" fill="#000"/><path d="M23.4 4.2v3.6c1.1-.3 1.6-.9 1.6-1.8s-.5-1.5-1.6-1.8Z" fill="#000" fill-opacity=".5"/></svg>
+  </span>
+</div>
+<div style="background:#FFFFFF;border-bottom:1px solid #E5E0D6;display:flex;align-items:center;gap:12px;padding:8px 16px 12px">
+  <svg width="12" height="20.4" viewBox="0 0 12 20" fill="none"><path d="M10 2 2 10l8 8" stroke="#1B1F24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div class="av" style="margin-left:2px"><div style="width:40px;height:40px;border-radius:50%;background:#8C7A46;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600" class="km">ច</div><span class="bdg"><svg width="18" height="18" viewBox="0 0 36 36"><defs><linearGradient id="mg18" x1=".3" y1="1" x2=".7" y2="0"><stop offset="0" stop-color="#0099FF"/><stop offset=".6" stop-color="#A033FF"/><stop offset="1" stop-color="#FF5280"/></linearGradient></defs><circle cx="18" cy="18" r="18" fill="url(#mg18)"/><path d="M18 8c-5.6 0-10 4.1-10 9.6 0 3.1 1.4 5.9 3.7 7.6v3.7l3.4-1.9c.9.3 1.9.4 2.9.4 5.6 0 10-4.1 10-9.7S23.6 8 18 8Zm1 12.9-2.6-2.7-5 2.7 5.5-5.8 2.6 2.7 4.9-2.7-5.4 5.8Z" fill="#fff"/></svg></span></div>
+  <div><div class="nm km" style="font-size:15px">ចាន់ថា</div><div class="sn km">Messenger · អតិថិជនថ្មី</div></div>
+  <div style="margin-left:auto"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#1B1F24" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 3h3l1.6 4-2 1.4a12 12 0 0 0 6.4 6.4l1.4-2 4 1.6v3A2 2 0 0 1 19 19.4 16.6 16.6 0 0 1 4.6 5 2 2 0 0 1 6.6 3Z"/></svg></div>
+</div>
+<div style="background:#F8EAE7;border-bottom:1px solid #EBD8D3;display:flex;align-items:center;gap:9px;padding:11px 16px;font-size:11.5px;color:#A93B2B" class="km">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A93B2B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg><span><b>ត្រូវការអ្នក៖</b> សំណើតម្លៃដុំ Moni មិនសម្រេចជំនួសអ្នកទេ</span>
+</div>
+<div style="padding:16px 16px 0;display:flex;flex-direction:column;gap:9px;justify-content:flex-end;height:calc(720px - 54px - 61px - 42px - 146px);background:#F6F4EF">
+  <div class="km" style="max-width:76%;background:#FFFFFF;border:1px solid #E5E0D6;padding:10px 14px;font-size:14px">សួស្តីបង ខ្ញុំចង់ទិញ ៥ គូសម្រាប់ហាងខ្ញុំ តម្លៃដុំមានទេ?</div>
+  <div class="km" style="max-width:76%;align-self:flex-end;background:#14181C;color:#F6F4EF;padding:10px 14px;font-size:14px">សួស្តីបង សម្រាប់ការទិញច្រើន ខ្ញុំនឹងឲ្យម្ចាស់ហាងឆ្លើយផ្ទាល់បាទ</div>
+  <div class="km" style="align-self:flex-end;display:flex;align-items:center;gap:5px;font-size:10.5px;color:#6D6A62"><svg width="13" height="13" viewBox="0 0 36 36"><rect width="36" height="36" rx="9" fill="#14181C"/><rect x="3" y="3" width="30" height="30" rx="6.5" fill="none" stroke="#C08A2E" stroke-width="1"/><path d="M10.4 25.6V10.4h3.9l4.2 7.4 4.2-7.4h3.9v15.2h-3.6v-8.9l-3.6 6.3h-1.8l-3.6-6.3v8.9Z" fill="#E8B455"/></svg> Moni បានបញ្ជូនបន្តទៅអ្នក · ១ នាទីមុន</div>
+  <div class="km" style="max-width:76%;background:#FFFFFF;border:1px solid #E5E0D6;padding:10px 14px;font-size:14px">បាទ ខ្ញុំរង់ចាំ</div>
+</div>
+<div style="position:absolute;bottom:78px;left:0;right:0;padding:12px 16px 14px;background:#F6F4EF">
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <div class="km" style="background:#F7EEDC;border:1px solid #EAD9B4;color:#A9761E;font-size:11.5px;font-weight:600;padding:7px 12px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A9761E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c3.4 2 5.4 4.4 5.4 7.4 0 3.4-2.4 5.9-5.4 5.9s-5.4-2.5-5.4-5.9c0-3 2-5.4 5.4-7.4z"/><path d="M12 8.6v11.9"/></svg> ទិញ ៥ គូ ៤២$/គូ</div>
+    <div class="km" style="background:#FFFFFF;border:1px solid #E5E0D6;font-size:11.5px;padding:7px 12px">សុំលេខទូរស័ព្ទ</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:11px;background:#FFFFFF;border:1px solid #E5E0D6;height:48px;padding:0 8px 0 15px">
+    <span class="km" style="flex:1;font-size:14px;color:#6D6A62">ឆ្លើយជំនួស Moni…</span>
+    <div style="width:36px;height:36px;background:#14181C;display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#E8B455" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/></svg></div>
+  </div>
+</div>
+<div class="nav">
+  <div class="on"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#14181C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.4a8 8 0 0 1-8.5 8 8.2 8.2 0 0 1-3.6-.85L3.5 20l1.4-4.4a8 8 0 0 1 7.1-11.6 8 8 0 0 1 8.5 7.4z"/><path d="M12 7.8c.5 2 1.1 2.6 3.1 3.1-2 .5-2.6 1.1-3.1 3.1-.5-2-1.1-2.6-3.1-3.1 2-.5 2.6-1.1 3.1-3.1z"/></svg><span class="km">ជំនួយការ</span></div>
+  <div class=""><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#6D6A62" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5h14v17l-2.3-1.6-2.4 1.6-2.3-1.6-2.4 1.6L7.3 19 5 20.5z"/><path d="M9 8.5h6M9 12.5h6"/></svg><span class="km">ការកម្មង់</span></div>
+  <div></div>
+  <div class=""><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#6D6A62" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11.6V4.2a.7.7 0 0 1 .7-.7h7.4a1 1 0 0 1 .7.3l8 8a1 1 0 0 1 0 1.4l-7.4 7.4a1 1 0 0 1-1.4 0l-8-8a1 1 0 0 1-.3-.7z"/><circle cx="7.8" cy="7.8" r="1.4"/></svg><span class="km">កាតាឡុក</span></div>
+  <div class=""><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#6D6A62" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.6" width="17.6" height="16.2" rx="2.4"/><path d="M3.2 9.8h17.6M8.2 2.6v4.2M15.8 2.6v4.2"/></svg><span class="km">កាលវិភាគ</span></div>
+  <div class="homebtn"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#E8B455" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M3.2 9.5 5 3.5h14l1.8 6a3 3 0 0 1-5.6 1.6 3 3 0 0 1-5.4 0 3 3 0 0 1-5.6-1.6z"/><path d="M9.8 20.5v-5.2h4.4v5.2"/></svg></div>
+  <div class="homelb km">ហាង</div>
+</div></div></body></html>

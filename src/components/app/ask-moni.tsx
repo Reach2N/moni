@@ -1,0 +1,428 @@
+'use client'
+
+import { startTransition, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useReducedMotion } from 'motion/react'
+import {
+  ArrowUpRight,
+  CalendarRange,
+  Bot,
+  Send,
+  TriangleAlert,
+  Settings2,
+  Store,
+} from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.tsx'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsx'
+import { Textarea } from '@/components/ui/textarea.tsx'
+import { ASK_CATEGORIES } from '@/lib/agent/categories.ts'
+import { RECEIPT_EVENT, type MoniReceiptEvent } from '@/lib/moni-events.ts'
+import { toKhmerDigits } from './dashboard-format.ts'
+import { Panel, PanelHeader } from './panel.tsx'
+import {
+  OwnerToolTrace,
+  type OwnerToolTraceStatus,
+  type OwnerToolTraceStep,
+} from './owner-tool-trace.tsx'
+
+type CategoryId = (typeof ASK_CATEGORIES)[number]['id']
+type ApiStep = { tool: string; args: unknown; result: unknown }
+type WorkState = 'idle' | 'working' | 'steps' | 'receipt' | 'error'
+
+const CATEGORY_ICON = {
+  organize: Settings2,
+  plan: CalendarRange,
+  operate: Store,
+} satisfies Record<CategoryId, typeof Settings2>
+
+const CATEGORY_LOADING: Record<CategoryId, string> = {
+  organize: 'Moni កំពុងរៀបចំហាងតាមសំណើនេះ…',
+  plan: 'Moni កំពុងគ្រោងផែនការពីទិន្នន័យហាង…',
+  operate: 'Moni កំពុងធ្វើការងារនេះក្នុងហាង…',
+}
+
+const CATEGORY_EXAMPLES: Record<CategoryId, readonly string[]> = {
+  organize: [ASK_CATEGORIES[0].examples[1], ASK_CATEGORIES[0].examples[3]],
+  plan: [ASK_CATEGORIES[1].examples[0], ASK_CATEGORIES[1].examples[2]],
+  operate: [ASK_CATEGORIES[2].examples[0], ASK_CATEGORIES[2].examples[1]],
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function strings(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function formatIdleGap(value: string) {
+  const match = value.match(/^(\d{2}:\d{2}) to (\d{2}:\d{2}), (\d+) minutes free$/)
+  if (!match) return toKhmerDigits(value)
+  return `ទំនេរ ${toKhmerDigits(match[1]!)} ដល់ ${toKhmerDigits(match[2]!)} · ${toKhmerDigits(match[3]!)} នាទី`
+}
+
+const CHANGE_LABEL: Record<string, string> = {
+  price_minor: 'តម្លៃថ្មី',
+  duration_min: 'រយៈពេលថ្មី',
+  name: 'ឈ្មោះថ្មី',
+  active: 'ស្ថានភាពប្រើប្រាស់',
+}
+
+const BOOKING_STATUS: Record<string, string> = {
+  completed: 'បានបញ្ចប់',
+  no_show: 'មិនបានមក',
+  cancelled: 'បានលុប',
+  confirmed: 'បានបញ្ជាក់',
+}
+
+type OwnerStep = { title: string; details: string[]; failed: boolean; bookingCode?: string }
+
+function ownerStep(step: ApiStep): OwnerStep {
+  const result = record(step.result)
+  const error = typeof result.error === 'string' ? result.error : null
+  if (error) return { title: 'Moni មិនអាចបញ្ចប់ជំហាននេះបាន', details: [error], failed: true }
+
+  switch (step.tool) {
+    case 'create_service':
+      return { title: `បានបន្ថែមសេវា ${String(result.added ?? '')}`, details: [], failed: false }
+    case 'update_service': {
+      const changes = record(result.changes)
+      const details = Object.entries(changes).map(([field, value]) => `${CHANGE_LABEL[field] ?? 'តម្លៃថ្មី'}: ${toKhmerDigits(String(value))}`)
+      return { title: `បានកែសេវា ${String(result.updated ?? '')}`, details, failed: false }
+    }
+    case 'adjust_prices': {
+      const changes = Array.isArray(result.changes) ? result.changes.map(record) : []
+      return {
+        title: `បានកែតម្លៃ ${toKhmerDigits(String(result.changed ?? changes.length))} សេវា`,
+        details: changes.map((change) => `${String(change.name ?? '')}: ${toKhmerDigits(String(change.from ?? ''))} → ${toKhmerDigits(String(change.to ?? ''))}`),
+        failed: false,
+      }
+    }
+    case 'create_resource':
+      return { title: `បានបន្ថែម ${String(result.added ?? 'ធនធានថ្មី')}`, details: [], failed: false }
+    case 'create_resources_bulk':
+      return {
+        title: `បានបន្ថែម ${toKhmerDigits(String(result.added ?? 0))} កន្លែង`,
+        details: [`${String(result.first ?? '')} ដល់ ${String(result.last ?? '')}`],
+        failed: false,
+      }
+    case 'set_hours':
+      return {
+        title: 'បានកំណត់ម៉ោងបើកហាង',
+        details: [
+          `បើក ${toKhmerDigits(String(result.open_days ?? 0))} ថ្ងៃ · បិទ ${toKhmerDigits(String(result.closed_days ?? 0))} ថ្ងៃ`,
+        ],
+        failed: false,
+      }
+    case 'add_closure': {
+      const clashes = Array.isArray(result.bookings_already_in_that_window)
+        ? result.bookings_already_in_that_window.map(record)
+        : []
+      return {
+        title: `បានបិទហាង ${toKhmerDigits(String(result.closed ?? ''))}`,
+        details: clashes.length > 0
+          ? clashes.map((clash) => `ត្រូវពិនិត្យ ${String(clash.code ?? '')} · ${String(clash.who ?? '')} · ${toKhmerDigits(String(clash.at ?? ''))}`)
+          : ['គ្មានការណាត់ប៉ះពាល់ទេ'],
+        failed: false,
+      }
+    }
+    case 'get_day_plan':
+      return {
+        title: `ផែនការថ្ងៃនេះមាន ${toKhmerDigits(String(result.count ?? 0))} ការណាត់`,
+        details: [
+          `ប្រាក់រំពឹងទុក ${toKhmerDigits(String(result.expected_takings ?? ''))}`,
+          `នៅត្រូវប្រមូល ${toKhmerDigits(String(result.still_to_collect ?? ''))}`,
+          ...strings(result.idle_gaps).map(formatIdleGap),
+        ],
+        failed: false,
+      }
+    case 'get_week_plan':
+      return {
+        title: 'បានគ្រោងសប្ដាហ៍ខាងមុខ',
+        details: strings(result.quiet_days).map((day) => `ថ្ងៃទំនេរសម្រាប់ផ្សព្វផ្សាយ: ${toKhmerDigits(day)}`),
+        failed: false,
+      }
+    case 'get_money_owed': {
+      const people = Array.isArray(result.people) ? result.people.map(record) : []
+      return {
+        title: `នៅត្រូវប្រមូល ${toKhmerDigits(String(result.total_owed ?? ''))}`,
+        details: people.map((person) => `${String(person.who ?? '')} · ${String(person.code ?? '')} · ${toKhmerDigits(String(person.owes ?? ''))}`),
+        failed: false,
+      }
+    }
+    case 'get_service_performance': {
+      const services = Array.isArray(result.services) ? result.services.map(record) : []
+      return {
+        title: 'បានប្រៀបធៀបសេវាកម្ម',
+        details: services.slice(0, 4).map((service) => `${String(service.name ?? '')} · ${toKhmerDigits(String(service.earned ?? ''))} · ${toKhmerDigits(String(service.per_hour ?? ''))}/ម៉ោង`),
+        failed: false,
+      }
+    }
+    case 'mark_booking':
+      return {
+        title: `បានកែការណាត់ ${String(result.code ?? '')}`,
+        details: [`ស្ថានភាពថ្មី: ${BOOKING_STATUS[String(result.status ?? '')] ?? 'បានកែរួច'}`],
+        failed: false,
+        bookingCode: String(result.code ?? ''),
+      }
+    case 'record_manual_payment':
+      return {
+        title: `បានកត់ប្រាក់ ${toKhmerDigits(String(result.recorded ?? ''))}`,
+        details: [`សម្រាប់ការណាត់ ${String(result.against ?? '')}`],
+        failed: false,
+        bookingCode: String(result.against ?? ''),
+      }
+    case 'export_customers':
+      return {
+        title: `បានរៀបចំបញ្ជីអតិថិជន ${toKhmerDigits(String(result.count ?? 0))} នាក់`,
+        details: [],
+        failed: false,
+      }
+    default:
+      return { title: 'Moni បានពិនិត្យ និងធ្វើការងារ', details: [], failed: false }
+  }
+}
+
+function wait(duration: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, duration))
+}
+
+export function AskMoni({ slug }: { slug: string }) {
+  const router = useRouter()
+  const reduceMotion = useReducedMotion()
+  const [category, setCategory] = useState<CategoryId>('plan')
+  const [text, setText] = useState('')
+  const [lastCommand, setLastCommand] = useState('')
+  const [state, setState] = useState<WorkState>('idle')
+  const [steps, setSteps] = useState<OwnerStep[]>([])
+  const [summary, setSummary] = useState('')
+  const [error, setError] = useState('')
+  const [confirmCommand, setConfirmCommand] = useState<string | null>(null)
+
+  const busy = state === 'working' || state === 'steps'
+  const empty = text.trim().length === 0
+  const firstExample = CATEGORY_EXAMPLES[category][0] ?? ''
+  const traceSteps: OwnerToolTraceStep[] = steps.map((step, index) => ({
+    id: `${index}-${step.title}`,
+    label: step.title,
+    details: step.details,
+    state: step.failed ? 'error' : 'complete',
+  }))
+  const traceFailed = steps.some((step) => step.failed)
+  const traceStatus: OwnerToolTraceStatus = state === 'receipt'
+    ? traceFailed ? 'error' : 'complete'
+    : 'working'
+
+  async function send(command = text) {
+    const trimmed = command.trim()
+    if (!trimmed || busy) return
+
+    setText(trimmed)
+    setLastCommand(trimmed)
+    setSteps([])
+    setSummary('')
+    setError('')
+    setState('working')
+
+    try {
+      const response = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug, text: trimmed }),
+      })
+      const body = await response.json()
+      if (!response.ok || body.error) throw new Error(body.error ?? 'request failed')
+
+      const returned = Array.isArray(body.steps) ? (body.steps as ApiStep[]) : []
+      const ownerSteps = returned.map(ownerStep)
+      const failed = ownerSteps.some((step) => step.failed)
+      const bookingCode = ownerSteps.find((step) => step.bookingCode)?.bookingCode
+      const receiptSummary = typeof body.text === 'string' && body.text.trim()
+        ? body.text.trim()
+        : 'Moni បានបញ្ចប់ការងារនេះ។'
+
+      setSteps(ownerSteps)
+      setSummary(receiptSummary)
+      setState('steps')
+      await wait(reduceMotion ? 0 : 180)
+      setState('receipt')
+
+      const receipt: MoniReceiptEvent = {
+        id: crypto.randomUUID(),
+        command: trimmed,
+        summary: receiptSummary,
+        createdAt: new Date().toISOString(),
+        status: failed ? 'failed' : 'success',
+        ...(bookingCode ? { bookingCode } : {}),
+      }
+      window.dispatchEvent(new CustomEvent(RECEIPT_EVENT, { detail: receipt }))
+      await wait(reduceMotion ? 0 : 220)
+      startTransition(() => router.refresh())
+    } catch {
+      setError('ការតភ្ជាប់ដាច់ ហើយគ្មានអ្វីក្នុងហាងបានប្តូរទេ។ សូមសាកម្តងទៀត។')
+      setState('error')
+    }
+  }
+
+  function requestSend(command = text) {
+    const trimmed = command.trim()
+    if (!trimmed || busy) return
+    if (category === 'plan') {
+      void send(trimmed)
+      return
+    }
+    setConfirmCommand(trimmed)
+  }
+
+  return (
+    <Panel id="moni" aria-labelledby="ask-moni-heading" aria-busy={busy} className="scroll-mt-4">
+      <PanelHeader
+        icon={Bot}
+        titleId="ask-moni-heading"
+        title="ប្រាប់ Moni ឱ្យធ្វើការ"
+        note="សរសេរជាភាសាធម្មតា ដូចអ្នកប្រាប់បុគ្គលិក"
+      />
+
+      <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryId)} className="gap-0">
+        <TabsList variant="line" aria-label="ប្រភេទការងារ" className="relative grid h-11 w-full grid-cols-3 gap-0 rounded-none border-b border-hairline p-0">
+          {ASK_CATEGORIES.map((item) => {
+            const Icon = CATEGORY_ICON[item.id]
+            return (
+              <TabsTrigger
+                key={item.id}
+                value={item.id}
+                className="min-w-0 rounded-none px-2 py-0 after:bg-seal data-[state=active]:font-semibold"
+              >
+                <Icon data-icon="inline-start" aria-hidden />
+                <span className="km truncate">{item.km}</span>
+              </TabsTrigger>
+            )
+          })}
+        </TabsList>
+
+        {ASK_CATEGORIES.map((item) => (
+          <TabsContent key={item.id} value={item.id} className="m-0">
+            <div className="grid grid-cols-2">
+              {CATEGORY_EXAMPLES[item.id].map((example, index) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => setText(example)}
+                  disabled={busy}
+                  className={`km flex min-h-11 items-center justify-between gap-2 border-b border-hairline px-3 py-1.5 text-left text-sm text-rule transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:px-4 sm:py-2 ${index === 0 ? 'border-r' : ''}`}
+                >
+                  <span>{example}</span>
+                  <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                </button>
+              ))}
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      <div className="p-2.5 sm:p-4">
+        <label htmlFor="owner-command" className="sr-only">ប្រាប់ Moni ឱ្យធ្វើអ្វី</label>
+        <Textarea
+          id="owner-command"
+          name="owner-command"
+          autoComplete="off"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') requestSend()
+          }}
+          disabled={busy}
+          rows={1}
+          placeholder="ឧ. ថ្ងៃនេះមានអ្វីខ្លះ…"
+          className="km min-h-14 resize-none rounded-none border-rule/70 bg-paper text-base text-ink shadow-none placeholder:text-rule sm:min-h-16 md:text-base"
+        />
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="km text-xs text-rule">Moni អានតម្លៃ និងម៉ោងពីហាងរបស់អ្នក វាមិនស្មានទេ</p>
+          <Button
+            type="button"
+            onClick={() => (empty ? setText(firstExample) : requestSend())}
+            disabled={busy}
+            className="km ml-auto min-h-11 rounded-none"
+          >
+            <Send data-icon="inline-start" aria-hidden />
+            {empty ? 'បំពេញឧទាហរណ៍' : 'ធ្វើការងារ'}
+          </Button>
+        </div>
+      </div>
+
+      <div aria-live="polite" aria-atomic="true">
+        {state === 'error' ? (
+          <Alert variant="inset">
+            <TriangleAlert strokeWidth={2} aria-hidden />
+            <AlertTitle>Moni មិនបានធ្វើការងារនេះទេ</AlertTitle>
+            <AlertDescription>
+              <p>{error}</p>
+              <Button type="button" variant="ghost" onClick={() => void send(lastCommand)} className="km min-h-11 rounded-none px-0 font-semibold text-ink underline decoration-rule underline-offset-4">
+                សាកម្តងទៀត
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+      </div>
+
+      {state === 'working' || state === 'steps' || state === 'receipt' ? (
+        <OwnerToolTrace
+          status={traceStatus}
+          steps={traceSteps}
+          receipt={state === 'receipt' ? { command: lastCommand, summary } : undefined}
+          labels={{ working: CATEGORY_LOADING[category] }}
+          defaultOpen
+        />
+      ) : null}
+
+      <Dialog
+        open={confirmCommand !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmCommand(null)
+        }}
+      >
+        <DialogContent className="rounded-none border-rule/70 bg-paper shadow-none sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="km text-left text-lg text-ink">បញ្ជាក់ការងារដែលនឹងប្តូរហាង</DialogTitle>
+            <DialogDescription className="km text-left text-sm text-rule">
+              Moni អាចកែតម្លៃ ម៉ោង ការណាត់ ឬកំណត់ត្រាប្រាក់តាមសំណើនេះ។ ពិនិត្យម្តងទៀតមុនធ្វើ។
+            </DialogDescription>
+          </DialogHeader>
+          <p className="km border-y border-hairline py-3 text-sm font-semibold text-ink">{confirmCommand}</p>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="km min-h-11 rounded-none shadow-none">
+                ត្រឡប់ទៅកែ
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              className="km min-h-11 rounded-none"
+              onClick={() => {
+                const command = confirmCommand
+                setConfirmCommand(null)
+                if (command) void send(command)
+              }}
+            >
+              បញ្ជាក់ និងធ្វើការងារ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Panel>
+  )
+}
+
+export { RECEIPT_EVENT }

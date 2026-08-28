@@ -10,9 +10,9 @@ import { motion, useReducedMotion } from 'motion/react'
  * waiting the same ring, its outer course broken, so the seal column stays aligned
  * void    an empty ring, the row's terms carry the strike
  *
- * This is the surface's one authored moment. Pressing it settles like a rubber
- * stamp hitting paper, 180ms, exponential ease out from an already visible
- * default, and it is the only motion on the screen.
+ * A receipt may press this like a rubber stamp hitting paper, 180ms with an
+ * exponential settle. Static booking states reuse the same geometry without
+ * suggesting that a completed service has also been paid.
  */
 export type SealState = 'paid' | 'waiting' | 'void'
 

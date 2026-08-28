@@ -210,3 +210,13 @@ insert into events (business_id, actor, actor_label, action, entity_type, entity
  ('b0000000-0000-4000-8000-000000000001','ai','ai:claude-opus-5','payment.paid','payment','70000000-0000-4000-8000-000000000001','{"amount_minor":15000,"provider":"khqr"}'::jsonb),
  ('b0000000-0000-4000-8000-000000000001','ai','ai:claude-opus-5','ai.escalated','conversation','e0000000-0000-4000-8000-000000000002','{"reason":"discount request"}'::jsonb),
  ('b0000000-0000-4000-8000-000000000002','ai','ai:claude-opus-5','booking.created','booking','90000000-0000-4000-8000-000000000011','{"code":"AR8T3M","nights":2}'::jsonb);
+
+-- ═══════════════════════════════════════ 3. platform: waitlist
+-- One approved (exercises the app-subdomain gate's happy path in dev) and one
+-- waiting (exercises the refusal path). The approved one is linked to the salon
+-- as a converted lead.
+
+insert into waitlist (id, email, locale, source, note, approved_at, approved_by, converted_business_id) values
+ ('11000000-0000-4000-8000-000000000001','sokha@example.com','km','landing','Salon in Takeo, two chairs', now(), 'mense', 'b0000000-0000-4000-8000-000000000001'),
+ ('11000000-0000-4000-8000-000000000002','visal@example.com','km','landing','Guesthouse, asks about Messenger', null, null, null)
+on conflict do nothing;

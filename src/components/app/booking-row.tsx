@@ -1,56 +1,85 @@
 'use client'
-// Searched first: shadcn Table is a data grid, not a row of ceremony, and neither
-// registry has a list row that carries a state seal. Hand built in the world's
-// vocabulary because the row IS the invitation.
+
+import { useEffect, useState } from 'react'
+import { motion, useReducedMotion } from 'motion/react'
+import type { DashboardSnapshot } from '@/lib/queries/dashboard.ts'
+import { RECEIPT_EVENT, type MoniReceiptEvent } from '@/lib/moni-events.ts'
 import { Seal, type SealState } from './seal.tsx'
-import { moneyKm, toKhmerDigits } from '@/lib/demo.ts'
-import type { DemoBooking } from '@/lib/demo.ts'
+import { cambodiaTime, moneyKm, toKhmerDigits } from './dashboard-format.ts'
 
-const sealFor = (s: DemoBooking['status']): SealState =>
-  s === 'completed' ? 'paid' : s === 'no_show' || s === 'cancelled' ? 'void' : 'waiting'
+type Booking = DashboardSnapshot['today']['bookings'][number]
 
-export function BookingRow({
-  booking,
-  pressed,
-  onToggle,
-}: {
-  booking: DemoBooking
-  pressed: boolean
-  onToggle: () => void
-}) {
-  const state = sealFor(booking.status)
-  const isVoid = state === 'void'
-  const balance = booking.priceMinor - booking.paidMinor
+const STATUS_LABEL: Record<Booking['status'], string> = {
+  pending: 'កំពុងរង់ចាំបញ្ជាក់',
+  confirmed: 'បានបញ្ជាក់',
+  completed: 'បានបញ្ចប់',
+  cancelled: 'បានលុប',
+  no_show: 'មិនបានមក',
+}
+
+function sealFor(booking: Booking): SealState {
+  if (booking.status === 'completed' && booking.balanceMinor <= 0) return 'paid'
+  if (booking.status === 'cancelled' || booking.status === 'no_show') return 'void'
+  return 'waiting'
+}
+
+export function BookingRow({ booking }: { booking: Booking }) {
+  const reduceMotion = useReducedMotion()
+  const [highlighted, setHighlighted] = useState(false)
+  const sealState = sealFor(booking)
+  const isVoid = sealState === 'void'
+  const start = toKhmerDigits(cambodiaTime(booking.startsAt))
+  const end = toKhmerDigits(cambodiaTime(booking.endsAt))
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    function receive(event: Event) {
+      const receipt = (event as CustomEvent<MoniReceiptEvent>).detail
+      if (receipt.status !== 'success' || receipt.bookingCode !== booking.code) return
+      setHighlighted(true)
+      timer = setTimeout(() => setHighlighted(false), reduceMotion ? 0 : 900)
+    }
+
+    window.addEventListener(RECEIPT_EVENT, receive)
+    return () => {
+      window.removeEventListener(RECEIPT_EVENT, receive)
+      if (timer) clearTimeout(timer)
+    }
+  }, [booking.code, reduceMotion])
 
   return (
-    <li className="relative border-t border-hairline first:border-t-0">
-      <div className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3.5 ${isVoid ? 'opacity-55' : ''}`}>
-        <p className="km tnum w-12 shrink-0 text-sm text-rule">{toKhmerDigits(booking.startsAt)}</p>
-
-        <div className="min-w-0">
-          <p className="km truncate text-lg font-medium text-ink">{booking.customer}</p>
-          {/* void is marked by striking the terms, never the person's name */}
-          <p className={`km tnum text-sm text-rule ${isVoid ? 'line-through decoration-rule/70' : ''}`}>
-            {booking.service} · {moneyKm(booking.priceMinor, booking.currency)}
-            {balance > 0 && !isVoid ? ` · នៅសល់ ${moneyKm(balance, booking.currency)}` : ''}
-          </p>
+    <motion.li
+      className="border-t border-hairline first:border-t-0"
+      initial={false}
+      animate={{ backgroundColor: highlighted ? 'rgba(5, 150, 105, 0.10)' : 'rgba(5, 150, 105, 0)' }}
+      transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className={`grid min-h-20 grid-cols-[3.75rem_minmax(0,1fr)_2.25rem] items-center gap-3 px-3 py-2.5 sm:px-4 ${isVoid ? 'opacity-55' : ''}`}>
+        <div className="tnum text-rule">
+          <p className="text-sm font-medium text-ink">{start}</p>
+          <p className="text-xs">{end}</p>
         </div>
 
-        <button
-          type="button"
-          onClick={onToggle}
-          disabled={isVoid}
-          aria-pressed={state === 'paid'}
-          aria-label={
-            state === 'paid'
-              ? `Mark ${booking.customer} unpaid`
-              : `Mark ${booking.customer} paid`
-          }
-          className="-m-2 rounded-sm p-2 transition-opacity hover:opacity-70 active:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Seal state={state} pressed={pressed} />
-        </button>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <p className="km text-base font-semibold text-ink">{booking.customer}</p>
+            <p className="km text-xs text-rule">{STATUS_LABEL[booking.status]}</p>
+          </div>
+          <p className={`km text-sm text-rule ${isVoid ? 'line-through decoration-rule/70' : ''}`}>
+            {booking.service} · {booking.resource}
+          </p>
+          {booking.balanceMinor > 0 && !isVoid ? (
+            <p className="km tnum text-xs text-rule">
+              នៅសល់ {moneyKm(booking.balanceMinor, booking.currency)} · {booking.code}
+            </p>
+          ) : null}
+        </div>
+
+        <span className="flex size-9 items-center justify-center" aria-label={STATUS_LABEL[booking.status]}>
+          <Seal state={sealState} />
+        </span>
       </div>
-    </li>
+    </motion.li>
   )
 }

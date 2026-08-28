@@ -1,0 +1,78 @@
+<!doctype html><html lang="km"><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+html,body{width:1080px;height:1440px;overflow:hidden;background:#000}
+body{font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,"Khmer Sangam MN",sans-serif}
+.km{font-family:-apple-system,"SF Pro Text","Helvetica Neue","Khmer Sangam MN",sans-serif;line-height:1.75}
+.screen{position:absolute;top:0;left:0;width:540px;height:720px;transform:scale(2);transform-origin:0 0;overflow:hidden;background:#fff}
+.sb{height:54px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 6px;font-size:15px;font-weight:600;letter-spacing:.2px}
+.sb .r{display:flex;align-items:center;gap:5px}
+.spacer{flex:1}
+img{display:block}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Regular.woff2") format("woff2");font-weight:400}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Medium.woff2") format("woff2");font-weight:500}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-SemiBold.woff2") format("woff2");font-weight:600}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Bold.woff2") format("woff2");font-weight:700}
+
+.nav{height:54px;display:flex;align-items:center;gap:11px;padding:0 16px;border-bottom:.5px solid #E4E6EB;background:#fff}
+.nav .nm{font-size:16.5px;font-weight:600;color:#050505;line-height:1.35}
+.nav .st{font-size:11.5px;color:#8A8D91;line-height:1.6;display:flex;align-items:center;gap:4px}
+.ri{display:flex;gap:18px;margin-left:auto;align-items:center}
+.feed{padding:12px 16px 6px;display:flex;flex-direction:column;justify-content:flex-end;height:calc(720px - 54px - 54px - 100px);overflow:hidden}
+.day{text-align:center;font-size:11.5px;color:#8A8D91;margin:2px 0 12px;font-weight:600}
+.mkt{display:flex;align-items:center;gap:5px;font-size:10.5px;color:#8A8D91;padding:0 0 5px 33px}
+.r{display:flex;align-items:flex-end;gap:7px}
+.r.me{justify-content:flex-end}
+.bub{max-width:74%;padding:9px 14px;font-size:15px;color:#050505;background:#F1F1F2;border-radius:19px}
+.me .bub{background:#0084FF;color:#fff}
+.grp .bub{border-bottom-left-radius:6px}
+.grp2 .bub{border-top-left-radius:6px}
+.me.grp .bub{border-bottom-right-radius:6px;border-bottom-left-radius:19px}
+.me.grp2 .bub{border-top-right-radius:6px;border-top-left-radius:19px}
+.tag{display:flex;align-items:center;gap:5px;font-size:10.5px;color:#8A8D91;justify-content:flex-end;padding:6px 2px 0}
+.tag b{font-weight:600;color:#6B7280}
+.card{width:176px;background:#fff;border:.5px solid #DCDFE3;border-radius:18px;overflow:hidden}
+.card img{width:100%;height:106px;object-fit:cover}
+.card .cb{padding:8px 11px 10px}
+.card .t{font-size:12px;font-weight:600;color:#050505}
+.card .p{font-size:13.5px;font-weight:700;color:#050505;margin-top:1px}
+.card .s{font-size:10.5px;color:#65686C;margin-top:4px}
+.typing{background:#0084FF;border-radius:19px;padding:12px 16px;display:flex;gap:5px}
+.typing i{width:7px;height:7px;border-radius:50%;background:#fff;display:block}
+.typing i:nth-child(2){opacity:.68}.typing i:nth-child(3){opacity:.4}
+.bar{position:absolute;bottom:64px;left:0;right:0;height:36px;background:#F0F7FF;border-top:.5px solid #D6E7FA;display:flex;align-items:center;gap:7px;padding:0 16px;font-size:11.5px;color:#1B62A8}
+.bar .btn{margin-left:auto;background:#0084FF;color:#fff;font-size:11px;font-weight:600;padding:5px 12px;border-radius:14px}
+.comp{position:absolute;bottom:0;left:0;right:0;height:64px;display:flex;align-items:center;gap:15px;padding:0 16px 10px;background:#fff}
+.inp{flex:1;height:36px;background:#F1F1F2;border-radius:18px;display:flex;align-items:center;padding:0 15px;font-size:14.5px;color:#8A8D91}
+</style></head><body><div class="screen" style="background:#fff">
+<div class="sb" style="color:#000">
+  <span>10:24</span>
+  <span class="r">
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="#000"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.2A10.5 10.5 0 0 1 15 4.2" stroke="#000" stroke-width="1.8" stroke-linecap="round"/><path d="M3.6 7A6.8 6.8 0 0 1 12.4 7" stroke="#000" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="10" r="1.4" fill="#000"/></svg>
+    <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".7" y=".7" width="21" height="10.6" rx="3" stroke="#000" stroke-opacity=".4" stroke-width="1.2"/><rect x="2.4" y="2.4" width="15" height="7.2" rx="1.8" fill="#000"/><path d="M23.4 4.2v3.6c1.1-.3 1.6-.9 1.6-1.8s-.5-1.5-1.6-1.8Z" fill="#000" fill-opacity=".5"/></svg>
+  </span>
+</div><div class="nav">
+  <svg width="13" height="22.099999999999998" viewBox="0 0 12 20" fill="none"><path d="M10 2 2 10l8 8" stroke="#0084FF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div style="width:36px;height:36px;border-radius:50%;background:#B06CE8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15.12px;font-weight:600;flex:none">ស</div>
+  <div><div class="nm km">ស្រីពៅ</div><div class="st km"><svg width="11" height="11" viewBox="0 0 36 36"><circle cx="18" cy="18" r="18" fill="#1877F2"/><path d="M23.4 23.2 24.2 18h-5v-3.4c0-1.4.7-2.8 2.9-2.8h2.3V7.4S22.3 7 20.4 7c-4 0-6.6 2.4-6.6 6.8V18H9.2v5.2h4.6V36h5.4V23.2Z" fill="#fff"/></svg> <span>Messenger · ហាងស្បែកជើង សុភា</span></div></div>
+  <div class="ri"><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M6.6 3h3l1.6 4-2 1.4a12 12 0 0 0 6.4 6.4l1.4-2 4 1.6v3A2 2 0 0 1 19 19.4 16.6 16.6 0 0 1 4.6 5 2 2 0 0 1 6.6 3Z" stroke="#0084FF" stroke-width="1.9" stroke-linejoin="round"/></svg><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.2" stroke="#0084FF" stroke-width="1.9"/><path d="M12 10.6v6" stroke="#0084FF" stroke-width="2.1" stroke-linecap="round"/><circle cx="12" cy="7.6" r="1.2" fill="#0084FF"/></svg></div>
+</div>
+<div class="feed">
+  
+  <div class="day km">ថ្ងៃនេះ 10:22</div>
+  <div class="mkt km">បានចែករំលែកបញ្ជីលក់របស់អ្នក</div>
+  <div class="r grp"><div style="width:26px;height:26px;border-radius:50%;background:#B06CE8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10.92px;font-weight:600;flex:none">ស</div><div class="bub" style="padding:0;background:none"><div class="card">
+  <img src="../assets/shoe-hero.jpg">
+  <div class="cb"><div class="t km">ស្បែកជើងស Crystal White</div><div class="p">45.00$</div>
+  <div class="s km">Marketplace · ភ្នំពេញ</div></div>
+</div></div></div>
+  <div class="r grp2" style="margin-top:3px;padding-left:33px"><div class="bub km">សួស្តី ស្បែកជើងនេះនៅមានទេ? ខ្ញុំចង់បានទំហំ 38</div></div>
+  <div class="r me" style="margin-top:12px"><div class="typing"><i></i><i></i><i></i></div></div>
+  <div class="tag km"><svg width="13" height="13" viewBox="0 0 36 36"><rect width="36" height="36" rx="9" fill="#14181C"/><rect x="3" y="3" width="30" height="30" rx="6.5" fill="none" stroke="#C08A2E" stroke-width="1"/><path d="M10.4 25.6V10.4h3.9l4.2 7.4 4.2-7.4h3.9v15.2h-3.6v-8.9l-3.6 6.3h-1.8l-3.6-6.3v8.9Z" fill="#E8B455"/></svg><b>ឆ្លើយស្វ័យប្រវត្តិដោយ Moni</b><span>· កំពុងឆ្លើយ</span></div>
+</div>
+<div class="bar km"><svg width="13" height="13" viewBox="0 0 36 36"><rect width="36" height="36" rx="9" fill="#14181C"/><rect x="3" y="3" width="30" height="30" rx="6.5" fill="none" stroke="#C08A2E" stroke-width="1"/><path d="M10.4 25.6V10.4h3.9l4.2 7.4 4.2-7.4h3.9v15.2h-3.6v-8.9l-3.6 6.3h-1.8l-3.6-6.3v8.9Z" fill="#E8B455"/></svg><span>Moni កំពុងឆ្លើយជំនួសអ្នក</span><div class="btn km">ឆ្លើយដោយខ្លួនឯង</div></div>
+<div class="comp">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#0084FF" stroke-width="2.2" stroke-linecap="round"/></svg><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3.5 8.4h3.2l1.5-2.2h7.6l1.5 2.2h3.2v10.4H3.5Z" stroke="#0084FF" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13.2" r="3.4" stroke="#0084FF" stroke-width="1.8"/></svg><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3.2" y="4.6" width="17.6" height="14.8" rx="3" stroke="#0084FF" stroke-width="1.8"/><circle cx="8.4" cy="9.6" r="1.7" fill="#0084FF"/><path d="m4.6 17.6 5-5 4.4 4.4 2.6-2.4 3.6 3.4" stroke="#0084FF" stroke-width="1.8" stroke-linejoin="round"/></svg><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="11" rx="3" stroke="#0084FF" stroke-width="1.8"/><path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0M12 17.8V21" stroke="#0084FF" stroke-width="1.8" stroke-linecap="round"/></svg>
+  <div class="inp km">សរសេរសារ</div>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="#0084FF"><path d="M3 11.4 20.4 3.6c.8-.4 1.6.4 1.2 1.2L13.8 22c-.4.8-1.6.7-1.8-.2l-1.4-6.4-6.4-1.4c-.9-.2-1-1.4-.2-1.6Z"/></svg>
+</div></div></body></html>

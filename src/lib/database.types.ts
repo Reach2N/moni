@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -157,9 +157,11 @@ export type Database = {
       businesses: {
         Row: {
           address: string | null
+          ai_instructions: string | null
           attributes: Json
           business_type: string
           category: string
+          clerk_user_id: string | null
           created_at: string
           default_currency: string
           hours: Json
@@ -180,9 +182,11 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_instructions?: string | null
           attributes?: Json
           business_type?: string
           category?: string
+          clerk_user_id?: string | null
           created_at?: string
           default_currency?: string
           hours?: Json
@@ -203,9 +207,11 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_instructions?: string | null
           attributes?: Json
           business_type?: string
           category?: string
+          clerk_user_id?: string | null
           created_at?: string
           default_currency?: string
           hours?: Json
@@ -237,6 +243,8 @@ export type Database = {
           last_error: string | null
           secret_ref: string | null
           status: string
+          token_ciphertext: string | null
+          webhook_secret: string | null
         }
         Insert: {
           business_id: string
@@ -248,6 +256,8 @@ export type Database = {
           last_error?: string | null
           secret_ref?: string | null
           status?: string
+          token_ciphertext?: string | null
+          webhook_secret?: string | null
         }
         Update: {
           business_id?: string
@@ -259,6 +269,8 @@ export type Database = {
           last_error?: string | null
           secret_ref?: string | null
           status?: string
+          token_ciphertext?: string | null
+          webhook_secret?: string | null
         }
         Relationships: [
           {
@@ -1021,6 +1033,146 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_month_usage"
             referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      waitlist: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          converted_business_id: string | null
+          created_at: string
+          email: string
+          id: string
+          locale: string
+          note: string | null
+          source: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          converted_business_id?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          locale?: string
+          note?: string | null
+          source?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          converted_business_id?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          locale?: string
+          note?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_converted_business_id_fkey"
+            columns: ["converted_business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitlist_converted_business_id_fkey"
+            columns: ["converted_business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "waitlist_converted_business_id_fkey"
+            columns: ["converted_business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "waitlist_converted_business_id_fkey"
+            columns: ["converted_business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      webhook_events: {
+        Row: {
+          business_id: string | null
+          channel: string
+          connection_id: string | null
+          error: string | null
+          external_event_id: string | null
+          id: number
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          status: string
+        }
+        Insert: {
+          business_id?: string | null
+          channel: string
+          connection_id?: string | null
+          error?: string | null
+          external_event_id?: string | null
+          id?: number
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+        }
+        Update: {
+          business_id?: string | null
+          channel?: string
+          connection_id?: string | null
+          error?: string | null
+          external_event_id?: string | null
+          id?: number
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "webhook_events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "webhook_events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "webhook_events_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "channel_connections"
+            referencedColumns: ["id"]
           },
         ]
       }

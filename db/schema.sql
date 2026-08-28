@@ -34,6 +34,7 @@ create table if not exists businesses (
   business_type      text not null default 'other',
   category           text not null default 'services',
   owner_user_id      uuid,
+  clerk_user_id      text,
   phone              text,
   address            text,
   province           text,
@@ -43,6 +44,7 @@ create table if not exists businesses (
   raw_description    text,
   parsed_at          timestamptz,
   parse_model        text,
+  ai_instructions    text,
   hours              jsonb not null default '[]'::jsonb,
   attributes         jsonb not null default '{}'::jsonb,
   plan               text not null default 'free',
@@ -55,21 +57,29 @@ comment on column businesses.raw_description is 'The exact text the owner typed 
 comment on column businesses.hours is 'Weekly opening hours: [{"dow":1,"open":"08:00","close":"19:00"}]. dow 0=Sunday. A day absent means closed.';
 comment on column businesses.business_type is 'Taxonomy id from BUSINESS_TYPES in types.ts (salon, clinic, hotel, ...). Deliberately unconstrained text so new verticals need no migration.';
 comment on column businesses.attributes is 'Vertical-specific fields that do not deserve a column. Keeps the table shape frozen.';
+comment on column businesses.clerk_user_id is 'Clerk user id (text like user_2abc), the tenant key. Deliberately NOT unique: the chain plan allows several businesses per owner.';
+comment on column businesses.ai_instructions is 'Owner''s standing instructions for the assistant ("never discount", "always offer the promo"). Appended to the system prompt. Separate from raw_description, which is never overwritten.';
+create index if not exists businesses_clerk_user
+  on businesses (clerk_user_id) where clerk_user_id is not null;
 
 create table if not exists channel_connections (
-  id           uuid primary key default gen_random_uuid(),
-  business_id  uuid not null references businesses(id) on delete cascade,
-  channel      text not null,
-  external_id  text,
-  display_name text,
-  secret_ref   text,
-  status       text not null default 'disconnected',
-  connected_at timestamptz,
-  last_error   text,
+  id               uuid primary key default gen_random_uuid(),
+  business_id      uuid not null references businesses(id) on delete cascade,
+  channel          text not null,
+  external_id      text,
+  display_name     text,
+  secret_ref       text,
+  token_ciphertext text,
+  webhook_secret   text,
+  status           text not null default 'disconnected',
+  connected_at     timestamptz,
+  last_error       text,
   unique (business_id, channel)
 );
 comment on table  channel_connections is 'Telegram / Messenger / Instagram hookups. Connecting a channel is data, not a code change.';
-comment on column channel_connections.secret_ref is 'Key NAME resolved server-side (env or vault). Never store the bot token or page token itself in a row.';
+comment on column channel_connections.secret_ref is 'Key NAME resolved server-side (env or vault), for PLATFORM-owned secrets such as our Meta app secret.';
+comment on column channel_connections.token_ciphertext is 'Owner-pasted credential (BotFather token, page access token), AES-256-GCM encrypted with the env key MONI_TOKEN_KEY before it reaches the row. Never plaintext, never sent to a client.';
+comment on column channel_connections.webhook_secret is 'Random per-connection secret embedded in the webhook URL so inbound calls prove their origin.';
 
 create table if not exists closures (
   id          uuid primary key default gen_random_uuid(),
@@ -332,9 +342,61 @@ create table if not exists events (
 comment on table events is 'Append-only: who did what, before and after. Doubles as the agent''s memory of its own actions and as the owner''s undo history. Never UPDATE or DELETE here.';
 create index if not exists events_biz_time on events (business_id, created_at desc);
 
+-- ═══════════════════════════════════════════ platform tables (ours, not the tenant's)
+-- The owner's data above is exportable and theirs. These two are operations data:
+-- when RLS lands they get NO member policy, service-role access only.
+
+create table if not exists waitlist (
+  id                    uuid primary key default gen_random_uuid(),
+  email                 text not null,
+  locale                text not null default 'km',
+  source                text not null default 'landing',
+  note                  text,
+  approved_at           timestamptz,
+  approved_by           text,
+  converted_business_id uuid references businesses(id) on delete set null,
+  created_at            timestamptz not null default now()
+);
+comment on table  waitlist is 'Founding-shop applications from the public landing page. Membership here (or approved_at set) is what the app-subdomain gate checks after Clerk sign-in.';
+comment on column waitlist.approved_at is 'Set by us, manually, until an admin surface exists. NULL means waiting.';
+comment on column waitlist.converted_business_id is 'Filled when the member finishes onboarding, closing the loop from lead to live shop.';
+create unique index if not exists waitlist_email_uniq on waitlist (lower(email));
+
+create table if not exists webhook_events (
+  id                bigserial primary key,
+  channel           text not null,
+  connection_id     uuid references channel_connections(id) on delete set null,
+  business_id       uuid references businesses(id) on delete set null,
+  external_event_id text,
+  payload           jsonb not null,
+  status            text not null default 'received',
+  error             text,
+  received_at       timestamptz not null default now(),
+  processed_at      timestamptz,
+  constraint webhook_events_status_ok check (status in ('received','processed','skipped','failed'))
+);
+comment on table  webhook_events is 'Raw inbound channel payloads (Telegram update, Meta message), append-first. Dedupe, replay and debugging all read from here; losing a webhook must never lose a customer message.';
+comment on column webhook_events.external_event_id is 'The provider''s own id (Telegram update_id, Meta mid). The dedupe key: providers redeliver on slow responses.';
+create unique index if not exists webhook_events_dedupe
+  on webhook_events (channel, connection_id, external_event_id)
+  where external_event_id is not null;
+create index if not exists webhook_events_pending
+  on webhook_events (status, received_at) where status = 'received';
+
+-- These two start LOCKED, unlike the tenant tables below where RLS waits for
+-- Clerk: they are new, the landing page feeds waitlist from the public
+-- internet, and only the service role has any business reading them. RLS on
+-- with no policy means exactly that.
+alter table waitlist       enable row level security;
+alter table webhook_events enable row level security;
+
 -- ═══════════════════════════════════════════════════════════ updated_at
 
-create or replace function moni_touch() returns trigger language plpgsql as $fn$
+-- search_path pinned empty (advisor 0011): a trigger function with a mutable
+-- search_path can be hijacked by objects planted in another schema. now() still
+-- resolves because pg_catalog is always searched implicitly.
+create or replace function moni_touch() returns trigger
+  language plpgsql set search_path = '' as $fn$
 begin new.updated_at = now(); return new; end $fn$;
 
 drop trigger if exists businesses_touch on businesses;
@@ -352,9 +414,12 @@ create trigger payments_touch before update on payments
 
 -- ═══════════════════════════════════════════════════════════════ views
 -- Written so the agent and the dashboard never hand-roll a join.
+-- All security_invoker (advisor 0010): a definer view silently bypasses RLS,
+-- which becomes a hole the day the member policies turn on. The service role
+-- bypasses RLS anyway, so the app sees no difference today.
 
 -- One row per business: everything the agent needs to be grounded.
-create or replace view v_agent_business as
+create or replace view v_agent_business with (security_invoker = true) as
 select b.id as business_id, b.slug, b.name, b.business_type, b.category,
        b.timezone, b.default_currency, b.locale, b.hours, b.phone, b.address,
        coalesce((select jsonb_agg(jsonb_build_object(
@@ -375,7 +440,7 @@ from businesses b;
 comment on view v_agent_business is 'The agent''s grounding payload: one row, hours + services + resources + closures. Serialise straight into the system prompt.';
 
 -- Bookings with everything a human or an agent needs to talk about them.
-create or replace view v_bookings_agent as
+create or replace view v_bookings_agent with (security_invoker = true) as
 select bk.id, bk.business_id, bk.code, bk.status, bk.starts_at, bk.ends_at,
        bk.unit, bk.quantity, bk.party_size, bk.price_minor, bk.currency, bk.channel,
        s.name as service_name, s.name_en as service_name_en,
@@ -394,7 +459,7 @@ left join (select booking_id, sum(amount_minor) as paid_minor
 comment on view v_bookings_agent is 'Balance is derived from paid payments, never stored, so it cannot drift.';
 
 -- Revenue counts completed bookings and paid payments only. Pending is not revenue.
-create or replace view v_month_stats as
+create or replace view v_month_stats with (security_invoker = true) as
 select b.id as business_id,
        date_trunc('month', now() at time zone b.timezone) as month,
        count(bk.id) filter (where bk.status = 'completed')                 as completed,
@@ -414,7 +479,7 @@ group by b.id, b.default_currency, b.timezone;
 -- Free-tier metering. A billable transaction is a booking that got real
 -- (confirmed or completed) plus any standalone paid sale with no booking behind
 -- it, so a booking that is also paid counts once, not twice.
-create or replace view v_month_usage as
+create or replace view v_month_usage with (security_invoker = true) as
 select b.id as business_id, b.plan, b.quota_txn_month,
        coalesce(bk.n, 0) + coalesce(pay.n, 0) as txn_used,
        greatest(b.quota_txn_month - (coalesce(bk.n, 0) + coalesce(pay.n, 0)), 0) as txn_left,
@@ -435,7 +500,7 @@ comment on view v_month_usage is 'The free-tier meter. Transactions, not convers
 
 -- Self-documenting schema: feed this to the agent instead of maintaining a
 -- hand-written description that drifts from reality.
-create or replace view v_schema_doc as
+create or replace view v_schema_doc with (security_invoker = true) as
 select c.relname as table_name,
        a.attname as column_name,
        format_type(a.atttypid, a.atttypmod) as data_type,
@@ -448,41 +513,54 @@ where n.nspname = 'public' and c.relkind in ('r','v')
 order by c.relname, a.attnum;
 
 -- ═══════════════════════════════════════════════════════════════ RLS
--- OFF for the demo: the server talks to Postgres with the service role, and you
--- said security stays loose for now. Uncomment on the day auth lands, then
--- tenant isolation is enforced by the database instead of by remembering a
--- WHERE clause in forty places.
+-- ON everywhere, deny by default, since 27 August 2026. No policies exist yet,
+-- so the anon and authenticated roles can do NOTHING through the Data API,
+-- which is exactly right for a live database with no auth story shipped. The
+-- app is unaffected: the server talks to Postgres with the service role, which
+-- bypasses RLS.
+--
+-- What waits for Clerk (PLAN.md Phase 2) is the MEMBER POLICIES below, not the
+-- lockdown. They are written for Clerk via Supabase third-party auth: the JWT
+-- subject is the Clerk user id, a TEXT like "user_2abc", not a uuid, so user_id
+-- is text and the member check reads auth.jwt()->>'sub', never auth.uid()
+-- (which expects uuid).
+
+alter table businesses          enable row level security;
+alter table channel_connections enable row level security;
+alter table closures            enable row level security;
+alter table services            enable row level security;
+alter table resources           enable row level security;
+alter table resource_services   enable row level security;
+alter table customers           enable row level security;
+alter table customer_identities enable row level security;
+alter table bookings            enable row level security;
+alter table payments            enable row level security;
+alter table payment_events      enable row level security;
+alter table conversations       enable row level security;
+alter table messages            enable row level security;
+alter table events              enable row level security;
+
+-- Phase 2, with Clerk:
 --
 -- create table business_members (
 --   business_id uuid references businesses(id) on delete cascade,
---   user_id     uuid not null,
+--   user_id     text not null,   -- Clerk user id
 --   role        text not null default 'owner',
 --   primary key (business_id, user_id)
 -- );
 -- create or replace function moni_is_member(bid uuid) returns boolean
---   language sql security definer stable as $fn$
---     select exists (select 1 from business_members
---                     where business_id = bid and user_id = auth.uid()) $fn$;
+--   language sql security definer stable set search_path = '' as $fn$
+--     select exists (select 1 from public.business_members
+--                     where business_id = bid and user_id = auth.jwt()->>'sub') $fn$;
 --
--- alter table businesses          enable row level security;
 -- create policy tenant on businesses          using (moni_is_member(id));
--- alter table channel_connections enable row level security;
 -- create policy tenant on channel_connections using (moni_is_member(business_id));
--- alter table closures            enable row level security;
 -- create policy tenant on closures            using (moni_is_member(business_id));
--- alter table services            enable row level security;
 -- create policy tenant on services            using (moni_is_member(business_id));
--- alter table resources           enable row level security;
 -- create policy tenant on resources           using (moni_is_member(business_id));
--- alter table customers           enable row level security;
 -- create policy tenant on customers           using (moni_is_member(business_id));
--- alter table bookings            enable row level security;
 -- create policy tenant on bookings            using (moni_is_member(business_id));
--- alter table payments            enable row level security;
 -- create policy tenant on payments            using (moni_is_member(business_id));
--- alter table conversations       enable row level security;
 -- create policy tenant on conversations       using (moni_is_member(business_id));
--- alter table messages            enable row level security;
 -- create policy tenant on messages            using (moni_is_member(business_id));
--- alter table events              enable row level security;
 -- create policy tenant on events              using (moni_is_member(business_id));

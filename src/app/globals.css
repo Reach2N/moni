@@ -45,6 +45,23 @@
   --color-on-ink-dim:#94A3B8;
   --color-hairline:  #CBD5E1;
 
+  /* shadcn semantic aliases. Components keep their upstream APIs while the
+     Invitation still owns every material and ink. */
+  --color-background:         #F8FAFC;
+  --color-foreground:         #0F172A;
+  --color-primary:            #0F172A;
+  --color-primary-foreground: #059669;
+  --color-secondary:          #F8FAFC;
+  --color-secondary-foreground:#0F172A;
+  --color-muted:              color-mix(in srgb, #0F172A 4%, #F8FAFC);
+  --color-muted-foreground:   #475569;
+  --color-accent:             color-mix(in srgb, #0F172A 4%, #F8FAFC);
+  --color-accent-foreground:  #0F172A;
+  --color-border:             #475569;
+  --color-input:              #475569;
+  --color-ring:               #059669;
+  --color-destructive:        #0F172A;
+
   /* Khmer coeng subscripts clip below 1.75, and Tailwind v4 pairs a line height
      with every text utility, so the defaults are raised at the source. */
   --text-xs--line-height: 1.75;
@@ -72,13 +89,14 @@
    The parts nobody draws still carry the design. Left at their defaults they
    belong to no design system at all. */
 ::selection            { background: var(--color-seal); color: var(--color-paper); }
-:root                  { caret-color: var(--color-seal); accent-color: var(--color-seal); }
+:root                  { caret-color: var(--color-seal); accent-color: var(--color-seal); color-scheme: light; }
 :focus-visible         { outline: 2px solid var(--color-seal); outline-offset: 2px; border-radius: 1px; }
 ::-webkit-scrollbar         { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track   { background: var(--color-paper); }
 ::-webkit-scrollbar-thumb   { background: var(--color-hairline); border: 3px solid var(--color-paper); }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-rule); }
 * { scrollbar-color: var(--color-hairline) var(--color-paper); scrollbar-width: thin; }
+button, a { touch-action: manipulation; -webkit-tap-highlight-color: color-mix(in srgb, var(--color-seal) 18%, transparent); }
 
 html, body {
   background: var(--color-paper);

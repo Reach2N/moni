@@ -1,5 +1,11 @@
 # Moni: UI build plan
 
+> **Superseded, 27 August 2026.** PLAN.md is now the build order and design direction
+> (black and white with a green accent, Apple-native, OpenRouter, Clerk, moni.cam).
+> This file remains useful for its verified research: component licensing, the Khmer
+> clipping fixes, the hand-built component rationale, and the route sketches. Where it
+> conflicts with PLAN.md, PLAN.md wins.
+
 Mark up anything here and I will swap it. Nothing below is built yet.
 
 House rules for this codebase:

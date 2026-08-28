@@ -1,0 +1,72 @@
+<!doctype html><html lang="km"><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+html,body{width:1080px;height:1440px;overflow:hidden;background:#000}
+body{font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,"Khmer Sangam MN",sans-serif}
+.km{font-family:-apple-system,"SF Pro Text","Helvetica Neue","Khmer Sangam MN",sans-serif;line-height:1.75}
+.screen{position:absolute;top:0;left:0;width:540px;height:720px;transform:scale(2);transform-origin:0 0;overflow:hidden;background:#fff}
+.sb{height:54px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 6px;font-size:15px;font-weight:600;letter-spacing:.2px}
+.sb .r{display:flex;align-items:center;gap:5px}
+.spacer{flex:1}
+img{display:block}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Regular.woff2") format("woff2");font-weight:400}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Medium.woff2") format("woff2");font-weight:500}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-SemiBold.woff2") format("woff2");font-weight:600}
+@font-face{font-family:Busra;src:url("../assets/fonts/Busra-Bold.woff2") format("woff2");font-weight:700}
+
+.nav{height:54px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#F7F7F7;border-bottom:.5px solid #D8D8DC}
+.nav .bk{display:flex;align-items:center;gap:4px;color:#007AFF;font-size:15px}
+.nav .mid{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+.nav .nm{font-size:15.5px;font-weight:600;color:#000}
+.nav .st{font-size:11.5px;color:#8E8E93}
+.wall{position:relative;height:calc(720px - 54px - 54px - 62px);background:#CFE3F0;overflow:hidden;padding:12px 12px 8px;display:flex;flex-direction:column;justify-content:flex-end}
+.wall:before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.5) 0 2px,transparent 3px),radial-gradient(circle at 70% 65%,rgba(255,255,255,.42) 0 2px,transparent 3px),radial-gradient(circle at 45% 85%,rgba(255,255,255,.35) 0 2px,transparent 3px);background-size:120px 120px}
+.day{position:relative;text-align:center;margin-bottom:10px}
+.day span{background:rgba(0,0,0,.16);color:#fff;font-size:11px;padding:3px 11px;border-radius:11px}
+.r{position:relative;display:flex;margin-bottom:5px}
+.r.me{justify-content:flex-end}
+.bub{max-width:76%;background:#fff;border-radius:14px;padding:8px 12px 7px;font-size:14.5px;color:#000;box-shadow:0 1px 1px rgba(0,0,0,.09)}
+.me .bub{background:#E1FFC7}
+.meta{display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:10px;color:#8E9AA4;margin-top:2px}
+.me .meta{color:#5FA355}
+.qr{background:#fff;border-radius:14px;padding:11px;box-shadow:0 1px 1px rgba(0,0,0,.09);width:214px}
+.qr .qh{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:#0F172A;margin-bottom:9px}
+.qr img{width:100%;height:auto;border:1px solid #EEF1F4}
+.qr .amt{font-size:19px;font-weight:700;text-align:center;margin-top:9px;color:#0F172A}
+.qr .sub{font-size:10.5px;color:#7B8794;text-align:center;margin-top:2px}
+.kb{display:flex;gap:5px;margin-top:5px}
+.kb div{flex:1;background:rgba(255,255,255,.92);border-radius:10px;text-align:center;font-size:12px;color:#2C7BC9;padding:8px 4px}
+.paid{background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 1px 1px rgba(0,0,0,.09);width:250px;border-left:3px solid #059669}
+.paid .h{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700;color:#047857}
+.paid .l{display:flex;justify-content:space-between;font-size:12px;color:#4A5563;margin-top:7px}
+.tag{display:flex;align-items:center;gap:5px;font-size:10.5px;color:#5A6B7A;justify-content:flex-end;padding:3px 4px 8px}
+.tag b{font-weight:600}
+.comp{position:absolute;bottom:0;left:0;right:0;height:62px;background:#F7F7F7;border-top:.5px solid #D8D8DC;display:flex;align-items:center;gap:14px;padding:0 14px 8px}
+.inp{flex:1;height:36px;background:#fff;border:.5px solid #D8D8DC;border-radius:18px;display:flex;align-items:center;padding:0 14px;font-size:14.5px;color:#A0A0A5}
+</style></head><body><div class="screen" style="background:#fff">
+<div class="sb" style="color:#000">
+  <span>10:24</span>
+  <span class="r">
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="#000"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.2A10.5 10.5 0 0 1 15 4.2" stroke="#000" stroke-width="1.8" stroke-linecap="round"/><path d="M3.6 7A6.8 6.8 0 0 1 12.4 7" stroke="#000" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="10" r="1.4" fill="#000"/></svg>
+    <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x=".7" y=".7" width="21" height="10.6" rx="3" stroke="#000" stroke-opacity=".4" stroke-width="1.2"/><rect x="2.4" y="2.4" width="15" height="7.2" rx="1.8" fill="#000"/><path d="M23.4 4.2v3.6c1.1-.3 1.6-.9 1.6-1.8s-.5-1.5-1.6-1.8Z" fill="#000" fill-opacity=".5"/></svg>
+  </span>
+</div>
+<div class="nav">
+  <span class="bk"><svg width="11" height="18.7" viewBox="0 0 12 20" fill="none"><path d="M10 2 2 10l8 8" stroke="#007AFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg> <span class="km">សារ</span></span>
+  <div class="mid"><div class="nm km">រតនា</div><div class="st km">តាមរយៈ @SopheaShoesBot</div></div>
+  <div style="margin-left:auto"><div style="width:34px;height:34px;border-radius:50%;background:#EF8A3C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14.28px;font-weight:600;flex:none">រ</div></div>
+</div>
+<div class="wall">
+  <div class="day"><span class="km">ថ្ងៃនេះ</span></div>
+  <div class="r me"><div class="bub"><span class="km">សរុប 46.50$ សូមស្កេន KHQR បាទ</span><div class="meta">10:38 <svg width="14" height="8.68" viewBox="0 0 16 10" fill="none"><path d="M1 5.6 4.2 8.8 10.4 1.6" stroke="#5FA355" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.6 8.4 14.8 1.4" stroke="#5FA355" stroke-width="1.7" stroke-linecap="round"/></svg></div></div></div>
+  <div class="r"><div class="bub"><span class="km">បង់រួចហើយបង</span><div class="meta">10:41</div></div></div>
+  <div class="r me"><div class="paid">
+    <div class="h km"><svg width="17" height="10.54" viewBox="0 0 16 10" fill="none"><path d="M1 5.6 4.2 8.8 10.4 1.6" stroke="#047857" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.6 8.4 14.8 1.4" stroke="#047857" stroke-width="1.7" stroke-linecap="round"/></svg> បានទទួលប្រាក់ 46.50$</div>
+    <div class="l"><span class="km">ការបញ្ជាទិញ</span><b>#1043</b></div>
+    <div class="l"><span class="km">ស្បែកជើងស Crystal White · ទំហំ 38</span></div>
+    <div class="l"><span class="km">ដឹកជញ្ជូន</span><span class="km">ភ្នំពេញ · ថ្ងៃនេះ</span></div>
+  </div></div>
+  <div class="r me"><div class="bub"><span class="km">អរគុណបង យើងនឹងដឹកជញ្ជូនក្នុងថ្ងៃនេះ។ ម្ចាស់ហាងបានទទួលការបញ្ជាទិញរួចហើយបាទ</span><div class="meta">10:41 <svg width="14" height="8.68" viewBox="0 0 16 10" fill="none"><path d="M1 5.6 4.2 8.8 10.4 1.6" stroke="#5FA355" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.6 8.4 14.8 1.4" stroke="#5FA355" stroke-width="1.7" stroke-linecap="round"/></svg></div></div></div>
+  <div class="tag km"><svg width="13" height="13" viewBox="0 0 36 36"><rect width="36" height="36" rx="9" fill="#14181C"/><rect x="3" y="3" width="30" height="30" rx="6.5" fill="none" stroke="#C08A2E" stroke-width="1"/><path d="M10.4 25.6V10.4h3.9l4.2 7.4 4.2-7.4h3.9v15.2h-3.6v-8.9l-3.6 6.3h-1.8l-3.6-6.3v8.9Z" fill="#E8B455"/></svg><b>ឆ្លើយស្វ័យប្រវត្តិដោយ Moni</b><span>· ភ្លាមៗ</span></div>
+</div>
+<div class="comp"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round"/></svg><div class="inp km">សារ</div><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="11" rx="3" stroke="#8E8E93" stroke-width="1.8"/><path d="M5.6 11.4a6.4 6.4 0 0 0 12.8 0M12 17.8V21" stroke="#8E8E93" stroke-width="1.8" stroke-linecap="round"/></svg></div></div></body></html>

@@ -39,13 +39,30 @@ export function Frame({
   )
 }
 
-/** The plate: the shop's name set centred at display scale under a hairline. */
-export function Plate({ name, meta }: { name: string; meta: string }) {
+/**
+ * The compact shop plate. This is the first of exactly two ornament instances
+ * on the command-centre surface; the day ledger owns the second.
+ */
+export function CompactPlate({
+  name,
+  meta,
+  shortMeta,
+}: {
+  name: string
+  meta: string
+  /** What survives when the plate runs out of room. The name never yields. */
+  shortMeta: string
+}) {
   return (
-    <Frame className="my-5 px-4 py-6 text-center">
-      <h1 className="km text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{name}</h1>
-      <hr className="mx-auto mt-4 w-20 border-0 border-t border-rule" />
-      <p className="km tnum mt-3 text-xs text-rule">{meta}</p>
+    <Frame className="flex h-10 min-w-0 items-center gap-3 px-3">
+      <h1 className="km min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.015em] text-ink">{name}</h1>
+      <span aria-hidden className="h-4 shrink-0 border-l border-hairline" />
+      {/* The meta was shrink-0, which made the demo label outrank the shop's own
+          name: at 390px "Sokha Beauty" was cut to "Sokha B..." so a fixture
+          marker could print in full. The marker is required (PRODUCT.md) but it
+          is not what she opened the app to read, so it shortens first. */}
+      <p className="km tnum hidden shrink-0 text-xs text-rule sm:block">{meta}</p>
+      <p className="km tnum shrink-0 text-xs text-rule sm:hidden">{shortMeta}</p>
     </Frame>
   )
 }

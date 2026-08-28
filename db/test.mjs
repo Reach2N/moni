@@ -14,6 +14,9 @@ import { formatMoney } from '../src/lib/types.ts'
 import { amountsMatch, idempotencyKey, shouldFallback, QR_TTL_SECONDS } from '../src/lib/payments.ts'
 import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
+import { cambodiaDayBounds, cambodiaMonthBounds } from '../src/lib/time/cambodia.ts'
+import { assertSameOriginBrowserPost, readJsonBody } from '../src/lib/http/post.ts'
+import { SetupRequestSchema } from '../src/lib/setup/schema.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const sql = (f) => readFileSync(join(here, f), 'utf8')
@@ -23,7 +26,8 @@ const ok = (name) => { pass++; console.log(`  \x1b[32m✓\x1b[0m ${name}`) }
 const no = (name, detail) => { fail++; console.log(`  \x1b[31m✗\x1b[0m ${name}\n      ${detail}`) }
 
 function eq(name, actual, expected) {
-  actual === expected ? ok(`${name} → ${actual}`) : no(name, `expected ${expected}, got ${actual}`)
+  if (actual === expected) ok(`${name} → ${actual}`)
+  else no(name, `expected ${expected}, got ${actual}`)
 }
 async function expectFail(db, name, statement, needle) {
   try {
@@ -31,9 +35,8 @@ async function expectFail(db, name, statement, needle) {
     no(name, 'statement was ACCEPTED but should have been rejected')
   } catch (e) {
     const m = String(e.message ?? e)
-    m.toLowerCase().includes(needle.toLowerCase())
-      ? ok(name)
-      : no(name, `rejected, but not for the expected reason: ${m.split('\n')[0]}`)
+    if (m.toLowerCase().includes(needle.toLowerCase())) ok(name)
+    else no(name, `rejected, but not for the expected reason: ${m.split('\n')[0]}`)
   }
 }
 async function expectOk(db, name, statement) {
@@ -193,9 +196,8 @@ console.log('\nupdated_at')
 const before = await one(db, `select updated_at from services where id='${S_CUT}'`)
 await db.exec(`update services set price_minor = 16000 where id='${S_CUT}'`)
 const after = await one(db, `select updated_at, price_minor from services where id='${S_CUT}'`)
-after.updated_at > before.updated_at
-  ? ok('updated_at moves on UPDATE (price drift is detectable)')
-  : no('updated_at trigger', 'timestamp did not change')
+if (after.updated_at > before.updated_at) ok('updated_at moves on UPDATE (price drift is detectable)')
+else no('updated_at trigger', 'timestamp did not change')
 eq('price actually changed', Number(after.price_minor), 16000)
 const hist = await one(db, `select price_minor from bookings where code='MN4K2P'`)
 eq('old booking keeps its snapshot price after the change', Number(hist.price_minor), 15000)
@@ -217,8 +219,10 @@ const nowMs = Date.now()
 const k1 = idempotencyKey('MN9X5C', 'deposit', nowMs)
 const k2 = idempotencyKey('MN9X5C', 'deposit', nowMs + 1000)
 const k3 = idempotencyKey('MN9X5C', 'deposit', nowMs + QR_TTL_SECONDS * 2000)
-k1 === k2 ? ok('a retry inside one QR lifetime reuses the same key') : no('idempotency', 'key churned within the TTL window')
-k1 !== k3 ? ok('after the QR lapses the key changes, so a new QR can be minted') : no('idempotency', 'key did not change across windows')
+if (k1 === k2) ok('a retry inside one QR lifetime reuses the same key')
+else no('idempotency', 'key churned within the TTL window')
+if (k1 !== k3) ok('after the QR lapses the key changes, so a new QR can be minted')
+else no('idempotency', 'key did not change across windows')
 
 await expectOk(db, 'DB accepts the re-mint after expiry (customer is not stranded)',
   `insert into payments (business_id, booking_id, amount_minor, currency, provider, idempotency_key)
@@ -232,17 +236,149 @@ await expectOk(db, 'next window mints a fresh row',
    values ('${B_SALON}', '90000000-0000-4000-8000-000000000003', 20000, 'KHR', 'khqr', '${k3}')`)
 
 // the float epsilon bug, closed
-amountsMatch(1500, 1500) ? ok('exact payment settles') : no('amountsMatch', 'exact amount rejected')
-!amountsMatch(1500, 1499) ? ok('one cent short does NOT settle') : no('amountsMatch', 'underpayment accepted')
-!amountsMatch(1500, 0) ? ok('zero does not settle') : no('amountsMatch', 'zero accepted')
-!amountsMatch(1500, undefined) ? ok('unparseable provider amount does not settle') : no('amountsMatch', 'undefined accepted')
-!amountsMatch(15000, 14999) ? ok('riel underpayment does not settle') : no('amountsMatch', 'KHR underpayment accepted')
+if (amountsMatch(1500, 1500)) ok('exact payment settles')
+else no('amountsMatch', 'exact amount rejected')
+if (!amountsMatch(1500, 1499)) ok('one cent short does NOT settle')
+else no('amountsMatch', 'underpayment accepted')
+if (!amountsMatch(1500, 0)) ok('zero does not settle')
+else no('amountsMatch', 'zero accepted')
+if (!amountsMatch(1500, undefined)) ok('unparseable provider amount does not settle')
+else no('amountsMatch', 'undefined accepted')
+if (!amountsMatch(15000, 14999)) ok('riel underpayment does not settle')
+else no('amountsMatch', 'KHR underpayment accepted')
 
 // fallback rules
-!shouldFallback(401) ? ok('bad auth does not retry on the other rail') : no('shouldFallback', '401 retried')
-!shouldFallback(422) ? ok('bad payload does not retry') : no('shouldFallback', '422 retried')
-shouldFallback(500) ? ok('server fault retries on the other rail') : no('shouldFallback', '500 not retried')
-shouldFallback(404) ? ok('missing route retries on the other rail') : no('shouldFallback', '404 not retried')
+if (!shouldFallback(401)) ok('bad auth does not retry on the other rail')
+else no('shouldFallback', '401 retried')
+if (!shouldFallback(422)) ok('bad payload does not retry')
+else no('shouldFallback', '422 retried')
+if (shouldFallback(500)) ok('server fault retries on the other rail')
+else no('shouldFallback', '500 not retried')
+if (shouldFallback(404)) ok('missing route retries on the other rail')
+else no('shouldFallback', '404 not retried')
+
+// ── 11. route boundaries and Cambodia calendar maths ─────────────────────
+console.log('\nrequest and Cambodia-time boundaries')
+const augustEnd = cambodiaDayBounds(new Date('2026-08-31T16:59:59.000Z'))
+eq('16:59 UTC is still 31 August in Cambodia', augustEnd.date, '2026-08-31')
+eq('Cambodia day starts with +07 offset', augustEnd.start, '2026-08-31T00:00:00+07:00')
+eq('Cambodia day is half-open at the next local midnight', augustEnd.end, '2026-09-01T00:00:00+07:00')
+const september = cambodiaMonthBounds(new Date('2026-08-31T17:00:00.000Z'))
+eq('17:00 UTC crosses the Cambodia month boundary', september.month, '2026-09')
+eq('Cambodia month starts locally', september.start, '2026-09-01T00:00:00+07:00')
+eq('Cambodia month ends locally', september.end, '2026-10-01T00:00:00+07:00')
+
+const sameOrigin = new Request('https://moni.example/api/ask', {
+  method: 'POST',
+  headers: { origin: 'https://moni.example', 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+  body: JSON.stringify({ text: 'hello' }),
+})
+try {
+  assertSameOriginBrowserPost(sameOrigin)
+  ok('same-origin browser POST is accepted')
+} catch (error) {
+  no('same-origin browser POST', String(error))
+}
+const parsedBody = await readJsonBody(sameOrigin, 1_000)
+eq('JSON body is read after the origin guard', parsedBody.text, 'hello')
+try {
+  assertSameOriginBrowserPost(new Request('https://moni.example/api/ask', {
+    method: 'POST',
+    headers: { origin: 'https://attacker.example', 'content-type': 'application/json' },
+  }))
+  no('cross-origin browser POST', 'request was accepted')
+} catch {
+  ok('cross-origin browser POST is rejected')
+}
+
+const setupExample = {
+  raw_description: 'Sokha Beauty is open Monday and offers haircuts.',
+  model: 'test-model',
+  shop: {
+    business_type: 'salon',
+    default_currency: 'KHR',
+    hours: [{ dow: 1, open: '08:00', close: '19:00' }],
+    resource_count: 2,
+    notes: null,
+    services: [{
+      name: 'កាត់សក់', name_en: 'Haircut', price_minor: 15000, currency: 'KHR',
+      unit: 'session', duration_min: 30, buffer_min: 0,
+    }],
+  },
+}
+if (SetupRequestSchema.safeParse(setupExample).success) ok('setup accepts a strict edited parse result')
+else no('setup schema', 'valid edited parse result was rejected')
+if (!SetupRequestSchema.safeParse({ ...setupExample, slug: 'another-shop' }).success) {
+  ok('setup rejects a client-chosen tenant')
+} else no('setup schema', 'client-chosen tenant was accepted')
+const duplicateSetup = structuredClone(setupExample)
+duplicateSetup.shop.services.push({ ...duplicateSetup.shop.services[0] })
+if (!SetupRequestSchema.safeParse(duplicateSetup).success) ok('setup rejects duplicate normalized service names')
+else no('setup schema', 'duplicate service names were accepted')
+
+// ── 12. platform tables: waitlist and webhook_events ──────────────────────
+console.log('\nplatform tables (the gate and the channel inbox)')
+eq('waitlist seeded', Number((await one(db, 'select count(*) c from waitlist')).c), 2)
+await expectFail(db, 'same email with different case is REJECTED (one application per human)',
+  `insert into waitlist (email) values ('SOKHA@example.com')`, 'duplicate key')
+const gate = await one(db,
+  `select count(*) c from waitlist where lower(email) = 'sokha@example.com'
+    and (approved_at is not null or created_at is not null)`)
+eq('the gate query finds the approved member', Number(gate.c), 1)
+await expectOk(db, 'approving is a row update, no admin UI needed',
+  `update waitlist set approved_at = now(), approved_by = 'mense'
+    where email = 'visal@example.com'`)
+const converted = await one(db,
+  `select b.slug from waitlist w join businesses b on b.id = w.converted_business_id
+    where w.email = 'sokha@example.com'`)
+eq('converted lead links to the live shop', converted.slug, 'sokha-beauty')
+
+await expectOk(db, 'inbound telegram update lands with its payload',
+  `insert into webhook_events (channel, connection_id, business_id, external_event_id, payload)
+   values ('telegram', 'f0000000-0000-4000-8000-000000000001', '${B_SALON}', '801245',
+           '{"update_id":801245,"message":{"text":"free at 2pm?"}}'::jsonb)`)
+await expectFail(db, 'provider redelivery of the same update_id is REJECTED (no double reply)',
+  `insert into webhook_events (channel, connection_id, business_id, external_event_id, payload)
+   values ('telegram', 'f0000000-0000-4000-8000-000000000001', '${B_SALON}', '801245', '{}'::jsonb)`,
+  'duplicate key')
+await expectFail(db, 'invented webhook status is REJECTED',
+  `insert into webhook_events (channel, payload, status) values ('telegram', '{}'::jsonb, 'done')`,
+  'webhook_events_status_ok')
+
+// ── 13. tenancy and the teachable prompt ───────────────────────────────────
+console.log('\nclerk tenancy and ai_instructions')
+await expectOk(db, 'a Clerk user id (text, not uuid) attaches to a business',
+  `update businesses set clerk_user_id = 'user_2abcDEF123' where id = '${B_SALON}'`)
+const tenant = await one(db,
+  `select slug from businesses where clerk_user_id = 'user_2abcDEF123'`)
+eq('tenant lookup by clerk_user_id resolves', tenant.slug, 'sokha-beauty')
+const rawBefore = await one(db, `select raw_description from businesses where id = '${B_SALON}'`)
+await expectOk(db, 'owner teaches the assistant without touching raw_description',
+  `update businesses set ai_instructions = 'Always offer the Friday promotion. Never discount below list.'
+    where id = '${B_SALON}'`)
+const rawAfter = await one(db, `select raw_description, ai_instructions from businesses where id = '${B_SALON}'`)
+eq('raw_description survived the instruction change', rawAfter.raw_description, rawBefore.raw_description)
+if (rawAfter.ai_instructions?.includes('Friday')) ok('ai_instructions stored for the system prompt')
+else no('ai_instructions', 'instruction text did not persist')
+
+// ── 14. the lockdown (advisors 0008/0010/0011/0013, fixed 27 August) ───────
+console.log('\nRLS lockdown and view security')
+const rls = await one(db, `
+  select count(*) c from pg_class t join pg_namespace n on n.oid = t.relnamespace
+  where n.nspname = 'public' and t.relkind = 'r' and not t.relrowsecurity`)
+eq('every public table has RLS enabled (deny by default, service role bypasses)', Number(rls.c), 0)
+const noPolicy = await one(db, `select count(*) c from pg_policies where schemaname = 'public'`)
+eq('and zero policies exist until Clerk lands (Phase 2)', Number(noPolicy.c), 0)
+const views = await one(db, `
+  select count(*) c from pg_class v join pg_namespace n on n.oid = v.relnamespace
+  where n.nspname = 'public' and v.relkind = 'v'
+    and not ('security_invoker=true' = any(coalesce(v.reloptions, '{}')))`)
+eq('every view is security_invoker (none can bypass RLS later)', Number(views.c), 0)
+const fn = await one(db, `
+  select coalesce(array_to_string(proconfig, ','), '') cfg
+  from pg_proc where proname = 'moni_touch'`)
+if (fn.cfg.includes('search_path=')) ok('moni_touch has a pinned search_path')
+else no('moni_touch search_path', `proconfig is "${fn.cfg}"`)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

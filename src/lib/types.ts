@@ -189,6 +189,8 @@ export type Business = {
   business_type: BusinessTypeId | string
   category: Category | string
   owner_user_id: string | null
+  /** Clerk user id (text like "user_2abc"), the tenant key. Not unique: the chain plan allows several businesses per owner. */
+  clerk_user_id: string | null
   phone: string | null
   address: string | null
   province: string | null
@@ -198,6 +200,8 @@ export type Business = {
   raw_description: string | null
   parsed_at: string | null
   parse_model: string | null
+  /** Owner's standing instructions for the assistant ("never discount", "always offer the promo"). Appended to the system prompt, audit-logged on change. Separate from raw_description, which is never overwritten. */
+  ai_instructions: string | null
   hours: OpeningHours
   attributes: Record<string, unknown>
   plan: string
@@ -363,8 +367,16 @@ export type ChannelConnection = {
   channel: Channel | string
   external_id: string | null
   display_name: string | null
-  /** never the secret itself, a key name resolved server-side */
+  /** key NAME resolved server-side, for platform-owned secrets (our Meta app secret) */
   secret_ref: string | null
+  /**
+   * Owner-pasted credential (BotFather token, page access token), AES-256-GCM
+   * encrypted with the env key MONI_TOKEN_KEY before it touches the row.
+   * Never plaintext, never sent to a client.
+   */
+  token_ciphertext: string | null
+  /** random per-connection secret embedded in the webhook URL, so inbound calls prove origin */
+  webhook_secret: string | null
   status: 'connected' | 'disconnected' | 'error' | string
   connected_at: string | null
   last_error: string | null
@@ -432,6 +444,45 @@ export function expandResourceRange(a: CreateResourcesBulkArgs): string[] {
 }
 
 export type Slot = { starts_at: string; ends_at: string; resource_id: string; resource_name: string }
+
+// ─────────────────────────────────────────── platform tables (ours, not the tenant's)
+// The owner's data (businesses, bookings, customers, ...) is exportable and theirs.
+// These two are operations data: never shown to owners as their asset, service-role
+// only when RLS lands.
+
+/** A founding-shop application from the public landing page. */
+export type WaitlistEntry = {
+  id: string
+  email: string
+  locale: 'km' | 'en' | string
+  /** where the signup came from: landing | referral | manual */
+  source: string
+  note: string | null
+  /** set by us, manually, until an admin surface exists. NULL means waiting. */
+  approved_at: string | null
+  approved_by: string | null
+  /** filled when the member finishes onboarding, closing the loop */
+  converted_business_id: string | null
+  created_at: string
+}
+
+export const WEBHOOK_EVENT_STATUSES = ['received', 'processed', 'skipped', 'failed'] as const
+export type WebhookEventStatus = (typeof WEBHOOK_EVENT_STATUSES)[number]
+
+/** Raw inbound channel payload, kept for dedupe, replay and debugging. */
+export type WebhookEvent = {
+  id: number
+  channel: Channel | string
+  connection_id: string | null
+  business_id: string | null
+  /** provider's own id (Telegram update_id, Meta mid): the dedupe key */
+  external_event_id: string | null
+  payload: unknown
+  status: WebhookEventStatus
+  error: string | null
+  received_at: string
+  processed_at: string | null
+}
 
 // ───────────────────────────────────────────────────────────── billing
 // A "transaction" is what the free tier counts: a booking that got real, plus any
