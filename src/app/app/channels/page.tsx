@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { MessengerConnect } from '@/components/app/messenger-connect.tsx'
 import { TelegramConnect } from '@/components/app/telegram-connect.tsx'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,7 @@ export default async function ChannelsPage() {
   const member = await requireMember()
   const connections = await getChannelConnections(member.businessId)
   const telegram = connections.find((row) => row.channel === 'telegram') ?? null
+  const messenger = connections.find((row) => row.channel === 'messenger') ?? null
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
@@ -34,13 +36,7 @@ export default async function ChannelsPage() {
       <div className="mt-6 flex flex-col gap-4">
         <TelegramConnect connection={telegram} />
 
-        <section className="border border-rule/70 px-3 py-3">
-          <h2 className="km text-sm font-semibold text-ink">Messenger</h2>
-          <p className="km mt-1 text-sm text-rule">
-            Messenger ជាបណ្តាញធំជាងគេនៅកម្ពុជា ហើយវាជាបណ្តាញបន្ទាប់របស់យើង។ Meta តម្រូវឱ្យពិនិត្យកម្មវិធីជាមុន
-            ដែលចំណាយពេលច្រើនសប្តាហ៍ ដូច្នេះវាមិនទាន់បើកនៅឡើយទេ។
-          </p>
-        </section>
+        <MessengerConnect connection={messenger} />
       </div>
     </main>
   )

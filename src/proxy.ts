@@ -35,6 +35,9 @@ export const config = {
     '/api/setup',
     '/api/transcribe',
     '/api/channels/:path*',
+    '/api/conversations/:path*',
+    '/api/stream/:path*',
+    '/api/orders/:path*',
     // /api/chat is the customer endpoint and stays usable signed out, but it
     // has to run through the proxy so that an OWNER previewing their assistant
     // is recognised. Nothing on the public marketing site calls it.

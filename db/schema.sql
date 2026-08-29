@@ -448,7 +448,11 @@ select bk.id, bk.business_id, bk.code, bk.status, bk.starts_at, bk.ends_at,
        c.display_name as customer_name, c.phone as customer_phone, c.no_show_count,
        coalesce(p.paid_minor, 0) as paid_minor,
        bk.price_minor - coalesce(p.paid_minor, 0) as balance_minor,
-       bk.customer_note, bk.owner_note, bk.created_by, bk.created_at
+       bk.customer_note, bk.owner_note, bk.created_by, bk.created_at,
+       -- Appended, never reordered: `create or replace view` accepts new columns
+       -- only at the end. This one is the cursor the SSE stream polls on, so the
+       -- live dashboard is a `where updated_at > $1` and not a table scan.
+       bk.updated_at
 from bookings bk
 join services s  on s.id = bk.service_id
 join resources r on r.id = bk.resource_id

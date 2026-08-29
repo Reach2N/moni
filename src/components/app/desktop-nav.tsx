@@ -12,8 +12,10 @@ export function DesktopNav({ snapshot, urgent }: { snapshot: DashboardSnapshot; 
   const links = [
     { href: '#needs-now', label: 'ត្រូវពិនិត្យ', Icon: BellRing, count: urgent },
     { href: '#moni', label: 'ប្រាប់ Moni', Icon: Bot, count: 0 },
-    { href: '#today', label: 'ថ្ងៃនេះ', Icon: CalendarDays, count: 0 },
-    { href: '#inbox', label: 'សារ', Icon: Inbox, count: snapshot.needsOwner.length },
+    // Real routes since Phase 5. These used to be in-page anchors because the
+    // calendar and the inbox did not exist yet.
+    { href: '/app/calendar', label: 'ប្រតិទិន', Icon: CalendarDays, count: 0 },
+    { href: '/app/inbox', label: 'សារ', Icon: Inbox, count: snapshot.needsOwner.length },
   ]
 
   return (

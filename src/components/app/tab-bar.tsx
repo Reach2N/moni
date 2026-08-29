@@ -1,15 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { BellRing, Bot, CalendarDays, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
 import { PanelCount } from './panel.tsx'
 
+/**
+ * Two of these are sections of this page and two are their own routes since
+ * Phase 5. A tab with an `href` leaves; a tab without one scrolls. The observer
+ * below already filters out sections that are not in the document, so the two
+ * that left need no special case.
+ */
 const TABS = [
-  { id: 'needs-now', label: 'ត្រូវធ្វើ', Icon: BellRing },
-  { id: 'moni', label: 'Moni', Icon: Bot },
-  { id: 'today', label: 'ថ្ងៃនេះ', Icon: CalendarDays },
-  { id: 'inbox', label: 'សារ', Icon: Inbox },
+  { id: 'needs-now', label: 'ត្រូវធ្វើ', Icon: BellRing, href: null },
+  { id: 'moni', label: 'Moni', Icon: Bot, href: null },
+  { id: 'today', label: 'ប្រតិទិន', Icon: CalendarDays, href: '/app/calendar' },
+  { id: 'inbox', label: 'សារ', Icon: Inbox, href: '/app/inbox' },
 ] as const
 
 /**
@@ -50,26 +57,27 @@ export function TabBar({ inboxCount, urgent }: { inboxCount: number; urgent: num
       aria-label="ការធ្វើដំណើររហ័ស"
       className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-rule/70 bg-paper pb-[env(safe-area-inset-bottom)] xl:hidden"
     >
-      {TABS.map(({ id, label, Icon }) => {
+      {TABS.map(({ id, label, Icon, href }) => {
         const count = id === 'inbox' ? inboxCount : id === 'needs-now' ? urgent : 0
+        const Tag = href ? Link : 'a'
         return (
-          <a
+          <Tag
             key={id}
-            href={`#${id}`}
+            href={href ?? `#${id}`}
             onClick={() => setActive(id)}
-            aria-current={id === active ? 'true' : undefined}
+            aria-current={!href && id === active ? 'true' : undefined}
             className={cn(
               'relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1',
-              id === active ? 'text-ink' : 'text-rule',
+              !href && id === active ? 'text-ink' : 'text-rule',
             )}
           >
-            {id === active ? <span aria-hidden className="absolute inset-x-4 top-0 h-0.5 bg-seal" /> : null}
+            {!href && id === active ? <span aria-hidden className="absolute inset-x-4 top-0 h-0.5 bg-seal" /> : null}
             <span className="relative">
               <Icon className="size-5" strokeWidth={id === active ? 2 : 1.5} aria-hidden />
               {count > 0 ? <PanelCount value={count} className="absolute -top-1 -right-3.5" /> : null}
             </span>
-            <span className={cn('km truncate text-xs', id === active && 'font-semibold')}>{label}</span>
-          </a>
+            <span className={cn('km truncate text-xs', !href && id === active && 'font-semibold')}>{label}</span>
+          </Tag>
         )
       })}
     </nav>

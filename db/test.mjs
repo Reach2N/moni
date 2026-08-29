@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createHmac } from 'node:crypto'
 import { PGlite } from '@electric-sql/pglite'
 import { formatMoney } from '../src/lib/types.ts'
 import { amountsMatch, idempotencyKey, shouldFallback, QR_TTL_SECONDS } from '../src/lib/payments.ts'
@@ -21,6 +22,8 @@ import { instructionsBlock } from '../src/lib/agent/instructions.ts'
 import { decryptSecret, encryptSecret, newWebhookSecret, secretsMatch } from '../src/lib/crypto/secrets.ts'
 import { extractIncoming, looksLikeBotToken } from '../src/lib/channels/telegram.ts'
 import { scopedExternalId } from '../src/lib/agent/identity.ts'
+import { sortInbox } from '../src/lib/queries/inbox-order.ts'
+import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
   escapeLikePattern,
@@ -615,6 +618,75 @@ const settled = await one(db, `
    where connection_id = '${conn.id}' and external_event_id = '7001'`)
 eq('the delivery is recorded as handled', settled.status, 'processed')
 eq('with the time it was handled', settled.done, true)
+
+// ── 18. the dashboard: live cursor and inbox order (PLAN.md Phase 5) ───────
+console.log('\nthe live dashboard')
+// The SSE route polls `updated_at > cursor`, so the acceptance check ("appears
+// without a refresh in under two seconds") rests entirely on this column moving
+// when a booking changes, and on the view exposing it.
+const viewHasCursor = await one(db, `
+  select count(*) c from information_schema.columns
+   where table_name = 'v_bookings_agent' and column_name = 'updated_at'`)
+eq('the bookings view exposes the cursor the stream polls', Number(viewHasCursor.c), 1)
+// Pinned by id, not by `order by created_at limit 1`: the seed inserts every
+// booking in one statement, so created_at ties and that ordering picks a
+// different row each time you ask.
+const touchTarget = await one(db, `select id, updated_at from bookings where business_id = '${B_SALON}' limit 1`)
+const beforeTouch = touchTarget
+await new Promise((r) => setTimeout(r, 20))
+await expectOk(db, 'confirming a booking moves the cursor',
+  `update bookings set status = 'confirmed' where id = '${touchTarget.id}'`)
+const afterTouch = await one(db, `select updated_at from bookings where id = '${touchTarget.id}'`)
+eq('so the open dashboard sees it on the next tick',
+  new Date(afterTouch.updated_at) > new Date(beforeTouch.updated_at), true)
+const streamed = await one(db, `
+  select count(*) c from v_bookings_agent
+   where business_id = '${B_SALON}' and updated_at > '${beforeTouch.updated_at.toISOString()}'`)
+if (Number(streamed.c) >= 1) ok(`the cursor query returns the changed row (${streamed.c})`)
+else no('stream cursor', 'a confirmed booking did not come back from the cursor query')
+
+console.log('\ninbox order')
+const unsorted = [
+  { status: 'open', lastMessageAt: '2026-08-30T10:00:00Z' },
+  { status: 'needs_owner', lastMessageAt: '2026-08-29T08:00:00Z' },
+  { status: 'open', lastMessageAt: '2026-08-30T12:00:00Z' },
+  { status: 'needs_owner', lastMessageAt: '2026-08-30T09:00:00Z' },
+]
+const sorted = sortInbox(unsorted)
+// Escalations first even when they are older: they are the only rows that need
+// the owner at all, and a shop owner scrolling to find one has already lost.
+eq('the oldest escalation still outranks the newest handled thread',
+  sorted[0].status === 'needs_owner' && sorted[1].status === 'needs_owner', true)
+eq('and escalations are newest first among themselves',
+  sorted[0].lastMessageAt, '2026-08-30T09:00:00Z')
+eq('with the rest newest first below them', sorted[2].lastMessageAt, '2026-08-30T12:00:00Z')
+eq('sorting does not mutate the caller\'s array', unsorted[0].status, 'open')
+
+// ── 19. Messenger: signature and envelope (PLAN.md Phase 6) ────────────────
+console.log('\nMessenger deliveries')
+// Deliberately NOT canonical JSON: Meta signs the bytes it sent, whitespace and
+// all. A payload that happens to round trip byte for byte would prove nothing.
+const RAW = '{"object": "page", "entry": [{"id": "777", "messaging": [{"sender": {"id": "42"}, "message": {"mid": "m1", "text": "តម្លៃកាត់សក់ប៉ុន្មាន?"}}]}]}'
+const APP_SECRET = 'meta-app-secret'
+const goodSig = 'sha256=' + createHmac('sha256', APP_SECRET).update(RAW, 'utf8').digest('hex')
+eq('a Meta signature over the RAW body verifies', verifySignature(RAW, goodSig, APP_SECRET), true)
+// Re-serialising parsed JSON changes the bytes. This is the bug that costs an
+// afternoon, so it is asserted rather than remembered.
+eq('the same JSON re-serialised does NOT verify',
+  verifySignature(JSON.stringify(JSON.parse(RAW)), goodSig, APP_SECRET), false)
+eq('a forged signature is refused', verifySignature(RAW, 'sha256=' + 'a'.repeat(64), APP_SECRET), false)
+eq('an unsigned delivery is refused', verifySignature(RAW, null, APP_SECRET), false)
+const messages = extractMessengerMessages(JSON.parse(RAW))
+eq('one customer message is extracted', messages.length, 1)
+eq('with the page id, which is how the shop is resolved', messages[0].pageId, '777')
+eq('and Meta\'s own message id, which is the dedupe key', messages[0].messageId, 'm1')
+// A page's own outgoing messages come back through the same webhook. Without the
+// echo check the assistant answers itself, forever.
+eq('the page\'s own echo is not treated as a customer message',
+  extractMessengerMessages({ object: 'page', entry: [{ id: '777', messaging: [
+    { sender: { id: '777' }, message: { mid: 'm2', text: 'hi', is_echo: true } }] }] }).length, 0)
+eq('and a non-page payload is ignored entirely',
+  extractMessengerMessages({ object: 'instagram', entry: [] }).length, 0)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
