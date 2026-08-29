@@ -481,6 +481,28 @@ alter table storefronts    enable row level security;
 alter table waitlist       enable row level security;
 alter table webhook_events enable row level security;
 
+-- ═══════════════════════════════════════════════ foreign key covering indexes
+-- Postgres does NOT index a foreign key for you. Without a covering index every
+-- cascade and every join through these columns is a sequential scan, which is
+-- invisible on a seed database and a wall at a few thousand rows. Flagged by the
+-- Supabase performance advisor on 30 August 2026; added before there is traffic,
+-- because the moment to add an index is not the moment you notice you need one.
+
+create index if not exists bookings_service            on bookings (service_id);
+create index if not exists conversations_customer      on conversations (customer_id);
+create index if not exists customer_identities_customer on customer_identities (customer_id);
+create index if not exists invoices_booking            on invoices (booking_id);
+create index if not exists invoices_order              on invoices (order_id);
+create index if not exists messages_booking            on messages (booking_id);
+create index if not exists messages_payment            on messages (payment_id);
+create index if not exists order_items_product         on order_items (product_id);
+create index if not exists orders_customer             on orders (customer_id);
+create index if not exists payments_customer           on payments (customer_id);
+create index if not exists resource_services_service   on resource_services (service_id);
+create index if not exists waitlist_converted          on waitlist (converted_business_id);
+create index if not exists webhook_events_business     on webhook_events (business_id);
+create index if not exists webhook_events_connection   on webhook_events (connection_id);
+
 -- ═══════════════════════════════════════════════════════════ updated_at
 
 -- search_path pinned empty (advisor 0011): a trigger function with a mutable
