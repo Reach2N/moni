@@ -1,7 +1,7 @@
 import { db } from '@/lib/db.ts'
 import { throwIfDbError } from '@/lib/db-result.ts'
 import { renderKhqrCard } from '@/lib/khqr/qr-card.ts'
-import { formatMoney, type CurrencyCode } from '@/lib/types.ts'
+import type { CurrencyCode } from '@/lib/types.ts'
 
 export const runtime = 'nodejs'
 
@@ -48,7 +48,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ code: s
   const svg = await renderKhqrCard({
     qrPayload: payment.qr_payload,
     shopName: booking.businesses?.name ?? 'Moni',
-    amountLabel: formatMoney(payment.amount_minor, currency),
+    // Minor units and the code, not a formatted string: the branded card sets
+    // the figure and the currency in different type sizes.
+    amountMinor: payment.amount_minor,
+    currency,
     reference: booking.code,
   })
 
