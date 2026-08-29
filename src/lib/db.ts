@@ -1,18 +1,17 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './database.types.ts'
-import type { PendingTables } from './database.pending.ts'
 
 /**
- * The generated row types, plus the tables schema.sql has grown since they were
- * last generated. See `database.pending.ts`: the intersection disappears when
- * the live project is migrated and the types are regenerated.
+ * The generated row types, straight from the live schema.
+ *
+ * There was briefly a `database.pending.ts` alongside this, carrying the tables
+ * schema.sql had grown before the live project was migrated. The migration
+ * landed on 30 August 2026 and the types were regenerated, so the promissory
+ * note was paid and the file deleted. If that window ever reopens, reopen the
+ * file rather than hand editing the generated one.
  */
-type Db = Omit<Database, 'public'> & {
-  public: Omit<Database['public'], 'Tables'> & {
-    Tables: Database['public']['Tables'] & PendingTables
-  }
-}
+type Db = Database
 
 function requiredServerEnv(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY') {
   const value = process.env[name]?.trim()

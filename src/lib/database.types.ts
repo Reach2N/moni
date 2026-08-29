@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -590,6 +590,89 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          booking_id: string | null
+          business_id: string
+          currency: string
+          id: string
+          issued_at: string
+          number: number
+          order_id: string | null
+          total_minor: number
+        }
+        Insert: {
+          booking_id?: string | null
+          business_id: string
+          currency?: string
+          id?: string
+          issued_at?: string
+          number: number
+          order_id?: string | null
+          total_minor: number
+        }
+        Update: {
+          booking_id?: string | null
+          business_id?: string
+          currency?: string
+          id?: string
+          issued_at?: string
+          number?: number
+          order_id?: string | null
+          total_minor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "v_bookings_agent"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "invoices_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "invoices_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "invoices_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           audio_url: string | null
@@ -697,6 +780,129 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_items: {
+        Row: {
+          id: string
+          line_total_minor: number
+          name: string
+          order_id: string
+          product_id: string | null
+          quantity: number
+          unit_price_minor: number
+        }
+        Insert: {
+          id?: string
+          line_total_minor: number
+          name: string
+          order_id: string
+          product_id?: string | null
+          quantity: number
+          unit_price_minor: number
+        }
+        Update: {
+          id?: string
+          line_total_minor?: number
+          name?: string
+          order_id?: string
+          product_id?: string | null
+          quantity?: number
+          unit_price_minor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          business_id: string
+          channel: string
+          code: string
+          created_at: string
+          currency: string
+          customer_id: string | null
+          id: string
+          note: string | null
+          status: string
+          total_minor: number
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          channel?: string
+          code?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          id?: string
+          note?: string | null
+          status?: string
+          total_minor?: number
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          channel?: string
+          code?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          id?: string
+          note?: string | null
+          status?: string
+          total_minor?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "orders_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "orders_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -852,6 +1058,80 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          active: boolean
+          business_id: string
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          name: string
+          name_en: string | null
+          price_minor: number
+          sort_order: number
+          stock: number | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          business_id: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name: string
+          name_en?: string | null
+          price_minor: number
+          sort_order?: number
+          stock?: number | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          business_id?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name?: string
+          name_en?: string | null
+          price_minor?: number
+          sort_order?: number
+          stock?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "products_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "products_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
           },
         ]
       }
@@ -1031,6 +1311,68 @@ export type Database = {
             foreignKeyName: "services_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
+            referencedRelation: "v_month_usage"
+            referencedColumns: ["business_id"]
+          },
+        ]
+      }
+      storefronts: {
+        Row: {
+          created_at: string
+          draft: Json | null
+          generated_by: string | null
+          id: string
+          published: Json | null
+          published_at: string | null
+          theme: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          draft?: Json | null
+          generated_by?: string | null
+          id: string
+          published?: Json | null
+          published_at?: string | null
+          theme?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          draft?: Json | null
+          generated_by?: string | null
+          id?: string
+          published?: Json | null
+          published_at?: string | null
+          theme?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storefronts_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "storefronts_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "v_agent_business"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "storefronts_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "v_month_stats"
+            referencedColumns: ["business_id"]
+          },
+          {
+            foreignKeyName: "storefronts_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
             referencedRelation: "v_month_usage"
             referencedColumns: ["business_id"]
           },
@@ -1256,6 +1598,7 @@ export type Database = {
           starts_at: string | null
           status: string | null
           unit: string | null
+          updated_at: string | null
         }
         Relationships: [
           {
