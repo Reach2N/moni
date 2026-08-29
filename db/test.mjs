@@ -23,6 +23,9 @@ import { decryptSecret, encryptSecret, newWebhookSecret, secretsMatch } from '..
 import { extractIncoming, looksLikeBotToken } from '../src/lib/channels/telegram.ts'
 import { scopedExternalId } from '../src/lib/agent/identity.ts'
 import { sortInbox } from '../src/lib/queries/inbox-order.ts'
+import { shopSlugFromHost } from '../src/lib/hosting/subdomain.ts'
+import { sanityCheck } from '../src/lib/ai/storefront-check.ts'
+import { THEMES } from '../src/lib/types.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
@@ -687,6 +690,74 @@ eq('the page\'s own echo is not treated as a customer message',
     { sender: { id: '777' }, message: { mid: 'm2', text: 'hi', is_echo: true } }] }] }).length, 0)
 eq('and a non-page payload is ignored entirely',
   extractMessengerMessages({ object: 'instagram', entry: [] }).length, 0)
+
+// ── 20. hosted shop sites (PLAN.md Phase 7) ────────────────────────────────
+console.log('\nsubdomain routing')
+eq('a shop subdomain resolves to its slug', shopSlugFromHost('sokha-beauty.moni.cam'), 'sokha-beauty')
+eq('and a port does not confuse it', shopSlugFromHost('sokha-beauty.localhost:3000'), 'sokha-beauty')
+eq('the apex is not a shop', shopSlugFromHost('moni.cam'), null)
+eq('nor is www', shopSlugFromHost('www.moni.cam'), null)
+// A preview URL's first label looks exactly like a slug. Rewriting it would
+// serve the whole deployment as a shop that does not exist.
+eq('a Vercel preview host is never treated as a shop',
+  shopSlugFromHost('moni-git-main-reach2n.vercel.app'), null)
+eq('a reserved name is never a shop', shopSlugFromHost('app.moni.cam'), null)
+eq('and neither is admin', shopSlugFromHost('admin.moni.cam'), null)
+eq('a deeper label is refused rather than guessed', shopSlugFromHost('a.b.moni.cam'), null)
+eq('an unrelated domain is ignored', shopSlugFromHost('example.com'), null)
+eq('a missing host is ignored', shopSlugFromHost(null), null)
+eq('and the host is matched case insensitively', shopSlugFromHost('Sokha-Beauty.Moni.Cam'), 'sokha-beauty')
+
+console.log('\ngenerated site copy')
+const goodCopy = {
+  theme: 'salon', headline: 'កាត់សក់នៅតាកែវ', subhead: 'បើករាល់ថ្ងៃ លើកលែងថ្ងៃអាទិត្យ',
+  about: 'ហាងកាត់សក់តូចមួយនៅតាកែវ មានបុគ្គលិកពីរនាក់។ យើងទទួលកក់ម៉ោងតាម Telegram។',
+  highlights: ['បុគ្គលិកពីរនាក់', 'កក់តាម Telegram'], callToAction: 'កក់ម៉ោង', notice: null,
+}
+eq('honest copy passes clean', sanityCheck(goodCopy, 'Sokha Beauty').length, 0)
+// The model never emits markup, and this is the assertion that keeps it true:
+// a bad generation must read badly, never render badly.
+const withMarkup = { ...goodCopy, about: '<script>alert(1)</script> ហាងកាត់សក់' }
+if (sanityCheck(withMarkup, 'Sokha Beauty').some((w) => w.issue.includes('markup'))) {
+  ok('markup in generated copy is caught before an owner can publish it')
+} else no('sanityCheck', 'markup passed the check')
+// A price in prose is the 100x currency bug all over again: prices render from
+// services.price_minor beside this text, so a second source of truth will drift.
+const withPrice = { ...goodCopy, subhead: 'កាត់សក់ត្រឹមតែ 15000៛' }
+if (sanityCheck(withPrice, 'Sokha Beauty').some((w) => w.issue.includes('price'))) {
+  ok('a price written into the copy is caught')
+} else no('sanityCheck', 'a price in prose passed the check')
+if (sanityCheck({ ...goodCopy, headline: 'The best salon in Cambodia' }, 'Sokha Beauty')
+      .some((w) => w.issue.includes('claim'))) {
+  ok('a claim the owner never made is caught')
+} else no('sanityCheck', 'an invented claim passed the check')
+if (sanityCheck({ ...goodCopy, about: 'Open daily — closed Sunday' }, 'Sokha Beauty')
+      .some((w) => w.issue.includes('em dash'))) {
+  ok('an em dash is caught, because the model produces them by default')
+} else no('sanityCheck', 'an em dash passed the check')
+if (sanityCheck({ ...goodCopy, headline: 'Sokha Beauty' }, 'Sokha Beauty')
+      .some((w) => w.issue.includes('says nothing'))) {
+  ok('a headline that is only the shop name is caught')
+} else no('sanityCheck', 'an empty headline passed the check')
+
+await expectOk(db, 'a shop gets exactly one site, keyed by its own id',
+  `insert into storefronts (id, theme, draft) values ('${B_SALON}', 'salon', '${JSON.stringify(goodCopy)}'::jsonb)`)
+await expectFail(db, 'and cannot have a second',
+  `insert into storefronts (id, theme) values ('${B_SALON}', 'stay')`, 'storefronts_pkey')
+const unpublished = await one(db, `select published, published_at from storefronts where id = '${B_SALON}'`)
+// Unpublished means there is NO site. Rendering a draft would be publishing on
+// the owner's behalf, which is the one thing generated sites must never do.
+eq('a generated draft is not published by existing', unpublished.published, null)
+await expectOk(db, 'the owner publishes, and only then',
+  `update storefronts set published = draft, published_at = now() where id = '${B_SALON}'`)
+const live = await one(db, `select published->>'headline' h, published_at from storefronts where id = '${B_SALON}'`)
+eq('the published copy is the draft verbatim', live.h, goodCopy.headline)
+if (live.published_at) ok('and the moment it went live is recorded')
+else no('publish', 'published_at was not set')
+// A theme declared in THEMES and not implemented is a COMPILE error via
+// `satisfies Record<ThemeId, ThemeModule>`; this asserts the other direction,
+// that the registry is not quietly a different set.
+eq('four themes are declared', THEMES.length, 4)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

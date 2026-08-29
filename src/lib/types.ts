@@ -497,3 +497,56 @@ export const PLANS = [
   { id: 'chain', name: 'Chain',  txn_per_month: 10000, price_usd_month: 29, locations: 5 },
 ] as const
 export type PlanId = (typeof PLANS)[number]['id']
+
+// ───────────────────────────────────────────────────────── hosted shop sites
+// Each shop gets {slug}.moni.cam. One Next app, one deploy, no per-tenant
+// provisioning: the proxy rewrites the subdomain to /s/{slug}.
+
+/**
+ * Four hand-built themes. `satisfies Record<ThemeId, ThemeModule>` on the
+ * registry turns a theme declared here and never implemented into a COMPILE
+ * error, which is the difference between a typo and a shop with a white screen.
+ */
+export const THEMES = [
+  { id: 'salon',    name: 'Salon',     note: 'Soft, service led. Hair, beauty, nails.' },
+  { id: 'stay',     name: 'Stay',      note: 'Rooms and nights. Guesthouses and hotels.' },
+  { id: 'workshop', name: 'Workshop',  note: 'Jobs booked in and collected. Repairs, tailoring.' },
+  { id: 'counter',  name: 'Counter',   note: 'Walk in and order. Food, drinks, retail.' },
+] as const
+export type ThemeId = (typeof THEMES)[number]['id']
+
+export const STOREFRONT_STATUSES = ['draft', 'published'] as const
+export type StorefrontStatus = (typeof STOREFRONT_STATUSES)[number]
+
+/**
+ * What the model is allowed to write for a shop's public site.
+ *
+ * Every field is a STRING or a list of strings. The model never emits markup,
+ * so the worst a bad generation can do is read badly: it can never ship a white
+ * screen to a real shop owner. ARCHITECTURE.md is explicit about this and it is
+ * the single most important constraint in this phase.
+ */
+export type StorefrontContent = {
+  theme: ThemeId
+  headline: string
+  subhead: string
+  about: string
+  /** Three or four short reasons to choose this shop. Not marketing claims. */
+  highlights: string[]
+  /** What the book-or-order button says. */
+  callToAction: string
+  /** Optional, and only if the owner's own description contained it. */
+  notice: string | null
+}
+
+export type Storefront = {
+  id: string
+  business_id: string
+  theme: ThemeId | string
+  draft: StorefrontContent | null
+  published: StorefrontContent | null
+  published_at: string | null
+  generated_by: string | null
+  created_at: string
+  updated_at: string
+}

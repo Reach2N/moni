@@ -1,6 +1,18 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './database.types.ts'
+import type { PendingTables } from './database.pending.ts'
+
+/**
+ * The generated row types, plus the tables schema.sql has grown since they were
+ * last generated. See `database.pending.ts`: the intersection disappears when
+ * the live project is migrated and the types are regenerated.
+ */
+type Db = Omit<Database, 'public'> & {
+  public: Omit<Database['public'], 'Tables'> & {
+    Tables: Database['public']['Tables'] & PendingTables
+  }
+}
 
 function requiredServerEnv(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY') {
   const value = process.env[name]?.trim()
@@ -18,12 +30,12 @@ function requiredServerEnv(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'SUPABASE_SERVICE_
  * import above is what makes a mistake here a build error rather than a
  * leaked key.
  */
-type DbClient = ReturnType<typeof createClient<Database>>
+type DbClient = ReturnType<typeof createClient<Db>>
 
 let client: DbClient | undefined
 
 function getClient(): DbClient {
-  client ??= createClient<Database>(
+  client ??= createClient<Db>(
     requiredServerEnv('NEXT_PUBLIC_SUPABASE_URL'),
     requiredServerEnv('SUPABASE_SERVICE_ROLE_KEY'),
     { auth: { persistSession: false } },
@@ -44,5 +56,5 @@ export const db = new Proxy({} as DbClient, {
   },
 })
 
-export type Tables = Database['public']['Tables']
-export type Views = Database['public']['Views']
+export type Tables = Db['public']['Tables']
+export type Views = Db['public']['Views']

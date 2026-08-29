@@ -362,6 +362,21 @@ comment on column waitlist.approved_at is 'Set by us, manually, until an admin s
 comment on column waitlist.converted_business_id is 'Filled when the member finishes onboarding, closing the loop from lead to live shop.';
 create unique index if not exists waitlist_email_uniq on waitlist (lower(email));
 
+create table if not exists storefronts (
+  id            uuid primary key references businesses(id) on delete cascade,
+  theme         text not null default 'salon',
+  draft         jsonb,
+  published     jsonb,
+  published_at  timestamptz,
+  generated_by  text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+comment on table  storefronts is 'The shop''s own public site at {slug}.moni.cam. One row per business: the primary key IS businesses.id, so a shop cannot have two sites and no join is needed to find one.';
+comment on column storefronts.draft is 'What the agent last generated: a validated StorefrontContent object, never markup. A bad generation is a bad string, never a white screen on a real shop''s site.';
+comment on column storefronts.published is 'What the public actually sees. Only the owner moves draft to published, so nothing the model wrote reaches a customer unread.';
+comment on column storefronts.generated_by is 'Model ref that wrote the draft, for the same reason businesses.parse_model exists: when a generation is wrong you need to know which model wrote it.';
+
 create table if not exists webhook_events (
   id                bigserial primary key,
   channel           text not null,
@@ -387,6 +402,7 @@ create index if not exists webhook_events_pending
 -- Clerk: they are new, the landing page feeds waitlist from the public
 -- internet, and only the service role has any business reading them. RLS on
 -- with no policy means exactly that.
+alter table storefronts    enable row level security;
 alter table waitlist       enable row level security;
 alter table webhook_events enable row level security;
 
@@ -410,6 +426,9 @@ create trigger bookings_touch before update on bookings
   for each row execute function moni_touch();
 drop trigger if exists payments_touch on payments;
 create trigger payments_touch before update on payments
+  for each row execute function moni_touch();
+drop trigger if exists storefronts_touch on storefronts;
+create trigger storefronts_touch before update on storefronts
   for each row execute function moni_touch();
 
 -- ═══════════════════════════════════════════════════════════════ views
