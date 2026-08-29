@@ -98,6 +98,8 @@ export const config = {
     // has to run through the proxy so that an OWNER previewing their assistant
     // is recognised. Nothing on the public marketing site calls it.
     '/api/chat',
+    // /api/cron/* is deliberately absent too: an external scheduler carries no
+    // Clerk session and proves itself with CRON_SECRET instead.
     // /api/webhooks/* is deliberately absent. Telegram and Meta carry no Clerk
     // session, and running the proxy there would 500 every inbound customer
     // message. Those routes prove their caller with a per-connection secret.

@@ -83,3 +83,20 @@ export function cambodiaMinutesOfDay(iso: string) {
   const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0)
   return hour * 60 + minute
 }
+
+/**
+ * A wall clock a customer can read, in Cambodia, from an instant.
+ *
+ * Reminders quote a time back to the person who booked it, so it has to be the
+ * time they think they booked. Everything is stored UTC and displayed in
+ * Asia/Phnom_Penh (CLAUDE.md hard rule 4), and 24 hour because that is how a
+ * booking code and a time read together without ambiguity.
+ */
+export function cambodiaClock(iso: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: CAMBODIA_TIME_ZONE,
+  }).format(new Date(iso))
+}

@@ -6,6 +6,8 @@ import type { Json } from '../database.types.ts'
 import { costMicroUsd, withFallback } from '../ai/models.ts'
 import { CUSTOMER_SYSTEM, contextLine, instructionsBlock } from './prompt.ts'
 import { customerTools } from './tools.ts'
+import { BUDGET_HANDOVER_REASON, checkBudget, formatSpend } from '../ops/budget.ts'
+import { readSpend } from '../queries/ops.ts'
 
 /**
  * One customer turn, for every channel.
@@ -173,6 +175,43 @@ export async function handleCustomerMessage({
   // Once handed to the owner the assistant is silent, on every channel. The
   // message is still recorded, so the owner reads the whole thread.
   if (current.status === 'needs_owner') {
+    return {
+      conversationId: conversation.id,
+      customerId,
+      text: null,
+      handedOver: true,
+      toolCalls: [],
+      model: null,
+      costMicroUsd: 0,
+    }
+  }
+
+  // Checked BEFORE the model runs. Refusing a turn we have not paid for is a
+  // cap; noticing afterwards is a receipt. PLAN.md Phase 9, and the acceptance
+  // check is that a runaway conversation is stopped by this and not by the bill.
+  const verdict = checkBudget(await readSpend(business.id, conversation.id))
+  if (!verdict.allowed) {
+    console.warn(
+      `[budget] ${business.id} hit the ${verdict.reason} ceiling: ` +
+        `${formatSpend(verdict.spentMicroUsd)} of ${formatSpend(verdict.ceilingMicroUsd)}`,
+    )
+    // Handed to the owner, never dropped. The customer is not told the reason:
+    // "this shop hit its AI budget" is true, useless to them, and embarrassing
+    // to the shop. They are told the owner will reply, which is what happens.
+    await db
+      .from('conversations')
+      .update({ status: 'needs_owner', needs_owner_reason: BUDGET_HANDOVER_REASON })
+      .eq('id', conversation.id)
+      .eq('business_id', business.id)
+    await db.from('events').insert({
+      business_id: business.id,
+      actor: 'system',
+      actor_label: 'budget ceiling',
+      action: 'ai.budget_exceeded',
+      entity_type: 'conversation',
+      entity_id: conversation.id,
+      after: { reason: verdict.reason, spent: verdict.spentMicroUsd, ceiling: verdict.ceilingMicroUsd },
+    })
     return {
       conversationId: conversation.id,
       customerId,

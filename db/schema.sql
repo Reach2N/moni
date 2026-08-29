@@ -39,7 +39,7 @@ create table if not exists businesses (
   address            text,
   province           text,
   timezone           text not null default 'Asia/Phnom_Penh',
-  default_currency   text not null default 'KHR',
+  default_currency   text not null default 'USD',
   locale             text not null default 'km',
   raw_description    text,
   parsed_at          timestamptz,
@@ -101,7 +101,7 @@ create table if not exists services (
   name_en          text,
   description      text,
   price_minor      integer not null,
-  currency         text not null default 'KHR',
+  currency         text not null default 'USD',
   unit             text not null default 'session',
   duration_min     integer not null default 30,
   buffer_min       integer not null default 0,
@@ -193,7 +193,7 @@ create table if not exists bookings (
   quantity               integer not null default 1,
   party_size             integer not null default 1,
   price_minor            integer not null,
-  currency               text not null default 'KHR',
+  currency               text not null default 'USD',
   deposit_required_minor integer,
   channel                text not null default 'telegram',
   created_by             text not null default 'ai',
@@ -242,7 +242,7 @@ create table if not exists payments (
   customer_id      uuid references customers(id) on delete set null,
   kind             text not null default 'deposit',
   amount_minor     integer not null,
-  currency         text not null default 'KHR',
+  currency         text not null default 'USD',
   provider         text not null default 'khqr',
   provider_account text,
   qr_payload       text,
@@ -353,7 +353,7 @@ create table if not exists products (
   name_en      text,
   description  text,
   price_minor  integer not null,
-  currency     text not null default 'KHR',
+  currency     text not null default 'USD',
   stock        integer,
   active       boolean not null default true,
   sort_order   integer not null default 0,
@@ -373,7 +373,7 @@ create table if not exists orders (
   status       text not null default 'pending',
   channel      text not null default 'telegram',
   total_minor  integer not null default 0,
-  currency     text not null default 'KHR',
+  currency     text not null default 'USD',
   note         text,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
@@ -406,7 +406,7 @@ create table if not exists invoices (
   booking_id   uuid references bookings(id) on delete set null,
   number       integer not null,
   total_minor  integer not null,
-  currency     text not null default 'KHR',
+  currency     text not null default 'USD',
   issued_at    timestamptz not null default now(),
   unique (business_id, number)
 );
@@ -609,7 +609,12 @@ create or replace view v_month_usage with (security_invoker = true) as
 select b.id as business_id, b.plan, b.quota_txn_month,
        coalesce(bk.n, 0) + coalesce(pay.n, 0) as txn_used,
        greatest(b.quota_txn_month - (coalesce(bk.n, 0) + coalesce(pay.n, 0)), 0) as txn_left,
-       coalesce(cv.n, 0) as conversations_this_month
+       coalesce(cv.n, 0) as conversations_this_month,
+       -- Appended, never reordered: `create or replace view` accepts new columns
+       -- only at the end. Phase 9 enforces a monthly model-spend ceiling, and
+       -- the meter already lives in messages.cost_micro_usd; reading it here
+       -- keeps one place to ask what a shop has used this month.
+       coalesce(ai.spend, 0) as ai_spend_micro_usd
 from businesses b
 left join (select business_id, count(*) n from bookings
             where status in ('confirmed','completed')
@@ -621,7 +626,11 @@ left join (select business_id, count(*) n from payments
             group by business_id) pay on pay.business_id = b.id
 left join (select business_id, count(distinct customer_id) n from conversations
             where last_message_at >= date_trunc('month', now())
-            group by business_id) cv on cv.business_id = b.id;
+            group by business_id) cv on cv.business_id = b.id
+left join (select business_id, sum(cost_micro_usd) spend from messages
+            where cost_micro_usd is not null
+              and created_at >= date_trunc('month', now())
+            group by business_id) ai on ai.business_id = b.id;
 comment on view v_month_usage is 'The free-tier meter. Transactions, not conversations: the owner is charged when the product made her money, which is the only fair place to meter.';
 
 -- Self-documenting schema: feed this to the agent instead of maintaining a

@@ -6,6 +6,7 @@ import type { Json } from '@/lib/database.types.ts'
 import { decryptSecret, secretsMatch } from '@/lib/crypto/secrets.ts'
 import { extractIncoming, sendReply } from '@/lib/channels/telegram.ts'
 import { handleCustomerMessage, scopedExternalId } from '@/lib/agent/customer-loop.ts'
+import { inboundMessageLimiter } from '@/lib/ops/rate-limit.ts'
 import { getBusinessById } from '@/lib/queries/business.ts'
 
 export const runtime = 'nodejs'
@@ -116,6 +117,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ connect
     if (!connection.token_ciphertext) {
       await settle('failed', 'connection has no token')
       return NextResponse.json({ ok: false })
+    }
+
+    // Per chat id, per shop. One customer sending more than twenty messages a
+    // minute is not a customer. Recorded as skipped rather than failed: nothing
+    // went wrong, we simply declined to do the work. PLAN.md Phase 9.
+    const rate = inboundMessageLimiter.check(`telegram:${connection.id}:${incoming.fromId}`)
+    if (!rate.allowed) {
+      await settle('skipped', `rate limited, retry in ${rate.retryAfterSeconds}s`)
+      return NextResponse.json({ ok: true, rate_limited: true })
     }
 
     const business = await getBusinessById(connection.business_id)

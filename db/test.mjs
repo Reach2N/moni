@@ -23,6 +23,8 @@ import { decryptSecret, encryptSecret, newWebhookSecret, secretsMatch } from '..
 import { extractIncoming, looksLikeBotToken } from '../src/lib/channels/telegram.ts'
 import { scopedExternalId } from '../src/lib/agent/identity.ts'
 import { sortInbox } from '../src/lib/queries/inbox-order.ts'
+import { checkBudget, formatSpend, DEFAULT_CONVERSATION_CAP_MICRO_USD, DEFAULT_MONTH_CEILING_MICRO_USD } from '../src/lib/ops/budget.ts'
+import { createRateLimiter } from '../src/lib/ops/rate-limit.ts'
 import { shopSlugFromHost } from '../src/lib/hosting/subdomain.ts'
 import { sanityCheck } from '../src/lib/ai/storefront-check.ts'
 import { buildKhqrPayload, crc16, amountField, khqrMd5 } from '../src/lib/khqr/payload.ts'
@@ -103,7 +105,7 @@ const mkBooking = (o) => `
                         status, unit, price_minor, currency, channel, created_by
                         ${o.code ? ', code' : ''})
   values ('${o.biz}','${o.svc}','${o.res}','${o.cust}', ${o.from}, ${o.to},
-          '${o.status ?? 'confirmed'}','${o.unit ?? 'session'}',${o.price ?? 15000},'KHR','web','ai'
+          '${o.status ?? 'confirmed'}','${o.unit ?? 'session'}',${o.price ?? 375},'USD','web','ai'
           ${o.code ? `, '${o.code}'` : ''})`
 
 await expectOk(db, 'first booking at 11:00 on Sokha',
@@ -147,7 +149,7 @@ await expectFail(db, 'duplicate code inside one business is REJECTED',
 console.log('\npayments (double-charge and double-count guards)')
 await expectFail(db, 'reusing an idempotency key is REJECTED (no second QR for one deposit)',
   `insert into payments (business_id, amount_minor, currency, provider, idempotency_key)
-   values ('${B_SALON}', 15000, 'KHR', 'khqr', 'booking:90000000-0000-4000-8000-000000000002:deposit')`,
+   values ('${B_SALON}', 375, 'USD', 'khqr', 'booking:90000000-0000-4000-8000-000000000002:deposit')`,
   'duplicate key')
 await expectFail(db, 'reusing a KHQR md5 across payments is REJECTED (no double-count)',
   `insert into payments (business_id, amount_minor, currency, provider, provider_ref, idempotency_key)
@@ -166,7 +168,7 @@ await expectFail(db, 'invented payment status is REJECTED',
    values ('${B_SALON}', 5000, 'KHR', 'khqr', 'settled', 'bad-status')`, 'payments_status_ok')
 await expectOk(db, 'a second payment on the same booking is fine (deposit then balance)',
   `insert into payments (business_id, booking_id, amount_minor, currency, provider, kind, status, paid_at, idempotency_key)
-   values ('${B_SALON}','90000000-0000-4000-8000-000000000002', 30000, 'KHR', 'cash', 'balance', 'paid', now(),
+   values ('${B_SALON}','90000000-0000-4000-8000-000000000002', 750, 'USD', 'cash', 'balance', 'paid', now(),
            'booking:90000000-0000-4000-8000-000000000002:balance')`)
 
 // ── 6. other closed sets ──────────────────────────────────────────────────
@@ -197,16 +199,16 @@ eq('v_agent_business carries the closure', ab.upcoming_closures.length, 1)
 eq('v_agent_business keeps Khmer intact', ab.services[0].name, 'កាត់សក់')
 
 const bk = await one(db, `select * from v_bookings_agent where code='MN7Q1A'`)
-eq('booking price', Number(bk.price_minor), 45000)
-eq('paid so far (15,000 deposit + 30,000 balance)', Number(bk.paid_minor), 45000)
+eq('booking price', Number(bk.price_minor), 1125)
+eq('paid so far ($3.75 deposit + $7.50 balance)', Number(bk.paid_minor), 1125)
 eq('balance derived, never stored', Number(bk.balance_minor), 0)
 eq('service name resolved for the agent', bk.service_name, 'លាបសក់')
 
 const st = await one(db, `select * from v_month_stats where business_id='${B_SALON}'`)
 eq('completed bookings this month', Number(st.completed), 1)
 eq('no-shows counted', Number(st.no_shows), 1)
-eq('booked revenue = completed only', Number(st.booked_revenue_minor), 15000)
-eq('cash collected this month', Number(st.collected_minor), 45000)
+eq('booked revenue = completed only', Number(st.booked_revenue_minor), 375)
+eq('cash collected this month', Number(st.collected_minor), 1125)
 
 const us = await one(db, `select * from v_month_usage where business_id='${B_SALON}'`)
 eq('free-tier quota is 100 transactions', Number(us.quota_txn_month), 100)
@@ -226,7 +228,7 @@ if (after.updated_at > before.updated_at) ok('updated_at moves on UPDATE (price 
 else no('updated_at trigger', 'timestamp did not change')
 eq('price actually changed', Number(after.price_minor), 16000)
 const hist = await one(db, `select price_minor from bookings where code='MN4K2P'`)
-eq('old booking keeps its snapshot price after the change', Number(hist.price_minor), 15000)
+eq('old booking keeps its snapshot price after the change', Number(hist.price_minor), 375)
 
 // ── 9. money maths (the 100x-on-stage bug) ────────────────────────────────
 console.log('\nmoney')
@@ -925,6 +927,84 @@ const replay = await db.query(`
    where provider = 'cutluy' and provider_ref = 'PUETcMUOKStjZsCb' and status = 'pending'
   returning id`)
 eq('and the same event arriving twice changes nothing', replay.rows.length, 0)
+
+// ── 23. operations: caps, limits, and the clock (PLAN.md Phase 9) ──────────
+console.log('\nspend ceilings')
+// The acceptance check for this phase: a runaway conversation is cut off by the
+// cap and not by the bill.
+eq('an ordinary turn is allowed',
+  checkBudget({ monthMicroUsd: 1_000, conversationMicroUsd: 500 }).allowed, true)
+const runaway = checkBudget({ monthMicroUsd: 1_000, conversationMicroUsd: DEFAULT_CONVERSATION_CAP_MICRO_USD })
+eq('a runaway conversation is stopped', runaway.allowed, false)
+eq('and names the conversation, not the month', runaway.allowed === false && runaway.reason, 'conversation')
+const overspent = checkBudget({ monthMicroUsd: DEFAULT_MONTH_CEILING_MICRO_USD, conversationMicroUsd: 0 })
+eq('a shop over its month ceiling is stopped', overspent.allowed, false)
+eq('and names the month', overspent.allowed === false && overspent.reason, 'month')
+// When both are blown, the conversation is the more actionable answer: one
+// thread to look at rather than a whole month to explain.
+const both = checkBudget({ monthMicroUsd: 9e9, conversationMicroUsd: 9e9 })
+eq('both blown reports the conversation first', both.allowed === false && both.reason, 'conversation')
+eq('the ceiling is inclusive, so exactly at the cap is refused',
+  checkBudget({ monthMicroUsd: 0, conversationMicroUsd: DEFAULT_CONVERSATION_CAP_MICRO_USD }).allowed, false)
+eq('a caller may raise the ceiling for one shop',
+  checkBudget({ monthMicroUsd: 0, conversationMicroUsd: 200_000 }, { conversationMicroUsd: 500_000 }).allowed, true)
+eq('micro dollars read back as money', formatSpend(1_234_567), '$1.23')
+
+console.log('\ninbound rate limit')
+const limiter = createRateLimiter({ limit: 3, windowMs: 60_000 })
+const t0 = 1_000_000
+eq('the first request passes', limiter.check('chat:1', t0).allowed, true)
+limiter.check('chat:1', t0); limiter.check('chat:1', t0)
+const blocked = limiter.check('chat:1', t0)
+eq('the fourth in the window is refused', blocked.allowed, false)
+eq('and says how long to wait', blocked.allowed === false && blocked.retryAfterSeconds, 60)
+// Per key: one abusive chat must not silence every other customer of the shop.
+eq('a different chat is unaffected', limiter.check('chat:2', t0).allowed, true)
+eq('the window reopens', limiter.check('chat:1', t0 + 60_001).allowed, true)
+// A map that only ever grows is a memory leak wearing a rate limiter's clothes.
+const churn = createRateLimiter({ limit: 1, windowMs: 1_000, maxKeys: 5 })
+for (let i = 0; i < 50; i += 1) churn.check(`k${i}`, t0 + i * 2_000)
+if (churn.size() <= 5) ok(`expired windows are swept, ${churn.size()} keys retained of 50`)
+else no('rate limiter', `retained ${churn.size()} keys, which is a leak`)
+
+console.log('\nUSD only')
+// CutLuy settles USD and it is now the only rail, so a new shop must default to
+// the currency it can actually be paid in.
+const defaults = await one(db, `
+  select column_default d from information_schema.columns
+   where table_name = 'businesses' and column_name = 'default_currency'`)
+if (String(defaults.d).includes('USD')) ok('a new shop defaults to USD')
+else no('default currency', `still ${defaults.d}`)
+const priced = await one(db, `
+  select count(*) c from services where currency <> 'USD'`)
+eq('every seeded service is priced in USD', Number(priced.c), 0)
+// KHR stays in the taxonomy: formatMoney must keep rendering it correctly for
+// any historical row, and riel has NO decimal places, which is the trap.
+// Latin digits and a comma group: formatMoney never goes near a km-KH locale,
+// because Node and Chrome disagree on its separators and that is a hydration
+// mismatch on every money string. toKhmerDigits is the separate, later step.
+eq('riel still renders with no decimals', formatMoney(15000, 'KHR'), '15,000៛')
+eq('and dollars with two', formatMoney(375, 'USD'), '$3.75')
+
+console.log('\nreminders are recorded, not repeated')
+// "Already sent" lives in events, so the 24 hour and 1 hour reminders cannot
+// suppress one another and a redelivered tick cannot spam a customer.
+const aBooking = await one(db, `select id from bookings where business_id = '${B_SALON}' limit 1`)
+await expectOk(db, 'a day-before reminder is recorded',
+  `insert into events (business_id, actor, action, entity_type, entity_id)
+   values ('${B_SALON}','system','reminder.day_before','booking','${aBooking.id}')`)
+const sameKind = await one(db, `
+  select count(*) c from events where action = 'reminder.day_before' and entity_id = '${aBooking.id}'`)
+eq('the tick can see it was already sent', Number(sameKind.c), 1)
+const otherKind = await one(db, `
+  select count(*) c from events where action = 'reminder.hour_before' and entity_id = '${aBooking.id}'`)
+eq('and the hour-before reminder is still owed', Number(otherKind.c), 0)
+
+console.log('\nthe spend meter')
+const meter = await one(db, `
+  select count(*) c from information_schema.columns
+   where table_name = 'v_month_usage' and column_name = 'ai_spend_micro_usd'`)
+eq('the month view exposes model spend, so the ceiling has something to read', Number(meter.c), 1)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

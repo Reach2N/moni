@@ -7,7 +7,7 @@
 insert into businesses (id, slug, name, business_type, category, phone, address, province,
                         locale, default_currency, raw_description, parsed_at, parse_model, hours)
 values ('b0000000-0000-4000-8000-000000000001', 'sokha-beauty', 'Sokha Beauty',
-        'salon', 'beauty', '+85512345678', 'Doun Kaev', 'Takeo', 'km', 'KHR',
+        'salon', 'beauty', '+85512345678', 'Doun Kaev', 'Takeo', 'km', 'USD',
         'កាត់សក់ 15000៛ 30 នាទី។ លាបសក់ 45000៛ ១ម៉ោងកន្លះ។ សក់អ៊ុត 60000៛ ២ម៉ោង។ '
         || 'លាងសក់ 8000៛។ តុបតែងមុខ 25000៛ 45 នាទី។ '
         || 'Open 8am to 7pm, Monday to Saturday. Closed Sunday. Two staff.',
@@ -19,11 +19,11 @@ on conflict (id) do nothing;
 
 insert into services (id, business_id, name, name_en, price_minor, currency, unit,
                       duration_min, buffer_min, capacity, requires_deposit, deposit_minor, sort_order) values
- ('50000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000001','កាត់សក់','Haircut',15000,'KHR','session',30,0,1,false,null,1),
- ('50000000-0000-4000-8000-000000000002','b0000000-0000-4000-8000-000000000001','លាបសក់','Hair coloring',45000,'KHR','session',90,15,1,false,null,2),
- ('50000000-0000-4000-8000-000000000003','b0000000-0000-4000-8000-000000000001','សក់អ៊ុត','Perm',60000,'KHR','session',120,15,1,true,20000,3),
- ('50000000-0000-4000-8000-000000000004','b0000000-0000-4000-8000-000000000001','លាងសក់','Wash & blow dry',8000,'KHR','session',20,0,1,false,null,4),
- ('50000000-0000-4000-8000-000000000005','b0000000-0000-4000-8000-000000000001','តុបតែងមុខ','Makeup',25000,'KHR','session',45,0,1,false,null,5)
+ ('50000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000001','កាត់សក់','Haircut',375,'USD','session',30,0,1,false,null,1),
+ ('50000000-0000-4000-8000-000000000002','b0000000-0000-4000-8000-000000000001','លាបសក់','Hair coloring',1125,'USD','session',90,15,1,false,null,2),
+ ('50000000-0000-4000-8000-000000000003','b0000000-0000-4000-8000-000000000001','សក់អ៊ុត','Perm',1500,'USD','session',120,15,1,true,500,3),
+ ('50000000-0000-4000-8000-000000000004','b0000000-0000-4000-8000-000000000001','លាងសក់','Wash & blow dry',200,'USD','session',20,0,1,false,null,4),
+ ('50000000-0000-4000-8000-000000000005','b0000000-0000-4000-8000-000000000001','តុបតែងមុខ','Makeup',625,'USD','session',45,0,1,false,null,5)
 on conflict (id) do nothing;
 
 insert into resources (id, business_id, name, kind) values
@@ -66,22 +66,22 @@ insert into bookings (id, business_id, service_id, resource_id, customer_id, sta
   '50000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-000000000002',
   (current_date + time '09:00') at time zone 'Asia/Phnom_Penh',
   (current_date + time '09:30') at time zone 'Asia/Phnom_Penh',
-  'completed','session',15000,'KHR',null,'telegram','ai','MN4K2P'),
+  'completed','session',375,'USD',null,'telegram','ai','MN4K2P'),
  ('90000000-0000-4000-8000-000000000002','b0000000-0000-4000-8000-000000000001',
   '50000000-0000-4000-8000-000000000002','a0000000-0000-4000-8000-000000000001','d0000000-0000-4000-8000-000000000001',
   (current_date + time '14:00') at time zone 'Asia/Phnom_Penh',
   (current_date + time '15:45') at time zone 'Asia/Phnom_Penh',
-  'confirmed','session',45000,'KHR',null,'telegram','ai','MN7Q1A'),
+  'confirmed','session',1125,'USD',null,'telegram','ai','MN7Q1A'),
  ('90000000-0000-4000-8000-000000000003','b0000000-0000-4000-8000-000000000001',
   '50000000-0000-4000-8000-000000000003','a0000000-0000-4000-8000-000000000002','d0000000-0000-4000-8000-000000000003',
   ((current_date + 1) + time '10:00') at time zone 'Asia/Phnom_Penh',
   ((current_date + 1) + time '12:15') at time zone 'Asia/Phnom_Penh',
-  'pending','session',60000,'KHR',20000,'instagram','ai','MN9X5C'),
+  'pending','session',1500,'USD',500,'instagram','ai','MN9X5C'),
  ('90000000-0000-4000-8000-000000000004','b0000000-0000-4000-8000-000000000001',
   '50000000-0000-4000-8000-000000000004','a0000000-0000-4000-8000-000000000002','d0000000-0000-4000-8000-000000000003',
   ((current_date - 2) + time '16:00') at time zone 'Asia/Phnom_Penh',
   ((current_date - 2) + time '16:20') at time zone 'Asia/Phnom_Penh',
-  'no_show','session',8000,'KHR',null,'telegram','ai','MN2B8D')
+  'no_show','session',200,'USD',null,'telegram','ai','MN2B8D')
 on conflict (id) do nothing;
 
 -- payments: one KHQR deposit already paid, one still pending with a live QR.
@@ -91,14 +91,14 @@ insert into payments (id, business_id, booking_id, customer_id, kind, amount_min
                       status, expires_at, paid_at, idempotency_key, last_checked_at, check_count) values
  ('70000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000001',
   '90000000-0000-4000-8000-000000000002','d0000000-0000-4000-8000-000000000001',
-  'deposit',15000,'KHR','khqr','sokha_beauty@aba',
+  'deposit',375,'USD','khqr','sokha_beauty@aba',
   '00020101021230500014sokha_beauty@aba0111Sokha Beauty5204739953031165405150005802KH5912Sokha Beauty6006Takeo6304A1B2',
   md5('00020101021230500014sokha_beauty@aba0111Sokha Beauty5204739953031165405150005802KH5912Sokha Beauty6006Takeo6304A1B2'),
   'BKG20260819A7741','paid', now() - interval '20 minutes', now() - interval '25 minutes',
   'booking:90000000-0000-4000-8000-000000000002:deposit', now() - interval '25 minutes', 3),
  ('70000000-0000-4000-8000-000000000002','b0000000-0000-4000-8000-000000000001',
   '90000000-0000-4000-8000-000000000003','d0000000-0000-4000-8000-000000000003',
-  'deposit',20000,'KHR','khqr','sokha_beauty@aba',
+  'deposit',500,'USD','khqr','sokha_beauty@aba',
   '00020101021230500014sokha_beauty@aba0111Sokha Beauty5204739953031165405200005802KH5912Sokha Beauty6006Takeo6304C3D4',
   md5('00020101021230500014sokha_beauty@aba0111Sokha Beauty5204739953031165405200005802KH5912Sokha Beauty6006Takeo6304C3D4'),
   null,'pending', now() + interval '9 minutes', null,
@@ -109,7 +109,7 @@ delete from payment_events where payment_id in
   ('70000000-0000-4000-8000-000000000001','70000000-0000-4000-8000-000000000002');
 insert into payment_events (payment_id, source, status_reported, raw) values
  ('70000000-0000-4000-8000-000000000001','poll','pending','{"responseCode":1,"responseMessage":"Transaction not found"}'::jsonb),
- ('70000000-0000-4000-8000-000000000001','poll','paid','{"responseCode":0,"data":{"hash":"BKG20260819A7741","amount":15000,"currency":"KHR"}}'::jsonb),
+ ('70000000-0000-4000-8000-000000000001','poll','paid','{"responseCode":0,"data":{"hash":"BKG20260819A7741","amount":3.75,"currency":"USD"}}'::jsonb),
  ('70000000-0000-4000-8000-000000000002','poll','pending','{"responseCode":1,"responseMessage":"Transaction not found"}'::jsonb);
 
 -- ═══════════════════════════════════════ 2. guesthouse, nights, same rails

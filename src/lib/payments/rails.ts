@@ -1,43 +1,27 @@
 import 'server-only'
-import { cutluyAdapter, localKhqrAdapter, manualAdapter, type PaymentProviderAdapter } from '../payments.ts'
-import { buildKhqrPayload, khqrMd5 } from '../khqr/payload.ts'
+import { cutluyAdapter, manualAdapter, type PaymentProviderAdapter } from '../payments.ts'
 import type { CurrencyCode } from '../types.ts'
 
 /**
- * The rails, actually wired.
+ * The rails, actually wired. There is one: CutLuy.
  *
- * `payments.ts` is ported from production code and takes its KHQR generator as
- * an injected function, deliberately. This is the file that supplies it and
- * reads the environment, so the ported adapter stays pure and testable and
- * nothing about a provider leaks into a route handler.
+ * CutLuy is Bakong, packaged. It issues a genuine Bakong KHQR (verified against
+ * a live response on 30 August 2026: tag 30 carrying `abaakhppxxx@abaa`, and a
+ * CRC our own crc16 reproduces exactly), so a customer scans it in any Cambodian
+ * banking app exactly as they would a bank's own code. What CutLuy adds is the
+ * part that is otherwise painful: issuing, and telling us it was paid, with no
+ * merchant relationship with NBC and no relay of our own.
  *
- * Routing is by CURRENCY, not preference (CLAUDE.md). CutLuy settles USD only,
- * so it cannot serve a riel shop, and riel is the default for local shops.
+ * The direct Bakong rail is GONE, and this comment is its headstone. It built
+ * the KHQR offline from a BAKONG_ACCOUNT and verified through a Cambodian relay,
+ * because NBC blocks check-transaction from servers outside Cambodia and Vercel
+ * is not in Cambodia. Five environment variables and a relay we do not run, to
+ * do what CutLuy already does. Keeping it meant two code paths for one behaviour
+ * and five credentials nobody would ever set.
+ *
+ * CutLuy settles USD, and since 30 August 2026 this product prices in USD, so
+ * one rail covers everything.
  */
-function khqrRail(): PaymentProviderAdapter | null {
-  const account = process.env.BAKONG_ACCOUNT?.trim()
-  const relayUrl = process.env.BAKONG_RELAY_API_URL?.trim()
-  const relayToken = process.env.BAKONG_RELAY_TOKEN?.trim()
-  // Generation is offline, but a QR nobody can verify is worse than no QR: the
-  // customer pays and the booking never confirms. So all three or none.
-  if (!account || !relayUrl || !relayToken) return null
-
-  return localKhqrAdapter({
-    buildPayload: (charge) =>
-      buildKhqrPayload(
-        {
-          accountId: account,
-          merchantName: process.env.BAKONG_MERCHANT_NAME?.trim() || 'Moni Shop',
-          merchantCity: process.env.BAKONG_MERCHANT_CITY?.trim() || 'Phnom Penh',
-        },
-        { amount_minor: charge.amount_minor, currency: charge.currency, reference: charge.reference },
-      ),
-    md5: khqrMd5,
-    relayUrl,
-    relayToken,
-  })
-}
-
 function cutluyRail(): PaymentProviderAdapter | null {
   const token = process.env.CUTLUY_TOKEN?.trim()
   if (!token) return null
@@ -49,22 +33,17 @@ function cutluyRail(): PaymentProviderAdapter | null {
 }
 
 /**
- * In preference order for this currency, configured rails only.
+ * Configured rails that settle this currency, in preference order.
  *
- * An empty list is a real answer: a shop that has not given us a Bakong account
- * cannot take a QR payment, and saying so beats minting a QR that pays nobody.
+ * Still takes a currency, and still asks the adapter what it settles, even with
+ * one rail: that is the seam a second rail arrives through, and a shop priced in
+ * something no rail can charge should get an empty list rather than a QR that
+ * pays nobody. An empty list is a real answer, not an unhandled case.
  */
 export function railsFor(currency: CurrencyCode): PaymentProviderAdapter[] {
-  const rails: PaymentProviderAdapter[] = []
-  const khqr = khqrRail()
   const cutluy = cutluyRail()
-  if (currency === 'KHR') {
-    if (khqr) rails.push(khqr)
-  } else {
-    if (cutluy) rails.push(cutluy)
-    if (khqr) rails.push(khqr)
-  }
-  return rails
+  if (!cutluy) return []
+  return cutluy.settlesCurrencies.includes(currency) ? [cutluy] : []
 }
 
 export { manualAdapter }
