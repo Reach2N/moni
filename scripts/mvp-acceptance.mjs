@@ -101,6 +101,13 @@ async function testSourceWiring() {
     assert.doesNotMatch(askMoni, /slug/)
     return 'requireMember() to businessId, no tenant in the client'
   })
+  await check('an empty shop is sent to the composer, not to a page of zeroes', () => {
+    // Phase 3. Onboarding is the first screen a member sees, so the dashboard
+    // has to hand over rather than render a shop with nothing in it.
+    assert.match(page, /snapshot\.services\.length === 0/)
+    assert.match(page, /redirect\(['"]\/app\/onboarding['"]\)/)
+    return '/app to /app/onboarding while the catalogue is empty'
+  })
   await check('owner and setup mutations trigger a server refresh', () => {
     assert.match(askMoni, /startTransition\s*\(\s*\(\)\s*=>\s*router\.refresh\s*\(\s*\)\s*\)/)
     assert.match(secondaryTools, /startTransition\s*\(\s*\(\)\s*=>\s*router\.refresh\s*\(\s*\)\s*\)/)
@@ -215,6 +222,12 @@ async function post(route, body, options = {}) {
  * MONI_ACCEPTANCE_OWNER_COOKIE (the `__session=...` pair from a signed-in
  * browser, or a Clerk testing token session). Customer routes stay anonymous,
  * because customers never sign in.
+ *
+ * That session must OWN the demo business: set
+ * `businesses.clerk_user_id = '<the Clerk user id>'` on sokha-beauty first.
+ * Otherwise setup writes to one shop and the customer checks read another, and
+ * the failure shows up as a price that did not persist rather than as a wiring
+ * mistake.
  */
 function ownerCookie() {
   return process.env.MONI_ACCEPTANCE_OWNER_COOKIE?.trim() || null
@@ -808,7 +821,7 @@ async function main() {
   if (!hasAi) throw new Error('live vertical slice requires a configured Gemini or Anthropic API key')
   if (!ownerCookie()) {
     throw new Error(
-      'owner routes are authenticated since Phase 2: set MONI_ACCEPTANCE_OWNER_COOKIE to a Clerk session cookie for a waitlisted member',
+      'owner routes are authenticated since Phase 2: set MONI_ACCEPTANCE_OWNER_COOKIE to a Clerk session cookie for a waitlisted member who owns the demo business (businesses.clerk_user_id on sokha-beauty)',
     )
   }
 

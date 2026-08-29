@@ -5,10 +5,12 @@ import { db } from '@/lib/db.ts'
 import { isDatabaseConflict, requireDbData, throwIfDbError } from '@/lib/db-result.ts'
 import type { Json } from '@/lib/database.types.ts'
 import { customerTools } from '@/lib/agent/tools.ts'
-import { CUSTOMER_SYSTEM, contextLine } from '@/lib/agent/prompt.ts'
+import { CUSTOMER_SYSTEM, contextLine, instructionsBlock } from '@/lib/agent/prompt.ts'
 import { costMicroUsd, withFallback } from '@/lib/ai/models.ts'
 import { ApiRequestError, assertSameOriginBrowserPost, readJsonBody, validationPayload } from '@/lib/http/post.ts'
 import { DEMO_BUSINESS_SLUG, DEMO_VISITOR_COOKIE, getDemoBusiness } from '@/lib/queries/demo-business.ts'
+import { getBusinessById } from '@/lib/queries/business.ts'
+import { memberGate } from '@/lib/auth/member.ts'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -44,13 +46,30 @@ function withVisitorCookie<T>(response: NextResponse<T>, visitor: { id: string; 
   return response
 }
 
+/**
+ * Whose shop is answering.
+ *
+ * A customer never signs in, so signed out means the public demo shop, exactly
+ * as before. A signed-in member is an OWNER trying their own assistant from the
+ * dashboard, and they get their own catalogue, their own opening hours and their
+ * own standing instructions. That is the difference between a demo and a
+ * product, and it is why this route runs through the proxy.
+ *
+ * The tenant still comes from the session and never from the body: the `slug`
+ * field is pinned to the demo shop and cannot select anything.
+ */
+async function chatBusiness() {
+  const gate = await memberGate()
+  return gate.status === 'member' ? getBusinessById(gate.member.businessId) : getDemoBusiness()
+}
+
 export async function POST(req: NextRequest) {
   let visitor: { id: string; isNew: boolean } | null = null
   try {
     assertSameOriginBrowserPost(req)
     const body = ChatBodySchema.parse(await readJsonBody(req, 12_000))
     visitor = visitorFor(req)
-    const business = await getDemoBusiness()
+    const business = await chatBusiness()
     const externalId = `${business.slug}:${visitor.id}`
     const customerId = await getOrCreateVisitor(business.id, externalId, body.name)
     const conversation = await getOrCreateConversation(business.id, customerId)
@@ -98,7 +117,7 @@ export async function POST(req: NextRequest) {
     const { result, ref } = await withFallback('chat', (model) =>
       generateText({
         model,
-        system: `${CUSTOMER_SYSTEM}\n\n${contextLine(business.name, business.timezone)}`,
+        system: `${CUSTOMER_SYSTEM}${instructionsBlock(business.ai_instructions)}\n\n${contextLine(business.name, business.timezone)}`,
         messages,
         tools: customerTools(business.id, customerId, conversation.id),
         stopWhen: stepCountIs(8),

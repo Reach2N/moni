@@ -33,3 +33,10 @@ export const contextLine = (shopName: string, tz = 'Asia/Phnom_Penh') => {
   const iso = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date())
   return `Shop: ${shopName}. Right now it is ${now} in Cambodia. Today's date for tool calls is ${iso}.`
 }
+
+/**
+ * Re-exported so every prompt builder reaches for it here. It lives in its own
+ * module because it carries no `server-only`, which is what lets `db/test.mjs`
+ * prove that owner text cannot move a guardrail.
+ */
+export { instructionsBlock } from './instructions.ts'

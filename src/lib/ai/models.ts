@@ -25,7 +25,7 @@ import { anthropic } from '@ai-sdk/anthropic'
 import type { LanguageModel } from 'ai'
 
 /** The jobs this product needs a model for. Add one, wire one line below. */
-export type Task = 'parse' | 'chat' | 'classify'
+export type Task = 'parse' | 'chat' | 'classify' | 'transcribe'
 
 /**
  * "provider:model". Kept as a string so an env var can override it verbatim.
@@ -56,6 +56,15 @@ const DEFAULTS: Record<Task, ModelRef[]> = {
     'google:gemini-3.7-flash',
     'google:gemini-3.5-flash',
     'anthropic:claude-sonnet-5',
+  ],
+  // a shop owner's voice note to text, in Khmer or English. Audio rides as an
+  // AI SDK file part, which the gateway passes through to Gemini untouched;
+  // Anthropic is deliberately absent because it takes no audio input, so a
+  // fallback to it would fail on every request rather than degrade.
+  transcribe: [
+    'gateway:google/gemini-3.7-flash',
+    'google:gemini-3.7-flash',
+    'google:gemini-3.5-flash',
   ],
   // "is this a booking request or a complaint", cheapest possible
   classify: [

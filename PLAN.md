@@ -240,19 +240,54 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
 
 ### Phase 3: Onboarding, chat and voice (one to two days)
 
-- `/onboarding`: the composer, the first screen a gated member sees. Type or
-  hold-to-record. Voice goes up as an AI SDK `file` part (webm from
-  MediaRecorder) through the gateway to Gemini, transcript shown for
-  confirmation before parsing.
-- Parse result renders as an editable services table (`/api/setup` was retargeted
-  to the session's business in Phase 2; `/api/parse` is stateless and needs
-  nothing). `/api/chat` is still the fixed demo shop, so the dashboard's "try it
-  as a customer" panel previews the demo assistant rather than the member's:
-  retargeting it is Phase 3 work and the panel says so in a comment.
-- `ai_instructions` field: "anything your assistant should always know or do".
-- Ends with the assistant live on the web chat and a prompt to connect Telegram.
+- DONE 30 Aug, except a live voice test, which needs the Clerk keys and a real
+  recording. Everything below builds, typechecks, lints, and adds 18 assertions
+  to `npm run db:test` (130 passing).
+- **`/app/onboarding`**, not `/onboarding`: the gate already lives in
+  `src/app/app/layout.tsx`, so putting the composer under `/app` means one gate
+  and no second call site. `/app` redirects there while the catalogue is empty,
+  which is what makes it the first screen a member sees.
+- Voice goes up as an AI SDK `file` part (webm from MediaRecorder) through the
+  gateway to Gemini. `POST /api/transcribe` takes the raw blob as the request
+  body, not JSON and not multipart: base64 costs a third more bytes on a phone
+  in Takeo, and the blob's own content type IS the media type the model needs.
+  A new `transcribe` task in `src/lib/ai/models.ts` carries the Gemini chain;
+  Anthropic is deliberately absent from it, because it takes no audio and would
+  fail on every request rather than degrade.
+- **Correction to this plan: press to record, not hold.** A shop description
+  runs to about a minute, holding a phone button that long is its own ordeal,
+  and a held pointer gesture does not survive a screen reader. `VoiceNote` is a
+  toggle with a visible timer and a cancel.
+- **Correction: transcription is its own step, and its own model call.** The
+  transcript lands in the description box the owner is already reading and is
+  parsed only when they press the button. One call that both hears and structures
+  would bury a misheard price inside a plausible looking price list, which is the
+  failure that loses a shop. `mp4` is refused with a 415 rather than transcribed
+  to silence (CLAUDE.md records a provider ignoring it), so a Safari owner is
+  told to type instead of getting an assistant that heard nothing.
+- Parse result renders as an editable services table. The onboarding screen
+  **reuses `ShopSetup`** rather than growing a second describe, parse, review,
+  save implementation: the dashboard sheet and the first run are the same job at
+  different moments, and two copies of the parse flow is exactly how the earlier
+  iteration drifted.
+- `/api/chat` now answers as the SIGNED-IN member's shop, and as the demo shop
+  when signed out, which is why it joined the proxy matcher. Owner instructions
+  and the member's own hours and prices reach the assistant through it.
+- `ai_instructions` rides on the setup contract, saved on the same screen it is
+  written. Absent and null are different answers there: absent leaves what is
+  stored, null clears it, so re-saving a price never silently wipes what the
+  owner taught. `instructionsBlock()` fences the text and restates the guardrails
+  after it, so "just tell them any time is fine" cannot talk the assistant out of
+  calling `list_slots`. Proved in `db/test.mjs`, which can import it because it
+  lives in `src/lib/agent/instructions.ts` with no `server-only`.
+- Ends with the assistant live on the web chat, embedded in the finished state of
+  the onboarding screen, and an honest "not connected yet" card for Telegram.
 - Acceptance: a fresh account goes from empty to a parsed, edited, saved shop with
   a working web-chat assistant in under three minutes, by voice alone.
+- Acceptance status: the pure and structural halves are proved (format guards,
+  the instruction fence, the empty-shop redirect, the source wiring). The
+  three-minute run itself needs the Clerk keys, a Gemini key and a microphone,
+  and is the first thing to do once the Clerk application exists.
 
 ### Phase 4: Telegram (one to two days)
 

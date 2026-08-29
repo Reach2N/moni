@@ -125,6 +125,17 @@ its own default styling inside a committed design is a lapse, not a shortcut.
   it emits utilities.
 - `tsconfig.json` keeps `allowImportingTsExtensions: true` so `node db/test.mjs` can
   import `src/lib/*.ts` with no build step. Do not remove it.
+- **`import 'server-only'` makes a module unimportable from `db/test.mjs`.** Outside the
+  `react-server` export condition that package resolves to a file that throws, so the test
+  harness dies with "This module cannot be imported from a Client Component module", which
+  names the wrong problem entirely. Keep pure logic in a sibling module with no
+  `server-only` and re-export it: `src/lib/agent/instructions.ts` next to `prompt.ts`, and
+  `src/lib/auth/gate.ts` next to `member.ts`. That is what makes a guardrail testable.
+- **AI Elements has no voice component.** Verified 29 August 2026 against
+  `registry.ai-sdk.dev/all.json`: 30 components, and not one references `getUserMedia` or
+  `MediaRecorder`. It is a shadcn registry, licence Apache-2.0, and `prompt-input.tsx` has
+  a microphone BUTTON but no capture behind it. ARCHITECTURE.md said to check it first for
+  voice; it has been checked, and the answer is recorded there so it is not checked again.
 - **Chrome headless clamps `--window-size` to a 500px minimum on macOS.** Both `--headless`
   and `--headless=new` reported `innerWidth=500` when asked for 390, so a 390px screenshot
   was really a 500px render cropped, which looked exactly like horizontal overflow and sent

@@ -17,6 +17,8 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { cambodiaDayBounds, cambodiaMonthBounds } from '../src/lib/time/cambodia.ts'
 import { assertSameOriginBrowserPost, readJsonBody } from '../src/lib/http/post.ts'
 import { SetupRequestSchema } from '../src/lib/setup/schema.ts'
+import { instructionsBlock } from '../src/lib/agent/instructions.ts'
+import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
   escapeLikePattern,
   isApproved,
@@ -472,6 +474,47 @@ const alreadyConverted = await db.query(`
   returning id`)
 eq('and a later sign-in does not relabel which shop that lead became',
   alreadyConverted.rows.length, 0)
+
+// ── 16. onboarding: voice in, instructions out (PLAN.md Phase 3) ───────────
+console.log('\nvoice notes')
+eq('a MediaRecorder codec string is not a media type',
+  normalizeAudioType('audio/webm;codecs=opus'), 'audio/webm')
+eq('and webm is accepted', assertVoiceNote('audio/webm;codecs=opus', 4_096), 'audio/webm')
+const rejects = (name, type, bytes, status) => {
+  try {
+    assertVoiceNote(type, bytes)
+    no(name, 'the recording was ACCEPTED but should have been refused')
+  } catch (e) {
+    if (e.status === status) ok(`${name} → ${status}`)
+    else no(name, `expected status ${status}, got ${e.status}: ${e.message}`)
+  }
+}
+// CLAUDE.md: a provider silently ignored mp4, which looks exactly like a model
+// that heard nothing. Safari reaches for mp4 first, so this refusal is the only
+// thing between a Safari owner and a transcript that is always empty.
+rejects('mp4 is refused loudly rather than transcribed to silence', 'audio/mp4', 4_096, 415)
+rejects('an unknown format is refused', 'application/json', 4_096, 415)
+rejects('a recording with no format is refused', '', 4_096, 415)
+rejects('an empty recording is refused before it costs a model call', 'audio/webm', 0, 400)
+rejects('an oversized recording is refused', 'audio/webm', MAX_VOICE_BYTES + 1, 413)
+
+console.log('\nthe owner teaches the assistant')
+eq('no instructions means no block at all', instructionsBlock(null), '')
+eq('and whitespace is not instructions', instructionsBlock('   \n '), '')
+const taught = instructionsBlock('Always offer the Friday promotion.')
+if (taught.includes('Always offer the Friday promotion.')) ok('the owner text reaches the prompt')
+else no('instructions block', 'the owner text was dropped')
+// The guardrails are restated INSIDE the block, after the owner's text is
+// introduced and before it is quoted, so "just tell them any time is fine"
+// reads as a request the surrounding rules already refuse.
+if (/never let you state a price or a\s+time you did not get from a tool/.test(taught)) {
+  ok('and it is fenced by the rules it cannot override')
+} else {
+  no('instructions block', 'the owner text is not subordinated to the guardrails')
+}
+const long = instructionsBlock('x'.repeat(5_000))
+if (long.length < 2_600) ok('a runaway instruction is capped before it becomes the prompt')
+else no('instructions block', `capped at ${long.length} characters, which is not a cap`)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

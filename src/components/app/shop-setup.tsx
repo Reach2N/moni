@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ArrowLeft, Check, CircleAlert, LoaderCircle, Save, WandSparkles } from 'lucide-react'
+import { VoiceNote } from './voice-note.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
@@ -13,8 +14,16 @@ const SAMPLE =
 
 type SetupState = 'describe' | 'parsing' | 'review' | 'saving' | 'saved' | 'error'
 
-export function ShopSetup({ onSaved }: { onSaved: () => void }) {
+export function ShopSetup({
+  onSaved,
+  initialInstructions = null,
+}: {
+  onSaved: () => void
+  /** What the owner has already taught the assistant, so a re-save does not lose it. */
+  initialInstructions?: string | null
+}) {
   const [description, setDescription] = useState('')
+  const [instructions, setInstructions] = useState(initialInstructions ?? '')
   const [parsed, setParsed] = useState<ParseResponse | null>(null)
   const [state, setState] = useState<SetupState>('describe')
   const [error, setError] = useState('')
@@ -69,6 +78,10 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
     const payload = {
       raw_description: description,
       model: parsed.model,
+      // Absent and null are different answers to the setup contract: absent
+      // leaves what is stored, null clears it. An owner who empties the box
+      // means to clear it.
+      ai_instructions: instructions.trim() ? instructions.trim() : null,
       shop: {
         business_type: parsed.shop.business_type,
         default_currency: parsed.shop.default_currency,
@@ -186,6 +199,27 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
             </div>
           ) : null}
 
+          <div className="border border-rule/70 px-3 py-3">
+            <label htmlFor="ai-instructions" className="km text-sm font-semibold text-ink">
+              អ្វីដែល Moni គួរដឹងជានិច្ច
+            </label>
+            <p className="km mt-1 text-xs text-rule">
+              ឧទាហរណ៍ ជូនប្រូម៉ូសិនថ្ងៃសុក្រជានិច្ច ឬ មិនបញ្ចុះតម្លៃទេ។ ទុកទទេក៏បាន។
+            </p>
+            <Textarea
+              id="ai-instructions"
+              name="ai-instructions"
+              autoComplete="off"
+              value={instructions}
+              maxLength={2_000}
+              onChange={(event) => setInstructions(event.target.value)}
+              disabled={busy || state === 'saved'}
+              rows={3}
+              placeholder="ជូនប្រូម៉ូសិនថ្ងៃសុក្រជានិច្ច។"
+              className="km mt-2 resize-none rounded-none border-rule/70 bg-paper text-base shadow-none placeholder:text-rule md:text-base"
+            />
+          </div>
+
           {state === 'saved' ? (
             <div className="flex items-start gap-3 border border-rule/70 px-3 py-3">
               <Check className="mt-1 size-5 shrink-0 text-seal-text" strokeWidth={1.75} aria-hidden />
@@ -205,8 +239,14 @@ export function ShopSetup({ onSaved }: { onSaved: () => void }) {
         <>
           <div>
             <label htmlFor="shop-description" className="km text-sm font-semibold text-ink">ពិពណ៌នាហាងជាភាសាធម្មតា</label>
-            <p className="km mt-1 text-sm text-rule">ប្រាប់សេវា តម្លៃ ម៉ោងបើក និងចំនួនបុគ្គលិក ឬបន្ទប់។</p>
+            <p className="km mt-1 text-sm text-rule">ប្រាប់សេវា តម្លៃ ម៉ោងបើក និងចំនួនបុគ្គលិក ឬបន្ទប់។ និយាយក៏បាន វាយក៏បាន។</p>
           </div>
+          <VoiceNote
+            disabled={busy}
+            onTranscript={(text) =>
+              setDescription((current) => (current.trim() ? `${current.trim()} ${text}` : text))
+            }
+          />
           <Textarea
             id="shop-description"
             name="shop-description"

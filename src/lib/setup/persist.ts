@@ -53,6 +53,7 @@ export async function persistSetup(businessId: string, input: SetupRequest): Pro
     ...(input.business && 'phone' in input.business ? { phone: input.business.phone } : {}),
     ...(input.business && 'address' in input.business ? { address: input.business.address } : {}),
     ...(input.business && 'province' in input.business ? { province: input.business.province } : {}),
+    ...(input.ai_instructions !== undefined ? { ai_instructions: input.ai_instructions } : {}),
     business_type: input.shop.business_type,
     category: type.category,
     default_currency: input.shop.default_currency,

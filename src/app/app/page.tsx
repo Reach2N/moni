@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { AskMoni } from '@/components/app/ask-moni.tsx'
 import { DayLedger } from '@/components/app/day-ledger.tsx'
 import { DesktopNav } from '@/components/app/desktop-nav.tsx'
@@ -28,6 +29,10 @@ export default async function OwnerCommandCentre() {
   // cached, so asking again costs nothing and keeps the tenant id out of props.
   const member = await requireMember()
   const snapshot = await getDashboardSnapshot(member.businessId)
+  // A shop with no catalogue has no day to plan and no takings to show, so the
+  // dashboard would be a page of zeroes. Send a new member to the composer
+  // instead: PLAN.md Phase 3 makes it the first screen they see.
+  if (snapshot.services.length === 0) redirect('/app/onboarding')
   const signals = shopSignals(snapshot)
   const urgent = signals.filter((signal) => signal.tone === 'act').length
 

@@ -61,6 +61,12 @@ export const SetupRequestSchema = z
   .object({
     raw_description: z.string().trim().min(8).max(8_000),
     model: z.string().trim().min(1).max(120).optional(),
+    // The owner's standing instructions for the assistant, saved alongside the
+    // catalogue because they are written on the same screen. Optional and
+    // nullable are different answers here: absent means "leave what is there",
+    // null means "clear it". Defaulting it would silently wipe an owner's
+    // instructions every time they re-saved a price.
+    ai_instructions: z.string().trim().max(2_000).nullable().optional(),
     business: z
       .object({
         name: z.string().trim().min(1).max(120).optional(),
