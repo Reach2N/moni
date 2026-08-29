@@ -1,18 +1,17 @@
-import { KhqrMark, Receipt, ReceiptLine, Sheet, SheetHead } from '@/components/marketing/artifacts.tsx'
-import { IconCheck, IconHandBack, IconMessage, IconQr } from '@/components/marketing/icons.tsx'
+import { KhqrMark, Receipt, ReceiptLine, Sheet } from '@/components/marketing/artifacts.tsx'
+import { IconCheck, IconMessage, IconQr, IconShield } from '@/components/marketing/icons.tsx'
 import { moneyKm } from '@/lib/format/khmer.ts'
 import type { Copy, Locale } from '@/lib/marketing/copy.ts'
 import { SERVICE_TEMPLATES, formatMoney } from '@/lib/types.ts'
 
 /**
- * The trust loop, shown as the shop's own record: the transcript on one side,
- * the receipt it produced on the other.
+ * The guardrail on one side, the record it produced on the other.
  *
- * This used to be two dark cards of chat bubbles with hardcoded #30D158 and
- * #111113, which meant it only worked on a permanently dark band and read as
- * generic messenger UI. A shop owner already knows what a chat looks like; what
- * they need to see is that the conversation ends in a written record with the
- * right amount on it.
+ * This used to open with the transcript, which AgentConversation now shows in
+ * the hero. Repeating it here would have made the page argue the same point
+ * twice, so this section takes the two things the conversation does not say:
+ * what Moni does when it is NOT sure, and what the shop is left holding
+ * afterwards.
  */
 export function BookingProof({ copy, locale }: { copy: Copy; locale: Locale }) {
   const c = copy.proof
@@ -25,33 +24,29 @@ export function BookingProof({ copy, locale }: { copy: Copy; locale: Locale }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-10">
-      <Sheet>
-        <SheetHead
-          title={c.customerLabel}
-          note={`${copy.channels.now} · ${copy.demo.example}`}
-          mark={<IconMessage className="size-4" />}
-        />
-        <dl className="divide-y divide-label/10">
-          <div className="px-4 py-4 sm:px-5">
-            <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-label-3">
-              {c.customerLabel}
-            </dt>
-            <dd className="mt-1.5 text-[15px] text-pretty text-label">{c.customerMessage}</dd>
+      <Sheet className="p-5 sm:p-7">
+        <span className="flex size-10 items-center justify-center rounded-[10px] bg-green/12 text-green">
+          <IconShield className="size-5" />
+        </span>
+        <h3 className="mt-4 text-xl font-semibold tracking-tight text-balance text-label">{c.handoff}</h3>
+        <p className="mt-2 text-[15px] text-pretty text-label-2">{c.handoffBody}</p>
+
+        <dl className="mt-6 divide-y divide-separator border-t border-separator">
+          <div className="flex items-start gap-3 py-3">
+            <IconMessage className="mt-0.5 size-4 shrink-0 text-label-3" />
+            <div className="min-w-0">
+              <dt className="text-[13px] font-semibold text-label">{c.assistantLabel}</dt>
+              <dd className="text-sm text-pretty text-label-2">{copy.agent.replyNote}</dd>
+            </div>
           </div>
-          <div className="border-l-2 border-green px-4 py-4 sm:px-5">
-            <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-label-3">
-              {c.assistantLabel}
-            </dt>
-            <dd className="mt-1.5 text-[15px] text-pretty text-label">{c.assistantMessage}</dd>
+          <div className="flex items-start gap-3 py-3">
+            <IconCheck className="mt-0.5 size-4 shrink-0 text-green" />
+            <div className="min-w-0">
+              <dt className="text-[13px] font-semibold text-label">{c.ownerNote}</dt>
+              <dd className="text-sm text-pretty text-label-2">{c.bookingValue}</dd>
+            </div>
           </div>
         </dl>
-        <div className="flex items-start gap-2.5 border-t border-label/15 px-4 py-4 sm:px-5">
-          <IconHandBack className="mt-0.5 size-4 shrink-0 text-label-2" />
-          <div className="min-w-0">
-            <p className="text-[15px] font-semibold text-label">{c.handoff}</p>
-            <p className="mt-1 text-sm text-pretty text-label-2">{c.handoffBody}</p>
-          </div>
-        </div>
       </Sheet>
 
       <Receipt

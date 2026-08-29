@@ -117,6 +117,17 @@
   /* Continuous, generous. No 0px corners: that was the Invitation. */
   --radius-card: 14px;
   --radius-well: 12px;
+  --radius-stage: 24px;
+  --radius-pill: 999px;
+
+  /* Elevation. Apple stacks two shadows: a tight contact shadow that says the
+     thing is resting on the page, and a wide soft one that says how far above
+     it. One blurry shadow reads as a drop shadow from 2010. */
+  --shadow-card:  0 1px 2px rgba(0,0,0,.05), 0 8px 24px -12px rgba(0,0,0,.14);
+  --shadow-float: 0 2px 6px rgba(0,0,0,.06), 0 24px 60px -24px rgba(0,0,0,.22);
+
+  /* The chrome material: translucent, blurred, hairline. Never a solid bar. */
+  --material: color-mix(in srgb, var(--background) 72%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -131,6 +142,11 @@
     --on-accent:            #08240F;
     --destructive:          #FF453A;
 
+    /* Shadow does almost no work on a black ground, so dark leans on the
+       hairline instead and keeps only enough shadow to lift a floating card. */
+    --shadow-card:  0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.7);
+    --shadow-float: 0 2px 6px rgba(0,0,0,.6), 0 24px 60px -24px rgba(0,0,0,.9);
+    --material: color-mix(in srgb, var(--background) 68%, transparent);
   }
 }
 
@@ -147,7 +163,14 @@
   --color-green:      var(--accent);
   --color-on-green:   var(--on-accent);
   --color-red:        var(--destructive);
+  --color-material:   var(--material);
 }
+
+/* Radii and shadows stay OUT of @theme. Tailwind's theme namespaces are
+   --radius-* and --shadow-*, which are the exact names :root already uses for
+   the raw values, so redeclaring them here would be a custom property
+   referencing itself and both would compute to nothing. Call them through
+   arbitrary values instead: rounded-[var(--radius-card)], shadow-[var(--shadow-card)]. */
 
 /* The public Moni surface. Its only job is to opt this subtree into both schemes
    so the browser's own chrome, form controls and overscroll follow the page.
@@ -161,6 +184,24 @@
    colour here; change the palette at :root where both schemes are defined. */
 .moni-hig {
   color-scheme: light dark;
+
+  /* PLAN.md section 3: "system stack first (-apple-system, BlinkMacSystemFont,
+     SF Pro Text, Inter, sans-serif), Khmer through the vendored Busra".
+
+     This is scoped to the public surface rather than changed in --font-sans,
+     because --font-sans is also the dashboard's face and the Invitation world
+     deliberately sets everything in Busra. Without this the marketing page
+     rendered its Latin in Busra too, whose Latin is a SERIF, so an interface
+     meant to read as Apple-native was setting its headlines in a bookish
+     roman. Futura 100 Khmer still leads when NEXT_PUBLIC_TYPEKIT_ID is set:
+     it is the licensed brand face and covers both scripts.
+
+     Font fallback is per glyph, not per string, so Khmer characters are absent
+     from SF and resolve to Busra on the next family in the list. That is why
+     one stack can serve both scripts without a :lang() rule. */
+  font-family: 'futura-100-khmer', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'Inter', system-ui, 'Busra', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 

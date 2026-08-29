@@ -1,5 +1,5 @@
 /**
- * The shop's own paper.
+ * The shop's own surfaces.
  *
  * The landing page's illustrations are the objects a Cambodian shop already
  * has: the price list taped to the wall, the receipt handed across the counter,
@@ -7,9 +7,13 @@
  * traffic lights, a gradient mesh, or a glowing card. Those belong to software
  * marketing; these belong to the shop, which is whose side Moni is on.
  *
- * All three share one substrate: white ground, a single hairline, square
- * corners on the paper itself and ruled horizontal separators. Riel amounts and
- * Khmer numerals do the decorating, so no ornament has to be invented.
+ * All three share one substrate: white ground, a single hairline, CONTINUOUS
+ * corners and ruled horizontal separators. Riel amounts and Khmer numerals do
+ * the decorating, so no ornament has to be invented.
+ *
+ * The corners are 14px, not 0. An earlier pass drew these square for a printed
+ * look and that contradicted PLAN.md section 3, which specifies Apple-native
+ * radii of 12 to 16 and says in as many words: no 0px corners.
  */
 
 import type { ReactNode } from 'react'
@@ -26,7 +30,7 @@ export function Sheet({
   as?: 'div' | 'figure' | 'aside'
 }) {
   return (
-    <Tag className={cn('border border-label/15 bg-surface text-label shadow-[0_1px_0_var(--separator)]', className)}>
+    <Tag className={cn('rounded-[var(--radius-card)] border border-separator bg-surface text-label shadow-[var(--shadow-card)]', className)}>
       {children}
     </Tag>
   )
@@ -43,7 +47,7 @@ export function SheetHead({
   mark?: ReactNode
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-label/15 px-4 py-3 sm:px-5">
+    <div className="flex items-baseline justify-between gap-3 border-b border-separator px-4 py-3 sm:px-5">
       <div className="flex min-w-0 items-center gap-2.5">
         {mark ? <span className="shrink-0 text-label-2">{mark}</span> : null}
         <h3 className="truncate text-[13px] font-semibold uppercase tracking-[0.14em] text-label">{title}</h3>
@@ -74,7 +78,7 @@ export function PriceList({
   return (
     <Sheet as="figure" className={className}>
       <SheetHead title={title} note={note} mark={mark} />
-      <dl className="divide-y divide-label/10">
+      <dl className="divide-y divide-separator">
         {rows.map((row) => (
           <div key={row.name} className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 px-4 py-3 sm:px-5">
             <dt className="min-w-0 truncate text-[15px] text-label">{row.name}</dt>
@@ -86,7 +90,7 @@ export function PriceList({
         ))}
       </dl>
       {footer ? (
-        <div className="border-t border-label/15 px-4 py-3 text-[13px] text-label-2 sm:px-5">{footer}</div>
+        <div className="border-t border-separator px-4 py-3 text-[13px] text-label-2 sm:px-5">{footer}</div>
       ) : null}
     </Sheet>
   )
@@ -117,15 +121,15 @@ export function Receipt({
       <div className="px-4 pb-5 pt-4 sm:px-5">{head}</div>
 
       <div className="relative" aria-hidden>
-        <div className="border-t border-dashed border-label/25" />
-        <span className="absolute -left-[7px] -top-[7px] size-3.5 rounded-full border border-label/15 bg-surface" />
-        <span className="absolute -right-[7px] -top-[7px] size-3.5 rounded-full border border-label/15 bg-surface" />
+        <div className="border-t border-dashed border-separator" />
+        <span className="absolute -left-[7px] -top-[7px] size-3.5 rounded-full border border-separator bg-surface" />
+        <span className="absolute -right-[7px] -top-[7px] size-3.5 rounded-full border border-separator bg-surface" />
       </div>
 
       <div className="px-4 pb-4 pt-5 sm:px-5">{children}</div>
 
       {stamp ? (
-        <div className="flex items-center gap-2 border-t border-label/15 px-4 py-3 sm:px-5">{stamp}</div>
+        <div className="flex items-center gap-2 border-t border-separator px-4 py-3 sm:px-5">{stamp}</div>
       ) : null}
     </Sheet>
   )

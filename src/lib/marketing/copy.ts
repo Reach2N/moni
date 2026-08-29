@@ -19,6 +19,7 @@ type Faq = { q: string; a: string }
 /** `panel` captions the product panel the pinned step sequence shows alongside. */
 type Step = { title: string; body: string; panel: string }
 type ShopKind = { name: string; detail: string }
+type Capability = { title: string; body: string }
 
 export type Copy = {
   /**
@@ -76,6 +77,26 @@ export type Copy = {
     title: string
     body: string
     items: [Step, Step, Step]
+  }
+  /**
+   * The agent doing the talking. This is the product's actual claim, so the
+   * page shows the work rather than describing it: `trace` is the run of
+   * actions displayed beside the conversation, in the order Moni takes them.
+   */
+  agent: {
+    eyebrow: string
+    title: string
+    body: string
+    typing: string
+    traceLabel: string
+    trace: [string, string, string, string]
+    replyNote: string
+  }
+  capabilities: {
+    eyebrow: string
+    title: string
+    body: string
+    items: [Capability, Capability, Capability, Capability, Capability, Capability]
   }
   proof: {
     eyebrow: string
@@ -195,6 +216,33 @@ const km: Copy = {
       { title: 'ប្រាប់ពីហាងរបស់អ្នក', body: 'វាយ ឬនិយាយអំពីសេវាកម្ម តម្លៃ និងម៉ោងបើក។ មិនចាំបាច់គូរលំហូរសារ។', panel: 'ឃ្លាមួយពីម្ចាស់ហាង' },
       { title: 'ពិនិត្យអ្វីដែលបានរៀបចំ', body: 'បញ្ជីតម្លៃ និងម៉ោងរបស់អ្នកនៅជាកន្លែងតែមួយ។ អ្នកអាចកែបានគ្រប់ពេល។', panel: 'បញ្ជីសេវាកម្មដែលរៀបរួច' },
       { title: 'ឲ្យ Moni ជួយឆ្លើយ', body: 'វាឆ្លើយតាមទិន្នន័យពិត ពិនិត្យម៉ោងទំនេរ និងប្រគល់សារមិនច្បាស់មកអ្នក។', panel: 'ការសន្ទនាជាមួយអតិថិជន' },
+    ],
+  },
+  agent: {
+    eyebrow: 'អ្នកជំនួយដែលនិយាយជំនួសអ្នក',
+    title: 'Moni ឆ្លើយអតិថិជន ដោយប្រើទិន្នន័យពិតរបស់អ្នក',
+    body: 'អតិថិជនសរសេរមកធម្មតា។ Moni អានបញ្ជីតម្លៃ ពិនិត្យម៉ោងទំនេរ ហើយឆ្លើយវិញភ្លាមៗ។ អ្នកមើលឃើញរាល់ជំហានដែលវាធ្វើ។',
+    typing: 'Moni កំពុងឆ្លើយ',
+    traceLabel: 'អ្វីដែល Moni បានធ្វើ',
+    trace: [
+      'អានបញ្ជីតម្លៃរបស់អ្នក',
+      'ពិនិត្យម៉ោង ១០:០០ ថ្ងៃស្អែក',
+      'កក់ម៉ោងទុកជូន',
+      'ផ្ញើ KHQR ១៥,០០០៛',
+    ],
+    replyNote: 'រាល់ចម្លើយមកពីទិន្នន័យរបស់អ្នក មិនមែនពីការស្មានទេ។',
+  },
+  capabilities: {
+    eyebrow: 'អ្វីដែល Moni ធ្វើបាន',
+    title: 'វាមិនត្រឹមតែឆ្លើយទេ វាបញ្ចប់ការងារ',
+    body: 'ចាប់ពីសារដំបូង រហូតដល់ការកក់ និងការទូទាត់ ក្នុងការសន្ទនាតែមួយ។',
+    items: [
+      { title: 'ឆ្លើយជាភាសាខ្មែរ និងអង់គ្លេស', body: 'វាឆ្លើយតាមភាសាដែលអតិថិជនសរសេរមក។' },
+      { title: 'ប្រាប់តម្លៃពិត', body: 'វាអានពីបញ្ជីរបស់អ្នក។ វាមិនប្រឌិតលេខទេ។' },
+      { title: 'ពិនិត្យម៉ោងទំនេរ', body: 'វាមើលកាលវិភាគមុននឹងសន្យាម៉ោងណាមួយ។' },
+      { title: 'កក់ និងបញ្ជាក់', body: 'វាកត់ត្រាការកក់ ហើយប្រាប់អ្នកភ្លាមៗ។' },
+      { title: 'ទទួលប្រាក់តាម KHQR', body: 'វាផ្ញើ QR ជារៀល ហើយបញ្ជាក់ពេលបង់រួច។' },
+      { title: 'ប្រគល់មកអ្នកពេលមិនច្បាស់', body: 'វាឈប់ ហើយទុកឲ្យអ្នកសម្រេច។' },
     ],
   },
   proof: {
@@ -323,6 +371,33 @@ const en: Copy = {
       { title: 'Describe your shop', body: 'Type or speak your services, prices, and hours. There is no flow chart to draw.', panel: 'One sentence from the owner' },
       { title: 'Check what it made', body: 'Your catalogue and hours stay in one place. Edit anything, whenever you need.', panel: 'The service list it built' },
       { title: 'Let Moni answer', body: 'It replies from your real data, checks availability, and hands uncertain messages back to you.', panel: 'A conversation with a customer' },
+    ],
+  },
+  agent: {
+    eyebrow: 'The assistant that does the talking',
+    title: 'Moni answers your customers, from your own data',
+    body: 'Customers write normally. Moni reads your price list, checks what is actually free, and replies straight away. You can see every step it took.',
+    typing: 'Moni is replying',
+    traceLabel: 'What Moni did',
+    trace: [
+      'Read your price list',
+      'Checked 10:00 tomorrow',
+      'Held the slot',
+      'Sent a KHQR for 15,000៛',
+    ],
+    replyNote: 'Every answer comes from your data, never from a guess.',
+  },
+  capabilities: {
+    eyebrow: 'What Moni can do',
+    title: 'It does not just reply. It finishes the job.',
+    body: 'From the first message to the booking and the payment, inside one conversation.',
+    items: [
+      { title: 'Answers in Khmer and English', body: 'It replies in whichever language the customer wrote in.' },
+      { title: 'Quotes your real prices', body: 'It reads them from your catalogue. It does not invent a number.' },
+      { title: 'Checks real availability', body: 'It looks at the calendar before it promises any time.' },
+      { title: 'Books and confirms', body: 'It records the booking and tells you straight away.' },
+      { title: 'Takes payment by KHQR', body: 'It sends a riel QR and confirms once it is paid.' },
+      { title: 'Hands back when unsure', body: 'It stops, and leaves the decision to you.' },
     ],
   },
   proof: {

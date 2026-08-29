@@ -3,9 +3,10 @@ import { BookingProof } from '@/components/marketing/booking-proof.tsx'
 import { SiteFooter, SiteHeader } from '@/components/marketing/chrome.tsx'
 import { Hero } from '@/components/marketing/hero.tsx'
 import { HowSequence } from '@/components/marketing/how-sequence.tsx'
+import { AgentConversation } from '@/components/marketing/agent-conversation.tsx'
+import { Capabilities } from '@/components/marketing/capabilities.tsx'
 import { MessageLog } from '@/components/marketing/message-log.tsx'
 import { PricingFigure } from '@/components/marketing/pricing-figure.tsx'
-import { ProductStage } from '@/components/marketing/product-stage.tsx'
 import { WaitlistForm } from '@/components/marketing/waitlist-form.tsx'
 import { Sheet, SheetHead } from '@/components/marketing/artifacts.tsx'
 import {
@@ -50,11 +51,42 @@ export default async function MarketingHome({
       <SiteHeader copy={copy} locale={locale} />
 
       <main>
-        {/* The statement, then the shop's own paper. One movement, so no rule
-            between them. White is the ground the whole way down: the dark band
-            this page used to carry has gone. */}
+        {/* The statement, then the agent answering. One movement, so no rule
+            between them. White is the ground the whole way down. */}
         <Hero copy={copy} />
-        <ProductStage copy={copy} locale={locale} />
+
+        {/* The page's whole claim, shown before it is argued: a customer writes,
+            Moni answers from the shop's data, and the work it did is listed
+            beside the reply. */}
+        <section className="border-b border-separator pb-20 sm:pb-28" aria-labelledby="agent-heading">
+          <div className="mx-auto max-w-5xl px-5 pb-10 sm:px-8 sm:pb-12">
+            <Reveal className="max-w-2xl">
+              <p className={EYEBROW}>{copy.agent.eyebrow}</p>
+              <h2 id="agent-heading" className={HEADING}>
+                {copy.agent.title}
+              </h2>
+              <p className="mt-5 text-lg text-pretty text-label-2">{copy.agent.body}</p>
+            </Reveal>
+          </div>
+          <div className="px-5 sm:px-8">
+            <AgentConversation copy={copy} />
+          </div>
+        </section>
+
+        <section className="border-b border-separator" aria-labelledby="capabilities-heading">
+          <div className={SECTION}>
+            <Reveal className="max-w-2xl">
+              <p className={EYEBROW}>{copy.capabilities.eyebrow}</p>
+              <h2 id="capabilities-heading" className={HEADING}>
+                {copy.capabilities.title}
+              </h2>
+              <p className="mt-5 text-lg text-pretty text-label-2">{copy.capabilities.body}</p>
+            </Reveal>
+            <Reveal className="mt-12" y={18}>
+              <Capabilities copy={copy} />
+            </Reveal>
+          </div>
+        </section>
 
         <HowSequence copy={copy} locale={locale} />
 
@@ -100,7 +132,7 @@ export default async function MarketingHome({
             </Reveal>
 
             <Reveal className="mt-4 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]" y={18}>
-              <div className="min-w-0 border border-label/15 bg-surface p-6 sm:p-8">
+              <div className="min-w-0 rounded-[var(--radius-card)] border border-separator bg-surface p-6 shadow-[var(--shadow-card)] sm:p-8">
                 <h3 id="channels-heading" className="text-xl font-semibold tracking-tight text-label sm:text-2xl">
                   {copy.channels.title}
                 </h3>
@@ -118,7 +150,7 @@ export default async function MarketingHome({
                       <p className="text-lg font-semibold text-label">{copy.channels.now}</p>
                       <p className="mt-1 text-sm text-label-2">{copy.channels.nowNote}</p>
                     </div>
-                    <span className="shrink-0 bg-green px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-green">
+                    <span className="shrink-0 rounded-full bg-green px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-green">
                       {copy.ui.badgeNow}
                     </span>
                   </li>
@@ -127,7 +159,7 @@ export default async function MarketingHome({
                       <p className="text-lg font-semibold text-label">{copy.channels.next}</p>
                       <p className="mt-1 text-sm text-label-2">{copy.channels.nextNote}</p>
                     </div>
-                    <span className="shrink-0 border border-label/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-label-2">
+                    <span className="shrink-0 rounded-full border border-separator px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-label-2">
                       {copy.ui.badgeNext}
                     </span>
                   </li>
@@ -151,7 +183,7 @@ export default async function MarketingHome({
                 {copy.pricing.headline}
               </p>
               <p className="mt-4 text-lg text-pretty text-label-2">{copy.pricing.body}</p>
-              <ul className="mt-8 divide-y divide-label/10 border-y border-label/15">
+              <ul className="mt-8 divide-y divide-separator border-y border-separator">
                 {copy.pricing.points.map((point) => (
                   <li key={point} className="flex items-start gap-3 py-3 text-[15px] text-label-2">
                     <IconCheck className="mt-1 size-3.5 shrink-0 text-green" />
@@ -170,7 +202,7 @@ export default async function MarketingHome({
                 {copy.faq.title}
               </h2>
             </Reveal>
-            <div className="mt-10 divide-y divide-label/10 border-y border-label/15">
+            <div className="mt-10 divide-y divide-separator border-y border-separator">
               {copy.faq.items.map((item) => (
                 <details key={item.q} className="group py-5">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-semibold text-label [&::-webkit-details-marker]:hidden">
@@ -194,7 +226,7 @@ export default async function MarketingHome({
               <p className="mt-5 text-lg text-pretty text-label-2">{copy.waitlist.body}</p>
               <p className="mt-5 text-sm text-label-3">{copy.hero.reassure}</p>
             </Reveal>
-            <Reveal y={18} delay={0.06} className="border border-label/15 bg-surface p-5 sm:p-8">
+            <Reveal y={18} delay={0.06} className="rounded-[var(--radius-card)] border border-separator bg-surface p-5 shadow-[var(--shadow-card)] sm:p-8">
               <WaitlistForm copy={copy} locale={locale} appUrl={APP_URL} />
             </Reveal>
           </div>
