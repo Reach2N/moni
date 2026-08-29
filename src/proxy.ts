@@ -34,9 +34,13 @@ export const config = {
     '/api/ask',
     '/api/setup',
     '/api/transcribe',
+    '/api/channels/:path*',
     // /api/chat is the customer endpoint and stays usable signed out, but it
     // has to run through the proxy so that an OWNER previewing their assistant
     // is recognised. Nothing on the public marketing site calls it.
     '/api/chat',
+    // /api/webhooks/* is deliberately absent. Telegram and Meta have no Clerk
+    // session, and running the proxy there would 500 every inbound customer
+    // message. Those routes prove their caller with a per-connection secret.
   ],
 }

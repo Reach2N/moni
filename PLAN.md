@@ -291,18 +291,56 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
 
 ### Phase 4: Telegram (one to two days)
 
-- Connect flow in settings: paste a BotFather token, we call `getMe` to validate,
-  store in `channel_connections`, set the webhook to
-  `/api/webhooks/telegram/[connectionId]` with a per-connection secret.
-- Webhook route: verify secret, log to `webhook_events`, map the Telegram user to
-  `customer_identities`, append to `conversations`/`messages`, run the existing
-  customer agent loop, reply via `sendMessage`.
+- DONE 30 Aug, except the live phone run, which needs a BotFather token, a public
+  HTTPS address and the Supabase keys. 27 new assertions in `npm run db:test`
+  (157 passing).
+- `/app/channels`: paste a BotFather token, `getMe` proves it, the token is stored
+  AES-256-GCM encrypted under `MONI_TOKEN_KEY` (never plaintext, never in an audit
+  row), and the webhook is set to `/api/webhooks/telegram/[connectionId]`.
+  Verify, then store, then set the webhook: a token stored without being verified
+  leaves a shop looking connected while every message vanishes.
+- **The webhook proves its caller two ways.** The connection id in the path says
+  which shop; Telegram's own `secret_token`, returned in an
+  `X-Telegram-Bot-Api-Secret-Token` header, says the call is really Telegram. The
+  id alone would be a bearer token sitting in every access log. A bad secret and
+  an unknown connection get the identical 404, so the endpoint cannot be used to
+  discover which connection ids exist.
+- `/api/webhooks/*` is deliberately OFF the Clerk proxy matcher. Telegram carries
+  no session, and running the proxy there would 500 every inbound message.
+- The customer agent loop moved OUT of `/api/chat` into
+  `src/lib/agent/customer-loop.ts` rather than being copied. The rule that the
+  assistant never states a price it did not get from a tool has to hold on every
+  channel, and it will not stay true in three transcriptions of the same hundred
+  lines. Web chat and Telegram now run the identical loop; Messenger reuses it
+  unchanged in Phase 6, which is what ARCHITECTURE.md means by keeping the loop
+  outside grammY middleware.
+- **grammY is used for its `Api` client and its types, not its middleware.**
+  `new Api(token)` needs no bot to initialise, so a multi-tenant webhook serves
+  any number of shops with no `getMe` round trip per message.
+- **`customer_identities` is unique on (channel, external_id) globally, not per
+  business**, so every channel scopes its external id by business id. Without
+  that, one Telegram user messaging two shops collapses into one customer row and
+  each shop reads the other's thread. The web chat did this already with a slug
+  prefix; `scopedExternalId()` is now the one implementation.
+- **The webhook answers 200 to almost everything, on purpose.** A non-2xx makes
+  Telegram redeliver, and the agent can book. Each update is written to
+  `webhook_events` before the agent runs, so a redelivery is recognised as a
+  duplicate and refused by the unique index. The cost is that a failed turn is
+  not retried; the alternative is two bookings for one customer. The customer's
+  message is stored before the model runs, so a model failure loses an answer and
+  never a customer's words.
 - The agent must complete a real booking: understand the requested time in Khmer or
   English, `list_slots`, negotiate alternatives when full, `create_booking`,
   confirm with a human-quotable code. Escalation to owner keeps working.
 - Acceptance: on a real phone, a customer books through Telegram end to end while
   the owner does nothing. The booking row exists in Supabase with the correct
   `tstzrange` and the conversation transcript is complete.
+- Acceptance status: everything that can be proved without a phone is proved.
+  Encryption round trip and tamper refusal, timing-safe secret comparison, token
+  shape, update extraction (text, bot, sticker), two shops sharing one Telegram
+  user, one bot per shop per channel, and the redelivery that must not book
+  twice. The phone run needs a BotFather token, an HTTPS address and the
+  Supabase keys.
 
 ### Phase 5: The owner dashboard, rebuilt (two to three days)
 

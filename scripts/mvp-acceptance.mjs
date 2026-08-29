@@ -248,7 +248,10 @@ function visitorExternalId(cookie) {
   const [name, id] = cookie.split('=', 2)
   assert.equal(name, 'moni_sokha_visitor')
   assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
-  const externalId = `${demoSlug}:${id}`
+  // Phase 4: every channel scopes its external id by BUSINESS ID, because
+  // customer_identities is unique on (channel, external_id) globally. The web
+  // chat used to prefix with the slug, which was the same idea by another name.
+  const externalId = `${snapshot.business.id}:${id}`
   testExternalIds.add(externalId)
   return externalId
 }

@@ -18,6 +18,9 @@ import { cambodiaDayBounds, cambodiaMonthBounds } from '../src/lib/time/cambodia
 import { assertSameOriginBrowserPost, readJsonBody } from '../src/lib/http/post.ts'
 import { SetupRequestSchema } from '../src/lib/setup/schema.ts'
 import { instructionsBlock } from '../src/lib/agent/instructions.ts'
+import { decryptSecret, encryptSecret, newWebhookSecret, secretsMatch } from '../src/lib/crypto/secrets.ts'
+import { extractIncoming, looksLikeBotToken } from '../src/lib/channels/telegram.ts'
+import { scopedExternalId } from '../src/lib/agent/identity.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
   escapeLikePattern,
@@ -515,6 +518,103 @@ if (/never let you state a price or a\s+time you did not get from a tool/.test(t
 const long = instructionsBlock('x'.repeat(5_000))
 if (long.length < 2_600) ok('a runaway instruction is capped before it becomes the prompt')
 else no('instructions block', `capped at ${long.length} characters, which is not a cap`)
+
+// ── 17. Telegram: the channel, the secret, and the retry (PLAN.md Phase 4) ──
+console.log('\nchannel credentials')
+// A key of the wrong length is a configuration mistake, and it must fail at the
+// point of encryption rather than produce a row nothing can ever decrypt.
+const KEY_A = Buffer.alloc(32, 7)
+const KEY_B = Buffer.alloc(32, 9)
+const cipher = encryptSecret('123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw', KEY_A)
+if (!cipher.includes('123456789')) ok('a bot token is not readable in the stored value')
+else no('encryptSecret', 'the token appears in the ciphertext')
+eq('and it round trips', decryptSecret(cipher, KEY_A).startsWith('123456789:'), true)
+const wrongKey = (() => {
+  try { decryptSecret(cipher, KEY_B); return 'DECRYPTED' } catch { return 'refused' }
+})()
+eq('the wrong key cannot read it', wrongKey, 'refused')
+// GCM authenticates, so a row edited in the database fails instead of decrypting
+// to something else. This is the difference between GCM and CBC, and the reason
+// schema.sql specifies it.
+const parts = cipher.split('.')
+const flipped = Buffer.from(parts[2], 'base64')
+flipped[0] ^= 0xff
+const tampered = (() => {
+  try { decryptSecret([parts[0], parts[1], flipped.toString('base64'), parts[3]].join('.'), KEY_A); return 'DECRYPTED' }
+  catch { return 'refused' }
+})()
+eq('a tampered ciphertext is refused, not silently altered', tampered, 'refused')
+eq('a secret matches itself', secretsMatch('abc', 'abc'), true)
+eq('and does not match a prefix of itself', secretsMatch('abc', 'ab'), false)
+eq('an absent secret never matches', secretsMatch(null, 'abc'), false)
+// Telegram allows A-Z a-z 0-9 _ and - in secret_token, and nothing else.
+if (/^[A-Za-z0-9_-]{40,}$/.test(newWebhookSecret())) ok('a webhook secret is URL safe and long')
+else no('newWebhookSecret', `got ${newWebhookSecret()}`)
+
+console.log('\nTelegram updates')
+eq('a BotFather token is recognised', looksLikeBotToken('123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw'), true)
+eq('half a paste is not', looksLikeBotToken('123456789:AAHdqTcv'), false)
+eq('and neither is a stray sentence', looksLikeBotToken('my bot token'), false)
+const textUpdate = {
+  update_id: 7001,
+  message: { message_id: 1, date: 0, chat: { id: 555, type: 'private' },
+    from: { id: 555, is_bot: false, first_name: 'ដារ៉ា' }, text: 'ស្អែកម៉ោង ១០ បានទេ?' },
+}
+const incoming = extractIncoming(textUpdate)
+eq('a customer message is extracted', incoming?.text, 'ស្អែកម៉ោង ១០ បានទេ?')
+eq('and carries the Telegram user id, not the chat id, as identity', incoming?.fromId, 555)
+eq('a name is kept in Khmer script', incoming?.displayName, 'ដារ៉ា')
+eq('another bot is ignored rather than answered',
+  extractIncoming({ ...textUpdate, message: { ...textUpdate.message, from: { id: 9, is_bot: true, first_name: 'b' } } }), null)
+eq('a sticker is ignored rather than answered',
+  extractIncoming({ update_id: 2, message: { message_id: 1, date: 0, chat: { id: 5, type: 'private' }, from: { id: 5, is_bot: false, first_name: 'a' } } }), null)
+
+console.log('\ntwo shops on one channel')
+// The identity table is unique on (channel, external_id) globally, so the tenant
+// has to be in the key. Without this, one Telegram user messaging two shops
+// collapses into a single customer row and each shop reads the other's thread.
+const idA = scopedExternalId(B_SALON, 555)
+const idB = scopedExternalId(B_HOUSE, 555)
+eq('the same Telegram user is a different customer at a different shop', idA === idB, false)
+await expectOk(db, 'the salon can record that Telegram customer',
+  `insert into customers (id, business_id, display_name) values ('d0000000-0000-4000-8000-0000000000a1','${B_SALON}','ដារ៉ា');
+   insert into customer_identities (customer_id, channel, external_id)
+     values ('d0000000-0000-4000-8000-0000000000a1','telegram','${idA}')`)
+await expectOk(db, 'and the guesthouse can record the same person separately',
+  `insert into customers (id, business_id, display_name) values ('d0000000-0000-4000-8000-0000000000a2','${B_HOUSE}','ដារ៉ា');
+   insert into customer_identities (customer_id, channel, external_id)
+     values ('d0000000-0000-4000-8000-0000000000a2','telegram','${idB}')`)
+await expectFail(db, 'while the same identity twice is still refused',
+  `insert into customer_identities (customer_id, channel, external_id)
+     values ('d0000000-0000-4000-8000-0000000000a2','telegram','${idA}')`,
+  'customer_identities_channel_external_id_key')
+
+console.log('\nwebhook delivery')
+await expectOk(db, 'a shop connects one Telegram bot',
+  `insert into channel_connections (id, business_id, channel, external_id, display_name, token_ciphertext, webhook_secret, status)
+   values ('c0000000-0000-4000-8000-0000000000f1','${B_SALON}','telegram','8899','@sokha_bot','${cipher}','s3cr3t','connected')
+   on conflict (business_id, channel) do update set status = 'connected'`)
+await expectFail(db, 'and cannot connect a second one to the same channel',
+  `insert into channel_connections (business_id, channel, display_name) values ('${B_SALON}','telegram','@other_bot')`,
+  'channel_connections_business_id_channel_key')
+const conn = await one(db, `select id from channel_connections where business_id = '${B_SALON}' and channel = 'telegram'`)
+await expectOk(db, 'an update is logged before the agent runs',
+  `insert into webhook_events (channel, connection_id, business_id, external_event_id, payload)
+   values ('telegram','${conn.id}','${B_SALON}','7001','{"update_id":7001}'::jsonb)`)
+// Telegram redelivers when we answer slowly, and the agent can book. The dedupe
+// index is what stops one customer message becoming two bookings.
+await expectFail(db, 'a redelivery of the same update is refused, so nobody is booked twice',
+  `insert into webhook_events (channel, connection_id, business_id, external_event_id, payload)
+   values ('telegram','${conn.id}','${B_SALON}','7001','{"update_id":7001}'::jsonb)`,
+  'webhook_events_dedupe')
+await expectOk(db, 'and a settled event leaves the pending queue',
+  `update webhook_events set status = 'processed', processed_at = now()
+    where connection_id = '${conn.id}' and external_event_id = '7001'`)
+const settled = await one(db, `
+  select status, processed_at is not null done from webhook_events
+   where connection_id = '${conn.id}' and external_event_id = '7001'`)
+eq('the delivery is recorded as handled', settled.status, 'processed')
+eq('with the time it was handled', settled.done, true)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

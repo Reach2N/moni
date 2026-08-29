@@ -55,8 +55,15 @@ export function Onboarding({
               បន្ទាប់៖ ភ្ជាប់ Telegram
             </p>
             <p className="km mt-1 text-sm text-rule">
-              អតិថិជននឹងសរសេរមក Telegram ហើយ Moni ឆ្លើយជំនួសអ្នក។ ការភ្ជាប់មិនទាន់រួចរាល់នៅឡើយទេ។
+              អតិថិជននឹងសរសេរមក Telegram ហើយ Moni ឆ្លើយជំនួសអ្នក។ ត្រូវការតែលេខសម្ងាត់ពី BotFather ប៉ុណ្ណោះ។
             </p>
+            <Link
+              href="/app/channels"
+              className="km mt-2 inline-flex min-h-11 items-center gap-2 text-sm text-ink underline underline-offset-4"
+            >
+              ភ្ជាប់ Telegram ឥឡូវ
+              <ArrowRight className="size-4" strokeWidth={1.75} aria-hidden />
+            </Link>
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-hairline pt-4">

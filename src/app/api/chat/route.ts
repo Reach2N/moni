@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateText, stepCountIs } from 'ai'
 import { z } from 'zod'
-import { db } from '@/lib/db.ts'
-import { isDatabaseConflict, requireDbData, throwIfDbError } from '@/lib/db-result.ts'
-import type { Json } from '@/lib/database.types.ts'
-import { customerTools } from '@/lib/agent/tools.ts'
-import { CUSTOMER_SYSTEM, contextLine, instructionsBlock } from '@/lib/agent/prompt.ts'
-import { costMicroUsd, withFallback } from '@/lib/ai/models.ts'
 import { ApiRequestError, assertSameOriginBrowserPost, readJsonBody, validationPayload } from '@/lib/http/post.ts'
-import { DEMO_BUSINESS_SLUG, DEMO_VISITOR_COOKIE, getDemoBusiness } from '@/lib/queries/demo-business.ts'
-import { getBusinessById } from '@/lib/queries/business.ts'
+import { handleCustomerMessage, scopedExternalId } from '@/lib/agent/customer-loop.ts'
 import { memberGate } from '@/lib/auth/member.ts'
+import { getBusinessById } from '@/lib/queries/business.ts'
+import { DEMO_BUSINESS_SLUG, DEMO_VISITOR_COOKIE, getDemoBusiness } from '@/lib/queries/demo-business.ts'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -40,7 +34,7 @@ function withVisitorCookie<T>(response: NextResponse<T>, visitor: { id: string; 
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
-      maxAge: 60 * 60 * 24 * 365,
+      maxAge: 60 * 60 * 24 * 30,
     })
   }
   return response
@@ -49,20 +43,24 @@ function withVisitorCookie<T>(response: NextResponse<T>, visitor: { id: string; 
 /**
  * Whose shop is answering.
  *
- * A customer never signs in, so signed out means the public demo shop, exactly
- * as before. A signed-in member is an OWNER trying their own assistant from the
- * dashboard, and they get their own catalogue, their own opening hours and their
- * own standing instructions. That is the difference between a demo and a
- * product, and it is why this route runs through the proxy.
+ * A customer never signs in, so signed out means the public demo shop. A
+ * signed-in member is an OWNER trying their own assistant from the dashboard,
+ * and they get their own catalogue, hours and standing instructions.
  *
- * The tenant still comes from the session and never from the body: the `slug`
- * field is pinned to the demo shop and cannot select anything.
+ * The tenant comes from the session and never from the body: the `slug` field is
+ * pinned to the demo shop and cannot select anything.
  */
 async function chatBusiness() {
   const gate = await memberGate()
   return gate.status === 'member' ? getBusinessById(gate.member.businessId) : getDemoBusiness()
 }
 
+/**
+ * The browser's customer channel. Since Phase 4 the conversation itself lives in
+ * `handleCustomerMessage`, shared with the Telegram webhook, so this route owns
+ * only what is specific to a browser: the origin check, the visitor cookie, and
+ * the JSON contract.
+ */
 export async function POST(req: NextRequest) {
   let visitor: { id: string; isNew: boolean } | null = null
   try {
@@ -70,100 +68,23 @@ export async function POST(req: NextRequest) {
     const body = ChatBodySchema.parse(await readJsonBody(req, 12_000))
     visitor = visitorFor(req)
     const business = await chatBusiness()
-    const externalId = `${business.slug}:${visitor.id}`
-    const customerId = await getOrCreateVisitor(business.id, externalId, body.name)
-    const conversation = await getOrCreateConversation(business.id, customerId)
 
-    const customerMessage = await db.from('messages').insert({
-      conversation_id: conversation.id,
-      business_id: business.id,
-      role: 'customer',
-      body: body.text,
+    const turn = await handleCustomerMessage({
+      business,
+      channel: 'web',
+      externalId: scopedExternalId(business.id, visitor.id),
+      displayName: body.name ?? 'Web visitor',
+      text: body.text,
     })
-    throwIfDbError('store customer message', customerMessage.error)
-
-    const touched = await db
-      .from('conversations')
-      .update({ last_message_at: new Date().toISOString() })
-      .eq('id', conversation.id)
-      .eq('business_id', business.id)
-      .eq('customer_id', customerId)
-      .select('id, status')
-      .single()
-    const currentConversation = requireDbData('touch customer conversation', touched)
-
-    // Once handed to the owner, messages are recorded but the assistant is silent.
-    if (currentConversation.status === 'needs_owner') {
-      return withVisitorCookie(
-        NextResponse.json({ text: null, handed_over: true, reason: 'already with the owner' }),
-        visitor,
-      )
-    }
-
-    const historyResult = await db
-      .from('messages')
-      .select('role, body')
-      .eq('business_id', business.id)
-      .eq('conversation_id', conversation.id)
-      .in('role', ['customer', 'ai'])
-      .order('created_at')
-      .limit(40)
-    throwIfDbError('load customer conversation history', historyResult.error)
-    const messages = (historyResult.data ?? []).map((message) => ({
-      role: message.role === 'customer' ? ('user' as const) : ('assistant' as const),
-      content: message.body,
-    }))
-
-    const { result, ref } = await withFallback('chat', (model) =>
-      generateText({
-        model,
-        system: `${CUSTOMER_SYSTEM}${instructionsBlock(business.ai_instructions)}\n\n${contextLine(business.name, business.timezone)}`,
-        messages,
-        tools: customerTools(business.id, customerId, conversation.id),
-        stopWhen: stepCountIs(8),
-        temperature: 0.3,
-      }),
-    )
-
-    const calls: { tool: string; args: Json }[] = JSON.parse(
-      JSON.stringify(
-        result.steps.flatMap((step) =>
-          step.toolCalls.map((call) => ({ tool: call.toolName, args: call.input })),
-        ),
-      ),
-    )
-    const statusResult = await db
-      .from('conversations')
-      .select('status')
-      .eq('id', conversation.id)
-      .eq('business_id', business.id)
-      .eq('customer_id', customerId)
-      .single()
-    const finalStatus = requireDbData('confirm conversation handoff state', statusResult).status
-    const handedOver = finalStatus === 'needs_owner'
-    const tokensIn = result.usage?.inputTokens ?? 0
-    const tokensOut = result.usage?.outputTokens ?? 0
-    const cost = costMicroUsd(ref, tokensIn, tokensOut)
-
-    const assistantMessage = await db.from('messages').insert({
-      conversation_id: conversation.id,
-      business_id: business.id,
-      role: handedOver ? 'system' : 'ai',
-      body: handedOver ? 'Conversation handed to the owner; the assistant sent no reply.' : result.text,
-      tool_calls: calls.length ? calls : null,
-      tokens_in: tokensIn,
-      tokens_out: tokensOut,
-      cost_micro_usd: cost,
-    })
-    throwIfDbError('store assistant result', assistantMessage.error)
 
     return withVisitorCookie(
       NextResponse.json({
-        text: handedOver ? null : result.text,
-        tool_calls: calls,
-        handed_over: handedOver,
-        model: ref,
-        cost_micro_usd: cost,
+        text: turn.text,
+        tool_calls: turn.toolCalls,
+        handed_over: turn.handedOver,
+        model: turn.model,
+        cost_micro_usd: turn.costMicroUsd,
+        ...(turn.handedOver && turn.model === null ? { reason: 'already with the owner' } : {}),
       }),
       visitor,
     )
@@ -178,84 +99,4 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({ error: 'The shop assistant is temporarily unavailable' }, { status: 502 })
     return visitor ? withVisitorCookie(response, visitor) : response
   }
-}
-
-async function getOrCreateVisitor(businessId: string, externalId: string, name?: string) {
-  const identityResult = await db
-    .from('customer_identities')
-    .select('customer_id')
-    .eq('channel', 'web')
-    .eq('external_id', externalId)
-    .maybeSingle()
-  throwIfDbError('load web visitor identity', identityResult.error)
-
-  if (identityResult.data) {
-    const customerResult = await db
-      .from('customers')
-      .select('id')
-      .eq('id', identityResult.data.customer_id)
-      .eq('business_id', businessId)
-      .single()
-    return requireDbData('scope web visitor to demo business', customerResult).id
-  }
-
-  const customerResult = await db
-    .from('customers')
-    .insert({ business_id: businessId, display_name: name ?? 'Web visitor', locale: 'km' })
-    .select('id')
-    .single()
-  const customer = requireDbData('create web visitor', customerResult)
-  const identityInsert = await db.from('customer_identities').insert({
-    customer_id: customer.id,
-    channel: 'web',
-    external_id: externalId,
-  })
-  if (isDatabaseConflict(identityInsert.error, '23505')) {
-    const winnerResult = await db
-      .from('customer_identities')
-      .select('customer_id')
-      .eq('channel', 'web')
-      .eq('external_id', externalId)
-      .single()
-    const winner = requireDbData('recover concurrent web visitor', winnerResult)
-    const scopedWinner = await db
-      .from('customers')
-      .select('id')
-      .eq('id', winner.customer_id)
-      .eq('business_id', businessId)
-      .single()
-    return requireDbData('scope concurrent web visitor', scopedWinner).id
-  }
-  throwIfDbError('create web visitor identity', identityInsert.error)
-  return customer.id
-}
-
-async function getOrCreateConversation(businessId: string, customerId: string) {
-  const existingResult = await db
-    .from('conversations')
-    .select('id, status')
-    .eq('business_id', businessId)
-    .eq('customer_id', customerId)
-    .eq('channel', 'web')
-    .maybeSingle()
-  throwIfDbError('load web conversation', existingResult.error)
-  if (existingResult.data) return existingResult.data
-
-  const insertedResult = await db
-    .from('conversations')
-    .insert({ business_id: businessId, customer_id: customerId, channel: 'web', status: 'open' })
-    .select('id, status')
-    .single()
-  if (!isDatabaseConflict(insertedResult.error, '23505')) {
-    return requireDbData('create web conversation', insertedResult)
-  }
-
-  const winnerResult = await db
-    .from('conversations')
-    .select('id, status')
-    .eq('business_id', businessId)
-    .eq('customer_id', customerId)
-    .eq('channel', 'web')
-    .single()
-  return requireDbData('recover concurrent web conversation', winnerResult)
 }

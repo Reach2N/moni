@@ -254,6 +254,16 @@ DESIGN.md           earlier "Invitation" design system, superseded by PLAN.md se
 - Telegram first because BotFather is a two minute token paste. Messenger needs Meta app
   review, which takes weeks. Messenger is the larger channel in Cambodia, so it is next,
   and the pitch says exactly that.
+- **Telegram, learned building Phase 4 on 30 August 2026.** `setWebhook` takes a
+  `secret_token`, which Telegram returns in an `X-Telegram-Bot-Api-Secret-Token` header on
+  every delivery: that, not the URL, is what proves a caller. Telegram only calls public
+  HTTPS, so a laptop needs a tunnel before a bot can be connected. It redelivers on a slow
+  response, and the agent can BOOK, so every update is written to `webhook_events` before
+  the agent runs and a redelivery is refused by the dedupe index; the webhook answers 200
+  to almost everything, because a non-2xx buys retries we cannot safely honour. grammY is
+  used as `new Api(token)` only, never `Bot`: `Api` needs no init, so one webhook serves
+  every tenant without a `getMe` per message. And `/api/webhooks/*` must stay OFF the Clerk
+  proxy matcher, or every inbound customer message 500s on a missing session.
 - KHQR payments: **route by currency, not by preference.**
   - KHR goes through local offline KHQR generation from `BAKONG_ACCOUNT`, verified through
     the relay at `BAKONG_RELAY_API_URL`. Riel is the default for local shops, so this is

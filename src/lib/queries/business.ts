@@ -39,3 +39,31 @@ export async function hasCatalogue(businessId: string): Promise<boolean> {
   throwIfDbError('count active services', result.error)
   return (result.count ?? 0) > 0
 }
+
+export type ChannelStatus = {
+  channel: string
+  displayName: string | null
+  status: string
+  connectedAt: string | null
+  lastError: string | null
+}
+
+/**
+ * What the owner has wired up. The token is never selected, not even to be
+ * ignored: a credential that is not read cannot be leaked by a careless log.
+ */
+export async function getChannelConnections(businessId: string): Promise<ChannelStatus[]> {
+  const result = await db
+    .from('channel_connections')
+    .select('channel, display_name, status, connected_at, last_error')
+    .eq('business_id', businessId)
+    .order('channel')
+  throwIfDbError('load channel connections', result.error)
+  return (result.data ?? []).map((row) => ({
+    channel: row.channel,
+    displayName: row.display_name,
+    status: row.status,
+    connectedAt: row.connected_at,
+    lastError: row.last_error,
+  }))
+}
