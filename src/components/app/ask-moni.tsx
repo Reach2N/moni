@@ -7,24 +7,15 @@ import {
   ArrowUpRight,
   CalendarRange,
   Bot,
-  Send,
   TriangleAlert,
   Settings2,
   Store,
 } from 'lucide-react'
+import { AgentApprovalCard } from '@/components/agent/approval-card.tsx'
+import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsx'
-import { Textarea } from '@/components/ui/textarea.tsx'
 import { ASK_CATEGORIES } from '@/lib/agent/categories.ts'
 import { RECEIPT_EVENT, type MoniReceiptEvent } from '@/lib/moni-events.ts'
 import { toKhmerDigits } from './dashboard-format.ts'
@@ -333,33 +324,17 @@ export function AskMoni({ slug }: { slug: string }) {
       </Tabs>
 
       <div className="p-2.5 sm:p-4">
-        <label htmlFor="owner-command" className="sr-only">ប្រាប់ Moni ឱ្យធ្វើអ្វី</label>
-        <Textarea
-          id="owner-command"
-          name="owner-command"
-          autoComplete="off"
+        <AgentPromptBar
           value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') requestSend()
-          }}
+          onChange={setText}
+          onSubmit={() => (empty ? setText(firstExample) : requestSend())}
           disabled={busy}
-          rows={1}
           placeholder="ឧ. ថ្ងៃនេះមានអ្វីខ្លះ…"
-          className="km min-h-14 resize-none rounded-none border-rule/70 bg-paper text-base text-ink shadow-none placeholder:text-rule sm:min-h-16 md:text-base"
+          submitLabel={empty ? 'បំពេញឧទាហរណ៍' : 'ធ្វើការងារ'}
+          ariaLabel="ប្រាប់ Moni ឱ្យធ្វើអ្វី"
+          helper="Moni អានតម្លៃ និងម៉ោងពីហាងរបស់អ្នក វាមិនស្មានទេ"
+          textareaClassName="border-0"
         />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="km text-xs text-rule">Moni អានតម្លៃ និងម៉ោងពីហាងរបស់អ្នក វាមិនស្មានទេ</p>
-          <Button
-            type="button"
-            onClick={() => (empty ? setText(firstExample) : requestSend())}
-            disabled={busy}
-            className="km ml-auto min-h-11 rounded-none"
-          >
-            <Send data-icon="inline-start" aria-hidden />
-            {empty ? 'បំពេញឧទាហរណ៍' : 'ធ្វើការងារ'}
-          </Button>
-        </div>
       </div>
 
       <div aria-live="polite" aria-atomic="true">
@@ -387,40 +362,28 @@ export function AskMoni({ slug }: { slug: string }) {
         />
       ) : null}
 
-      <Dialog
-        open={confirmCommand !== null}
-        onOpenChange={(open) => {
-          if (!open) setConfirmCommand(null)
-        }}
-      >
-        <DialogContent className="rounded-none border-rule/70 bg-paper shadow-none sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="km text-left text-lg text-ink">បញ្ជាក់ការងារដែលនឹងប្តូរហាង</DialogTitle>
-            <DialogDescription className="km text-left text-sm text-rule">
-              Moni អាចកែតម្លៃ ម៉ោង ការណាត់ ឬកំណត់ត្រាប្រាក់តាមសំណើនេះ។ ពិនិត្យម្តងទៀតមុនធ្វើ។
-            </DialogDescription>
-          </DialogHeader>
-          <p className="km border-y border-hairline py-3 text-sm font-semibold text-ink">{confirmCommand}</p>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" className="km min-h-11 rounded-none shadow-none">
-                ត្រឡប់ទៅកែ
-              </Button>
-            </DialogClose>
-            <Button
-              type="button"
-              className="km min-h-11 rounded-none"
-              onClick={() => {
-                const command = confirmCommand
-                setConfirmCommand(null)
-                if (command) void send(command)
-              }}
-            >
-              បញ្ជាក់ និងធ្វើការងារ
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmCommand ? (
+        <AgentApprovalCard
+          title="បញ្ជាក់ការងារដែលនឹងប្តូរហាង"
+          description="Moni អាចកែតម្លៃ ម៉ោង ការណាត់ ឬកំណត់ត្រាប្រាក់តាមសំណើនេះ។ ពិនិត្យម្តងទៀតមុនធ្វើ។"
+          command={confirmCommand}
+          details={[
+            {
+              label: 'ប្រភេទការងារ',
+              value: ASK_CATEGORIES.find((item) => item.id === category)?.km ?? category,
+            },
+            { label: 'ការពារ', value: 'Moni នឹងកែតែបន្ទាប់ពីអ្នកបញ្ជាក់' },
+          ]}
+          cancelLabel="ត្រឡប់ទៅកែ"
+          confirmLabel="បញ្ជាក់ និងធ្វើការងារ"
+          onCancel={() => setConfirmCommand(null)}
+          onConfirm={() => {
+            const command = confirmCommand
+            setConfirmCommand(null)
+            if (command) void send(command)
+          }}
+        />
+      ) : null}
     </Panel>
   )
 }

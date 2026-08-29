@@ -60,12 +60,16 @@ and are superseded where they conflict with PLAN.md.
 - **Clerk supports Next 16 from `@clerk/nextjs` 7.2.5.** On Next 16 the middleware file
   is `proxy.ts`, not `middleware.ts` (same contents). Scaffold with `npx clerk@latest init`,
   keys via `clerk env pull`. `auth()` is async, always awaited.
-- **OpenRouter is the only LLM gateway** (decided 27 August 2026). `@openrouter/ai-sdk-provider`
-  plugs into the Vercel AI SDK; model refs are `openrouter:google/gemini-2.5-flash` style
-  slugs and live only in `src/lib/ai/models.ts`. Audio goes up as base64 `input_audio`
-  (`wav` and `webm` are reliable; `audio/mp4` was silently ignored per provider issue #393,
-  so never label voice notes mp4). Pure transcription can use
-  `POST /api/v1/audio/transcriptions`. Env: `OPENROUTER_API_KEY`.
+- **Vercel AI Gateway is the only LLM gateway** (decided 27 August 2026, replacing the
+  earlier OpenRouter pick; `package.json` and PLAN.md already agreed, this paragraph was
+  the last stale copy). `@ai-sdk/gateway` plugs into the Vercel AI SDK; model refs are
+  `gateway:google/gemini-3.7-flash` style slugs and live only in `src/lib/ai/models.ts`,
+  with direct Gemini and Anthropic keys as the fallback chain. Keyless on Vercel
+  deployments (`VERCEL_OIDC_TOKEN` is injected), `AI_GATEWAY_API_KEY` locally, and local
+  dev also runs on `GEMINI_API_KEY` alone. Audio goes up as an AI SDK `file` part
+  (`type: 'file'`, `mediaType`, raw bytes), which the gateway passes through without a
+  format allowlist. Still record `webm` or `wav` and never label a voice note mp4: that
+  was an OpenRouter bug (provider issue #393) but the habit is cheap insurance.
 
 ## Component sourcing rule
 
@@ -173,7 +177,7 @@ its own default styling inside a committed design is a lapse, not a shortcut.
 
 ```bash
 npm run db:test       # applies schema.sql + seed.sql to a real Postgres (PGlite/WASM)
-                      # and runs 80 assertions. Run this after ANY schema change.
+                      # and runs the full assertion suite. Run after ANY schema change.
 npm run test:signals  # the notice board's rules, including the first-run and
                       # channel-down states no seed data can ever show. No server.
 npm run shoot         # desktop + mobile + mobile-viewport captures via CDP
@@ -183,9 +187,10 @@ npm run shoot         # desktop + mobile + mobile-viewport captures via CDP
 
 ```
 db/schema.sql       16 tables, 5 views. RLS ON everywhere with zero policies (deny by
-                    default, service role only); Clerk member policies commented until Phase 2
+                    default, service role only). The commented Clerk member policies are
+                    CANCELLED: see ARCHITECTURE.md section 1. Do not enable them.
 db/seed.sql         two demo businesses: a salon (sessions) and a guesthouse (nights)
-db/test.mjs         the proof. 80 assertions, no server required
+db/test.mjs         the proof. Full assertion suite, no server required
 src/lib/format/khmer.ts   every user facing quantity. One implementation, on purpose
 src/lib/queries/signals.ts what the shop needs from its owner, ranked. Pure, and tested
 src/components/app/panel.tsx  the panel grammar: header, rows, note, count badge
@@ -222,12 +227,20 @@ DESIGN.md           earlier "Invitation" design system, superseded by PLAN.md se
 - Auth is **Clerk** (PLAN.md Phase 2). Customers never log in, only owners. Since
   27 August 2026 **RLS is ON for every table with zero policies**: deny by default, the
   service role is the only way in, so the open-Data-API hole is closed before anything
-  public deploys. Phase 2 adds the member policies (written and commented in schema.sql,
-  keyed on `auth.jwt()->>'sub'` because Clerk user ids are text, not uuid). Views are
+  public deploys. **It stays that way permanently.** The plan to add Clerk-JWT member
+  policies in Phase 2 is cancelled (ARCHITECTURE.md section 1): opening the Data API would
+  make ~20 hand-written SQL policies the only wall between tenants. Tenancy is enforced
+  instead in one server-side `requireMember()` plus a `businessId` argument on every query,
+  which is auditable in one place. RLS stays as defence in depth. Views are
   `security_invoker` and `moni_touch` has a pinned search_path, per Supabase advisors.
-- **OpenRouter** is the LLM gateway, decided 27 August 2026. Gemini-family models stay the
-  default because they handle Khmer, voice and instruction-following well. Nothing outside
-  `src/lib/ai/models.ts` may name a provider or model.
+- **The database client is Drizzle over Supavisor transaction mode**, not `supabase-js`
+  (ARCHITECTURE.md section 2). PostgREST has no transactions, and stock decrement plus
+  invoice numbering both need one. Set `prepare: false` on the postgres.js client or the
+  second request to any route dies with "prepared statement already exists".
+  `@supabase/supabase-js` remains installed for Storage uploads only.
+- **Vercel AI Gateway** is the LLM gateway, decided 27 August 2026. Gemini-family models
+  stay the default because they handle Khmer, voice and instruction-following well. Nothing
+  outside `src/lib/ai/models.ts` may name a provider or model.
 - The domain is **moni.cam**, RDAP-verified unregistered on 27 August 2026, NOT yet
   purchased. Everything runs on vercel.app URLs until it is bought, so it gates launch,
   not work. Wildcard `*.moni.cam` is reserved in planning for future generated shop sites.

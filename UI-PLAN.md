@@ -1,12 +1,45 @@
 # Moni: UI build plan
 
 > **Superseded, 27 August 2026.** PLAN.md is now the build order and design direction
-> (black and white with a green accent, Apple-native, OpenRouter, Clerk, moni.cam).
+> (black and white with a green accent, Apple-native, Vercel AI Gateway, Clerk, moni.cam).
 > This file remains useful for its verified research: component licensing, the Khmer
 > clipping fixes, the hand-built component rationale, and the route sketches. Where it
 > conflicts with PLAN.md, PLAN.md wins.
 
 Mark up anything here and I will swap it. Nothing below is built yet.
+
+## Approved component sources (keep this list for future screens)
+
+Moni uses a source-owned shadcn workflow: components are copied into this
+repository, reviewed, and then themed with the Moni tokens. Do not add a
+runtime UI dependency when a registry item can be installed as source.
+
+### Beautiful UI
+
+`https://www.beautifului.dev/` is an approved design and interaction source for
+AI-native surfaces. Its public catalog covers the exact states Moni needs:
+Prompt Bar, Chat, Thinking, Streaming Text, Approval Card, Tool Chips, Task
+Rows, Context Cards, Records/Filter Tables, Sidebar Nav, and Insight Cards.
+The companion repository is MIT licensed and provides the web/shadcn guidance;
+the site is not an npm package, so components must be copied or adapted after
+review rather than imported from a black box.
+
+| Moni surface | Beautiful UI pattern | Planned use |
+|---|---|---|
+| Ask Moni / onboarding | Prompt Bar + Chat | Text and voice composer with streaming response |
+| Owner tool trace | Thinking + Tool Chips | Show grounded tool calls and elapsed state |
+| Publish storefront / payments | Approval Card | Explicit owner confirmation before side effects |
+| Bookings and orders | Task Rows + Records Table | Dense, keyboard-friendly operational lists |
+| Dashboard navigation | Sidebar Nav + Search | Command-centre navigation and quick lookup |
+| Signals | Insight Cards | Explainable act/watch/reassure cards |
+
+The first source-installed Motion components are in
+`src/components/velora/`: Browser Mockup for the landing proof, Blur Fade for
+section reveals, and Number Ticker for future numeric proof. They follow the
+same copy/paste ownership rule and are compatible with the existing
+`motion/react` dependency. Beautiful UI patterns should use these primitives
+where possible, while preserving Khmer line-height 1.75, reduced-motion
+fallbacks, focus-visible states, and the API-first boundary.
 
 House rules for this codebase:
 1. No em dashes in any user-facing string, marketing copy, or AI output. Colons, commas,
@@ -23,7 +56,7 @@ House rules for this codebase:
 |---|---|---|
 | Framework | Next.js 16.3.1, App Router, TS strict | Current default as of today. Server actions remove an entire API layer for owner mutations |
 | Styling | Tailwind v4 | Tokens live in CSS, no JS config to drift |
-| Components | shadcn/ui 4.18 as the base, 21st.dev for marketing sections only | You own the code. No version upgrade breaks your design |
+| Components | shadcn/ui as the base, Beautiful UI patterns for AI surfaces, Velora/Motion registry items for animation and mockups | Source-owned code, accessible states, and no runtime lock-in |
 | Data | Supabase Postgres, service role server side only | Auth is deferred, RLS already written and commented in schema.sql |
 | Agent | Anthropic SDK, tool calling, two tool sets | Tools are typed in `types.ts` already |
 | Deploy | Vercel | Free, instant, custom domain in two minutes |

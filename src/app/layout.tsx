@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'Moni',
   description:
     'Run a Cambodian shop in plain language. Moni organizes the catalogue, plans the day, books customers, and hands uncertain conversations to the owner.',
-  metadataBase: new URL('https://monikhmer.com'),
+  metadataBase: new URL('https://moni.cam'),
 }
 
 export const viewport: Viewport = {
@@ -47,25 +47,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           <link rel="stylesheet" href={`https://use.typekit.net/${TYPEKIT_ID}.css`} />
         </head>
       ) : null}
-      <body className="min-h-full bg-paper text-ink">
-        <div
-          hidden
-          dangerouslySetInnerHTML={{
-            __html: `<!--
-  THESIS: The owner sees what requires her now, tells Moni what to handle, and watches
-  the shop plan change. Refuses a revenue CMS and a customer-booking-only dashboard.
-  OWN-WORLD: Khmer wedding invitation. Note paper #F8FAFC as the single ground, plate
-  ink #0F172A, ruled ornament #475569, one metallic ink #059669. Ruled frame, kbach
-  corner brackets, centred plate, struck seals. One family, Busra.
-  STORY: She sees what needs her now, gives Moni one task, then reads the changed day.
-  FIRST VIEWPORT: a compact framed shop plate; one ink region for what needs her;
-  one task-oriented Moni control; then the ruled day ledger with appointments and
-  meaningful gaps. Bottom nav is Moni, Day, Inbox and stays pinned to the viewport.
-  FORM: The Invitation, candidate 4 of the grounded list, seed f1fef148.
-  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish
-  review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
--->` }}
-        />
+      <body className="min-h-full">
         {children}
       </body>
     </html>

@@ -18,11 +18,31 @@ function requiredServerEnv(name: 'NEXT_PUBLIC_SUPABASE_URL' | 'SUPABASE_SERVICE_
  * import above is what makes a mistake here a build error rather than a
  * leaked key.
  */
-export const db = createClient<Database>(
-  requiredServerEnv('NEXT_PUBLIC_SUPABASE_URL'),
-  requiredServerEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  { auth: { persistSession: false } },
-)
+type DbClient = ReturnType<typeof createClient<Database>>
+
+let client: DbClient | undefined
+
+function getClient(): DbClient {
+  client ??= createClient<Database>(
+    requiredServerEnv('NEXT_PUBLIC_SUPABASE_URL'),
+    requiredServerEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    { auth: { persistSession: false } },
+  )
+  return client
+}
+
+/**
+ * Resolve the client on first use rather than while Next collects route
+ * configuration. This keeps `next build` and the public marketing page
+ * usable on a clean checkout with no deployment secrets, while preserving the
+ * same fail-fast error as soon as a database-backed request is handled.
+ */
+export const db = new Proxy({} as DbClient, {
+  get(_target, property) {
+    const value = Reflect.get(getClient(), property)
+    return typeof value === 'function' ? value.bind(getClient()) : value
+  },
+})
 
 export type Tables = Database['public']['Tables']
 export type Views = Database['public']['Views']

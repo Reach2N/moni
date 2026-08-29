@@ -6,8 +6,6 @@ import { ShopHeader } from '@/components/app/shop-header.tsx'
 import { ShopSignals } from '@/components/app/shop-signals.tsx'
 import { TabBar } from '@/components/app/tab-bar.tsx'
 import { Takings } from '@/components/app/takings.tsx'
-import { getDashboardSnapshot } from '@/lib/queries/dashboard.ts'
-import { shopSignals } from '@/lib/queries/signals.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +16,13 @@ export const dynamic = 'force-dynamic'
  * ink region answers the second; the ledger answers the third.
  */
 export default async function OwnerCommandCentre() {
+  // Keep database configuration out of the build-time module graph. This route
+  // is dynamic and needs credentials only when an owner opens the dashboard;
+  // importing the query modules above made `next build` fail on a clean clone.
+  const [{ getDashboardSnapshot }, { shopSignals }] = await Promise.all([
+    import('@/lib/queries/dashboard.ts'),
+    import('@/lib/queries/signals.ts'),
+  ])
   const snapshot = await getDashboardSnapshot()
   const signals = shopSignals(snapshot)
   const urgent = signals.filter((signal) => signal.tone === 'act').length

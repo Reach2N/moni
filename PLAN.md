@@ -1,9 +1,13 @@
 # Moni: the master plan
 
-Written 27 August 2026. This document is the single source of truth for what gets
-built, in what order, and against which acceptance test. Where it conflicts with
-FEATURES.md, UI-PLAN.md or DESIGN.md, this document wins: those describe the earlier
+Written 27 August 2026. Revised 29 August 2026. This document is the source of truth
+for what gets built, in what order, and against which acceptance test. Where it conflicts
+with FEATURES.md, UI-PLAN.md or DESIGN.md, this document wins: those describe the earlier
 demo iteration, which did not follow the current direction and is being re-created.
+
+**ARCHITECTURE.md is the source of truth for architecture**: the data model, the seams,
+the third-party adopt/reject record, and the guardrail harness. Where the two disagree on
+architecture, ARCHITECTURE.md wins and this file is corrected in the same commit.
 
 Every coding session starts by reading CLAUDE.md (the harness: hard rules and
 toolchain gotchas) and then this file (the what and the when). A session works on
@@ -39,7 +43,7 @@ The four core features, mapped to the demo action words:
 | LLM gateway | **Vercel AI Gateway**, via `@ai-sdk/gateway` on the Vercel AI SDK (decided 27 Aug, replacing the earlier OpenRouter pick) | All model choice stays in `src/lib/ai/models.ts`; gateway refs are `gateway:google/gemini-3.7-flash` style slugs, with direct Gemini and Anthropic keys as the fallback chain. Keyless on Vercel deployments (`VERCEL_OIDC_TOKEN` is injected), `AI_GATEWAY_API_KEY` locally, and local dev also runs on the direct `GEMINI_API_KEY` alone. Provider list price, no markup, usage in the Vercel dashboard. |
 | Voice | Audio as AI SDK `file` parts (`type: 'file'`, `mediaType`, raw bytes), passed through the gateway to Gemini | Browser records with MediaRecorder (`audio/webm`), uploads the bytes; the SDK handles base64. The gateway passes attachments through without a format allowlist, which is the problem OpenRouter had. Test with real recordings early. |
 | Auth | **Clerk**, `@clerk/nextjs` v7 (>= 7.2.5 for Next 16) | Setup via `npx clerk@latest init`. On Next 16 the middleware file is `proxy.ts`, not `middleware.ts`. Owners sign in; customers never do. Clerk also has an iOS SDK, which keeps the SwiftUI door open. |
-| Database | Supabase project `Moni` (ref `roorkzxyoyacychgrktt`) | Existing 14-table schema is reused, not rebuilt. RLS stays written-but-off until Clerk lands, then turns on via Clerk third-party auth JWT. |
+| Database | Supabase project `Moni` (ref `roorkzxyoyacychgrktt`), accessed with **Drizzle over Supavisor transaction mode** | Existing 16-table schema is reused, not rebuilt. RLS is already ON everywhere with zero policies and **stays that way**: tenancy is enforced server-side, not by SQL policies. `supabase-js` is Storage-only. See ARCHITECTURE.md sections 1 and 2. |
 | Channels | Telegram Bot API (webhook), Meta Messenger Platform (webhook) | Telegram ships first (token paste, no review). Messenger runs in dev mode for test users immediately; Meta app review is submitted in parallel and gates public availability, not the demo. |
 | Payments | `src/lib/payments.ts`, already ported and tested | KHR: offline Bakong KHQR + relay verify. USD: CutLuy. NOT wired in the MVP: bookings log `expected amount` only. Do not delete or simplify the adapter. |
 | Email | Resend | Waitlist confirmation and launch announcements. One template, bilingual. |
@@ -192,9 +196,12 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
   update, no admin UI needed yet.
 - `businesses.clerk_user_id` replaces the hardcoded `sokha-beauty` tenant lookup.
   Every query in `src/lib/queries/` takes a business id resolved from the session.
-- Add the member policies over Clerk third-party auth JWTs. RLS itself is already
-  ON everywhere with zero policies (locked down 27 August); the policies are
-  written and commented in schema.sql, keyed on `auth.jwt()->>'sub'`.
+- **CANCELLED 29 August (ARCHITECTURE.md section 1):** do NOT add member policies over
+  Clerk JWTs. That step ships the anon key to the browser and makes ~20 hand-written SQL
+  policies the only wall between tenants. RLS stays ON everywhere with zero policies, as
+  defence in depth. Tenancy is enforced by one `requireMember()` helper plus a
+  `businessId` argument on every query, which is auditable in one place. The commented
+  policies in schema.sql stay commented.
 - Acceptance: a non-waitlisted email signs in and is refused with the join screen;
   a waitlisted email passes and sees the composer; two different members see two
   different businesses and cannot read each other's rows (tested at the database
@@ -237,9 +244,12 @@ Re-created in the new design language, desktop and mobile.
   channel in one list, escalations first, channel shown as an icon. Owner can read
   the full transcript (what was promised in her name), reply manually, and hand
   back to the AI. This is the universal control surface the product is named for.
-- `/app/calendar`: resource-lane calendar (hand-built CSS grid per the earlier
-  research; shadcn's calendar is a date picker). Bookings appear live via Supabase
-  Realtime, which is the "row animates in" demo moment.
+- `/app/calendar`: resource-lane calendar (evaluate schedule-x for resource views
+  first; FullCalendar paywalls exactly that feature; hand-build the ~150 line CSS grid
+  otherwise). Bookings appear live via the owned SSE route
+  `GET /api/stream/[businessId]`, NOT Supabase Realtime: Realtime respects RLS, so with
+  deny-all the browser gets nothing, and reaching for it would reopen the Data API.
+  SSE also keeps the API-first rule and is trivially consumable from Swift.
 - Expected KHQR amount shown per booking from `services.price_minor`, rendered
   through `formatMoney()`, logged at confirmation time.
 - Acceptance: booking made on Telegram appears on the open dashboard without a
@@ -255,20 +265,71 @@ Re-created in the new design language, desktop and mobile.
 - Acceptance: a test-user conversation books end to end and lands in the same
   inbox and calendar as Telegram.
 
+### Phase 7: The hosted shop site (one to two days)
+
+Each shop gets `{slug}.moni.cam`. See ARCHITECTURE.md section 6 for the full design.
+
+- `proxy.ts` reads the Host header, checks a reserved-subdomain list, rewrites
+  `{slug}.moni.cam` to `/s/{slug}`. One Next app, one deploy, no per-tenant
+  provisioning. Wildcard `*.moni.cam` is one Vercel domain entry.
+- `src/themes/registry.ts`: four hand-built themes, all consuming one typed
+  `StorefrontData` prop, `satisfies Record<ThemeId, ThemeModule>` so a declared theme
+  that is not implemented is a compile error.
+- The owner agent picks a theme and fills a zod `StorefrontContent` object with
+  `Output.object`, the same pattern as `src/lib/ai/parse.ts`, followed by a
+  `sanityCheck()`. It writes to `storefronts.draft`. The owner publishes.
+  **The model never emits markup**, so a bad generation is a bad string and never a
+  white screen shipped to a real shop.
+- Acceptance: three different verticals produce three coherent live sites on their own
+  subdomains, each with a working catalogue and a book-or-order action.
+
+### Phase 8: Money, orders and invoices (two days)
+
+- Implement `create_payment` and `check_payment`, which are declared in `CUSTOMER_TOOLS`
+  and deliberately unimplemented. Wire `src/lib/payments.ts` as-is: the PORTED comments
+  carry bugs already paid for once.
+- One test generates the same KHQR payload through `payments.ts` and through `ts-khqr`
+  and asserts they match. A divergence in TLV or CRC means one is wrong, and you want to
+  know before a customer scans a bad QR. A test, not a dependency.
+- `products`, `orders`, `order_items` and `invoices` ship. Stock decrement and order
+  creation happen in one transaction. Invoice numbers are allocated with
+  `select coalesce(max(number),0)+1 ... for update` inside that transaction, which is the
+  operation PostgREST cannot express and the reason for the Drizzle move.
+- The invoice is a Next route with a print stylesheet. No PDF library.
+- Acceptance: a customer pays by KHQR in Telegram, stock decrements atomically, and a
+  numbered invoice renders and emails.
+
+### Phase 9: Operations (half a day, but do it in week 4)
+
+Small, cheap, and painful if discovered late. Detail in ARCHITECTURE.md section 4.
+
+- **`POST /api/cron/tick`**, bearer-authenticated, called every five minutes by a free
+  external scheduler. Vercel Hobby cron cannot fire more than once a day and **fails at
+  deploy time** for anything more frequent, so the three sub-daily needs all ride this one
+  endpoint: 24-hour and 1-hour booking reminders, KHQR payment polling, and the Supabase
+  keep-alive. It also carries the weekly `pg_dump` to Storage until the Pro upgrade.
+- Per-business monthly AI spend ceiling and a per-conversation cost cap.
+  `messages.cost_micro_usd` records spend today but nothing bounds it.
+- Webhook rate limit per chat id and a body size cap.
+- Owner notification on `needs_owner` escalation, over the owner's own Telegram chat.
+- Acceptance: a reminder arrives one hour before a booking; a synthetic runaway
+  conversation is cut off by the cost cap rather than by the bill.
+
 ### Explicit room left, not built now
 
-These have reserved seams and must not be casually implemented or deleted:
+Four items moved INTO scope on 29 August and are now phases 7 and 8: payment
+collection, invoices, generated shop sites, and product businesses. What remains
+reserved, with seams that must not be casually implemented or deleted:
 
-- **Payment collection**: `src/lib/payments.ts` wires into `create_payment` /
-  `check_payment` (declared in CUSTOMER_TOOLS, unimplemented on purpose).
-- **Invoices**: a rendered, numbered document per paid booking. Depends on payments.
-- **Generated shop sites** on `*.moni.cam` subdomains: template-based, one command
-  from the owner agent. The public booking page `/s/[slug]` is its ancestor.
-- **Product businesses** (coffee shops): catalogue, orders and revenue dashboards
-  differ from service businesses. `BUSINESS_TYPES` taxonomy already carries the
-  distinction; dashboards branch on it later.
 - **Ads management** for owners: the "we do the technical work" service layer.
-- **SwiftUI native app**: enabled by the API-first rule and Clerk iOS.
+- **SwiftUI native app**: enabled by the API-first rule and Clerk iOS. Every choice in
+  ARCHITECTURE.md that looks fussy (SSE over Realtime, REST over tRPC, typed contracts in
+  one file) exists to keep this door open.
+- **Instagram and TikTok**: each needs its own app review, measured in weeks. The
+  `CHANNELS` taxonomy already carries them.
+- **Content publishing**: the unified inbox is the omnichannel story for the MVP.
+  Composing and publishing posts is a `posts` table and one screen, and it is not in
+  the nine weeks.
 
 ## 6. Vibecoding guardrails (why past iterations drifted, and the fix)
 
@@ -285,7 +346,10 @@ These have reserved seams and must not be casually implemented or deleted:
 7. No em dashes, no emoji, money through `formatMoney()`, Khmer line-height 1.75.
 8. When a decision here proves wrong, update PLAN.md in the same commit that
    changes the code. The document and the code never disagree for more than one
-   commit.
+   commit. Architecture decisions go in ARCHITECTURE.md, not here.
+9. Before hand-building anything, check ARCHITECTURE.md section 3. It records what was
+   already adopted, what was rejected, and why, so the same evaluation is not repeated.
+   Adding to either list is welcome; silently contradicting one is not.
 
 ## 7. What only the human can do (current blockers)
 
@@ -301,3 +365,16 @@ These have reserved seams and must not be casually implemented or deleted:
 - Create the **Meta developer app** and a test page for Messenger dev mode.
 - A **BotFather** token for the first Telegram bot takes two minutes when Phase 4
   starts.
+- Create a free **external cron account** (cron-job.org or Upstash QStash) pointed at
+  `POST /api/cron/tick`. Vercel Hobby cron cannot fire more than once a day and rejects a
+  more frequent expression **at deploy time**, so reminders and payment polling depend on
+  this. Five minutes of setup.
+- Create a **PostHog** project. Chosen over Sentry: its free tier is 100k errors and 5k
+  session recordings against Sentry's 5k and 50, and it bundles the product analytics that
+  turn "we built it" into "twelve shops took four hundred bookings".
+- Decide the **Supabase Pro** upgrade date. Free pauses after seven days idle, which was
+  already hit on 27 August. Current decision is to upgrade before demo week, which makes
+  the keep-alive ping in Phase 9 mandatory until then, and means there are no backups
+  until then either.
+- Recruit the **first real shops** for week 5. This is the long-lead human task and the
+  strongest thing you can put in front of a shortlist panel.

@@ -18,6 +18,31 @@ It replaces untyped agent payloads, Base UI, Tabler icons, Agent Elements CSS, a
 developer language with strict owner-facing props, shadcn Radix Collapsible, Lucide icons,
 Khmer copy, and Moni's existing Motion and Invitation tokens.
 
+## Beautiful UI: Approval Card
+
+- Project: [Beautiful UI](https://www.beautifului.dev/)
+- Pattern: [Approval Card](https://www.beautifului.dev/#approval-card)
+- License: MIT (the site publishes the component set under MIT)
+- Local adaptation: `src/components/agent/approval-card.tsx`
+
+This is the human-in-the-loop gate for owner commands that can change prices,
+hours, bookings, or payment records. The local component keeps Beautiful UI's
+decision grammar—proposed action, visible scope, and explicit continue/skip
+actions—but uses Moni's separator-only panels, Khmer line-height rules, and
+existing shadcn Button. No runtime dependency or opaque stylesheet is added.
+
+## 21st.dev Agent Elements: InputBar
+
+- Project: [21st-dev/agent-elements](https://github.com/21st-dev/agent-elements)
+- Registry item: [InputBar documentation](https://agent-elements.21st.dev/docs/input-bar)
+- License: MIT
+- Local adaptation: `src/components/agent/prompt-bar.tsx`
+
+The shared owner/customer composer retains the source pattern's multiline input,
+keyboard send affordance, helper/status row, and extension slots. Base UI,
+Tabler icons, and Agent Elements' theme variables were intentionally not copied;
+the local component composes the shadcn Textarea and Button already owned by Moni.
+
 ## shadcn/ui: Collapsible
 
 - Project: [shadcn/ui](https://github.com/shadcn-ui/ui)

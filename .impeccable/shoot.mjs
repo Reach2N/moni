@@ -1,18 +1,23 @@
 import puppeteer from 'puppeteer-core'
 const CHROME='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-const OUT='/Users/mense/moni/.impeccable/review'
+// Was hardcoded to /Users/mense/moni, which does not exist on every machine
+// this repo is checked out on. Resolve from the repo instead.
+const OUT=new URL('./review/',import.meta.url).pathname
 const BASE_URL=process.env.MONI_CAPTURE_URL ?? 'http://localhost:3000'
 const b = await puppeteer.launch({executablePath:CHROME, headless:true, args:['--no-sandbox']})
-async function shoot(name,w,h,dsf,act,viewportOnly){
+async function shoot(name,w,h,dsf,act,viewportOnly,route='/app',settleMs=500){
   const p = await b.newPage()
   await p.setViewport({width:w,height:h,deviceScaleFactor:dsf,isMobile:w<600,hasTouch:w<600})
-  await p.goto(`${BASE_URL}/app`,{waitUntil:'networkidle0'})
+  await p.goto(`${BASE_URL}${route}`,{waitUntil:'networkidle0'})
   if(act) await act(p)
-  await new Promise(r=>setTimeout(r,500))
+  // The landing composer types for ~3s. fullPage resizes the viewport, which
+  // fires its IntersectionObserver, so a 500ms shot always catches it mid-word
+  // and the review artifact looks like a broken demo.
+  await new Promise(r=>setTimeout(r,settleMs))
   const m = await p.evaluate(()=>({iw:window.innerWidth, sw:document.documentElement.scrollWidth,
     over:[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>window.innerWidth+1).length}))
   await p.screenshot({path:`${OUT}/${name}.png`, fullPage:!viewportOnly})
-  console.log(`${name}: vw=${m.iw} scrollW=${m.sw} overflowing=${m.over}`)
+  console.log(`${name}: route=${route} vw=${m.iw} scrollW=${m.sw} overflowing=${m.over}`)
   await p.close()
 }
 // the real product moment: paste the shop text and let Gemini parse it
@@ -29,6 +34,12 @@ const runParse = async (p)=>{
   await press()
   await p.waitForSelector('#services-h',{timeout:90000})
 }
+// Phase 1: the public surface, both widths, both languages.
+await shoot('landing-mobile',390,844,2,undefined,false,'/',4200)
+await shoot('landing-mobile-viewport',390,844,2,undefined,true,'/',4200)
+await shoot('landing-desktop',1440,900,1,undefined,false,'/',4200)
+await shoot('landing-desktop-en',1440,900,1,undefined,false,'/?lang=en',4200)
+
 await shoot('mobile',390,844,2)
 // fullPage renders position:fixed at its first-viewport spot, so the pinned nav
 // is only ever truthful in a viewport-only capture. CLAUDE.md, paid for once.

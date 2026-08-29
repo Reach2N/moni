@@ -1,9 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Bot, CircleAlert, HandHelping, LoaderCircle, Send, UserRound } from 'lucide-react'
+import { Bot, CircleAlert, HandHelping, LoaderCircle, UserRound } from 'lucide-react'
+import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Textarea } from '@/components/ui/textarea.tsx'
 
 type Turn =
   | { role: 'customer'; text: string }
@@ -135,22 +135,18 @@ export function ChatPanel({ slug, onChanged }: { slug: string; onChanged?: () =>
         {handedOver ? (
           <p className="km text-sm text-rule">សន្ទនានេះកំពុងរង់ចាំម្ចាស់ហាង។ Moni នឹងមិនឆ្លើយបន្ថែមទេ។</p>
         ) : (
-          <div className="flex items-end gap-2">
-            <label htmlFor="customer-message" className="sr-only">សារអតិថិជន</label>
-            <Textarea
-              id="customer-message"
-              name="customer-message"
-              autoComplete="off"
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              rows={2}
-              placeholder="សរសេរសារជាអតិថិជន…"
-              className="km min-h-16 resize-none rounded-none border-rule/70 bg-paper text-base shadow-none placeholder:text-rule md:text-base"
-            />
-            <Button type="button" size="icon-lg" onClick={() => void send()} disabled={busy || !text.trim()} className="size-11 rounded-none" aria-label="ផ្ញើសារ">
-              <Send aria-hidden />
-            </Button>
-          </div>
+          <AgentPromptBar
+            value={text}
+            onChange={setText}
+            onSubmit={() => void send()}
+            placeholder="សរសេរសារជាអតិថិជន…"
+            submitLabel="ផ្ញើសារ"
+            ariaLabel="សារអតិថិជន"
+            helper="សរសេរជាភាសាខ្មែរ ឬអង់គ្លេស"
+            rows={2}
+            disabled={busy}
+            submitDisabled={!text.trim()}
+          />
         )}
 
         {error ? (

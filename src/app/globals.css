@@ -76,6 +76,79 @@
   --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ── the Apple semantic palette (PLAN.md section 3) ─────────────────────────
+   Black, white, one green. Named after their UIKit/SwiftUI equivalents so a
+   native port is a find-and-replace, not a re-design.
+
+   These are raw custom properties, NOT --color-* utilities, for two reasons.
+   The bare names are the ones that map 1:1 to SwiftUI. And the Invitation block
+   above already owns --color-background, --color-accent and --color-destructive,
+   so reusing those names would silently repaint the /app dashboard.
+
+   Light and dark are both defined here, from day one, through
+   prefers-color-scheme. There is no theme toggle and no next-themes provider
+   yet: a class-based toggle flashes on first paint, and "no layout shift on the
+   hero" is a Phase 1 acceptance check. Add the toggle when a user asks for one.
+
+   TEMPORARY OVERLAP: the Invitation tokens above stay until Phase 5 rebuilds the
+   dashboard in this language. Delete them in that commit, not before: every
+   component under src/components/app/ still reads bg-paper, text-rule, text-seal. */
+:root {
+  --background:           #FFFFFF;              /* systemBackground */
+  --background-secondary: #F5F5F7;              /* secondarySystemBackground */
+  --label:                #1D1D1F;              /* label */
+  --label-secondary:      rgba(60, 60, 67, 0.60);
+  --label-tertiary:       rgba(60, 60, 67, 0.30);
+  --separator:            rgba(60, 60, 67, 0.29);
+  --accent:               #34C759;              /* systemGreen */
+  --destructive:          #FF3B30;              /* systemRed, sparingly */
+
+  /* Continuous, generous. No 0px corners: that was the Invitation. */
+  --radius-card: 14px;
+  --radius-well: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background:           #000000;
+    --background-secondary: #1C1C1E;
+    --label:                #F5F5F7;
+    --label-secondary:      rgba(235, 235, 245, 0.60);
+    --label-tertiary:       rgba(235, 235, 245, 0.30);
+    --separator:            rgba(84, 84, 88, 0.60);
+    --accent:               #30D158;
+    --destructive:          #FF453A;
+  }
+}
+
+/* `inline` is load bearing. Without it Tailwind resolves each var once at build
+   time and the prefers-color-scheme override above never reaches the utility,
+   so dark mode silently does nothing. */
+@theme inline {
+  --color-surface:    var(--background);
+  --color-surface-2:  var(--background-secondary);
+  --color-label:      var(--label);
+  --color-label-2:    var(--label-secondary);
+  --color-label-3:    var(--label-tertiary);
+  --color-separator:  var(--separator);
+  --color-green:      var(--accent);
+  --color-red:        var(--destructive);
+}
+
+/* The public Moni surface is deliberately monochrome. Keep the dashboard's
+   inherited Invitation palette untouched until its later rebuild. */
+.moni-hig {
+  color-scheme: light;
+  --background:           #FFFFFF;
+  --background-secondary: #F7F7F5;
+  --label:                #000000;
+  --label-secondary:      rgba(0, 0, 0, 0.62);
+  --label-tertiary:       rgba(0, 0, 0, 0.38);
+  --separator:            rgba(0, 0, 0, 0.18);
+  --accent:               #000000;
+  --destructive:          #000000;
+}
+
 /* Unlayered on purpose. Tailwind emits utilities inside @layer utilities and
    unlayered rules beat layered ones by cascade layer, which is how this defeats
    the leading-none that shadcn hardcodes into CardTitle, DialogTitle and Label
@@ -88,8 +161,8 @@
 /* ── browser surfaces ───────────────────────────────────────────────────────
    The parts nobody draws still carry the design. Left at their defaults they
    belong to no design system at all. */
-::selection            { background: var(--color-seal); color: var(--color-paper); }
-:root                  { caret-color: var(--color-seal); accent-color: var(--color-seal); color-scheme: light; }
+::selection            { background: var(--accent); color: #FFFFFF; }
+:root                  { caret-color: var(--color-seal); accent-color: var(--color-seal); }
 :focus-visible         { outline: 2px solid var(--color-seal); outline-offset: 2px; border-radius: 1px; }
 ::-webkit-scrollbar         { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track   { background: var(--color-paper); }
@@ -99,9 +172,12 @@
 button, a { touch-action: manipulation; -webkit-tap-highlight-color: color-mix(in srgb, var(--color-seal) 18%, transparent); }
 
 html, body {
-  background: var(--color-paper);
-  color: var(--color-ink);
-  /* clip, not hidden: a descendant must never be able to widen the document and
+  /* No ground here. Two design worlds now live under this document: the
+     Invitation paints itself in src/app/app/layout.tsx, the Apple palette in
+     the marketing layout. A ground set here would leak the retired system onto
+     the public surface and show through on overscroll in dark mode.
+
+     clip, not hidden: a descendant must never be able to widen the document and
      push the centred column off axis. hidden would create a scroll container. */
   overflow-x: clip;
   max-width: 100vw;
@@ -114,3 +190,6 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Composer demo caret. Steps, not a fade: a text cursor does not dissolve. */
+@keyframes moni-caret { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
