@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files. Everything real stays out; the EXAMPLE is the one file a fresh
+# clone needs most, so it is explicitly un-ignored. Without this negation
+# `.env*` swallows it and a new machine has nothing to copy from.
 .env*
+!.env.example
 
 # vercel
 .vercel

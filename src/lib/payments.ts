@@ -353,34 +353,17 @@ export const manualAdapter: PaymentProviderAdapter = {
 }
 
 /**
- * Route by currency, then fall back. Riel shops are the common case here, and
- * CutLuy cannot settle riel, so the order is not a global preference.
+ * Rail selection lives in `src/lib/payments/rails.ts`, not here.
+ *
+ * There used to be a `providersFor()` in this file. It was superseded by
+ * `railsFor()` in Phase 8 and became a trap: it threw
+ * "inject buildPayload from lib/khqr-string.ts" if anything called it, nothing
+ * did, and it read the SAME two secrets under different names
+ * (BAKONG_RELAY_API_TOKEN and CUTLUY_API_TOKEN against the live code's
+ * BAKONG_RELAY_TOKEN and CUTLUY_TOKEN). Two spellings of one secret is a
+ * deployment that works locally and cannot take a payment in production, so the
+ * dead one is gone rather than documented.
+ *
+ * This file stays what it says on the tin: adapters and the rules they carry.
+ * Which adapter runs, and where its credentials come from, is `rails.ts`.
  */
-export function providersFor(currency: CurrencyCode): PaymentProviderAdapter[] {
-  const out: PaymentProviderAdapter[] = []
-  const cutluyToken = process.env.CUTLUY_API_TOKEN?.trim()
-  const relayUrl = process.env.BAKONG_RELAY_API_URL?.trim()
-  const relayToken = process.env.BAKONG_RELAY_API_TOKEN?.trim()
-
-  if (relayUrl && relayToken && process.env.BAKONG_ACCOUNT?.trim()) {
-    // buildPayload and md5 are injected at the call site, where the KHQR string
-    // builder lives. Kept out of here so this file stays network-only.
-    out.push(
-      localKhqrAdapter({
-        buildPayload: () => {
-          throw new Error('inject buildPayload from lib/khqr-string.ts')
-        },
-        md5: () => {
-          throw new Error('inject md5 from node:crypto')
-        },
-        relayUrl,
-        relayToken,
-      }),
-    )
-  }
-  if (currency === 'USD' && cutluyToken) {
-    out.push(cutluyAdapter({ token: cutluyToken, paymentLinkId: process.env.CUTLUY_PAYMENT_LINK_ID }))
-  }
-  if (out.length === 0) throw new Error(`no payment rail configured that settles ${currency}`)
-  return out
-}
