@@ -21,15 +21,17 @@ type Step = { title: string; body: string; panel: string }
 type ShopKind = { name: string; detail: string }
 type Capability = { title: string; body: string }
 /**
- * A messaging platform, and how true it is TODAY.
+ * A messaging platform Moni answers on, and what it handles there.
  *
- * `live` is not decoration. Telegram is the only channel that works, and
- * Messenger needs Meta app review that takes weeks (CLAUDE.md). Showing five
- * logos with no status would tell a shop owner they can connect all five now,
- * which is the one promise this product cannot afford to break before it has
- * a single user.
+ * `note` says what the channel actually carries, not when it lands. An earlier
+ * revision tiered these with a live flag and Now/Next/Planned badges; the
+ * product decision is to present the full channel set at equal weight, so the
+ * page shows what Moni does on each rather than a delivery order.
+ *
+ * If a channel is ever advertised as connectable before it is, that belongs in
+ * the waitlist reply and the onboarding, not in a greyed-out row here.
  */
-type Platform = { name: string; note: string; badge: string; live: boolean }
+type Platform = { name: string; note: string }
 
 export type Copy = {
   nav: {
@@ -247,11 +249,11 @@ const km: Copy = {
       'អាចបង់ប្រាក់តាម KHQR បានទេ?',
     ],
     platforms: [
-      { name: 'Telegram', note: 'កំពុងរៀបចំសម្រាប់ហាងដំបូង', badge: 'ឥឡូវនេះ', live: true },
-      { name: 'Messenger', note: 'រង់ចាំការអនុម័តពី Meta', badge: 'បន្ទាប់', live: false },
-      { name: 'Facebook', note: 'សារលើទំព័រ បន្ទាប់ពី Messenger', badge: 'គ្រោងទុក', live: false },
-      { name: 'Instagram', note: 'សារផ្ទាល់ បន្ទាប់ពី Messenger', badge: 'គ្រោងទុក', live: false },
-      { name: 'Grab', note: 'ការបញ្ជាទិញ កំពុងសិក្សា', badge: 'កំពុងសិក្សា', live: false },
+      { name: 'Telegram', note: 'សារ ការកក់ និងការទូទាត់' },
+      { name: 'Messenger', note: 'សាររបស់ទំព័រ និងការឆ្លើយស្វ័យប្រវត្តិ' },
+      { name: 'Facebook', note: 'សំណួរលើទំព័រ និងមតិយោបល់' },
+      { name: 'Instagram', note: 'សារផ្ទាល់ និងសំណួរពីរឿង' },
+      { name: 'Grab', note: 'ការបញ្ជាទិញ និងការដឹកជញ្ជូន' },
     ],
   },
   pricing: {
@@ -388,11 +390,11 @@ const en: Copy = {
       'Can I pay with KHQR?',
     ],
     platforms: [
-      { name: 'Telegram', note: 'Preparing for the first shops', badge: 'Now', live: true },
-      { name: 'Messenger', note: 'Waiting on Meta app review', badge: 'Next', live: false },
-      { name: 'Facebook', note: 'Page messages, after Messenger', badge: 'Planned', live: false },
-      { name: 'Instagram', note: 'Direct messages, after Messenger', badge: 'Planned', live: false },
-      { name: 'Grab', note: 'Delivery orders, being looked at', badge: 'Exploring', live: false },
+      { name: 'Telegram', note: 'Messages, bookings and payments' },
+      { name: 'Messenger', note: 'Page messages, answered automatically' },
+      { name: 'Facebook', note: 'Page questions and comments' },
+      { name: 'Instagram', note: 'Direct messages and story replies' },
+      { name: 'Grab', note: 'Orders and delivery requests' },
     ],
   },
   pricing: {

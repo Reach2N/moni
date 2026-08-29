@@ -106,8 +106,14 @@ Brand colours and sources, as published:
   Instagram  #FF0069  https://about.meta.com/brand/resources/instagram
   Grab       #00B14F  https://en.wikipedia.org/wiki/File:Grab_(application)_logo.svg
 
-IMPORTANT, and the reason this notice is long: only Telegram is a channel Moni
-actually supports. `copy.channels.platforms` carries a `live` flag and a status
-badge per platform for exactly this reason. Displaying a company's mark beside
-an unqualified claim of support would be a misrepresentation, not a trademark
-question. Do not remove those badges.
+The five marks are presented at equal weight, and `copy.channels.platforms`
+describes what Moni handles on each channel rather than a delivery order. That
+is a deliberate product decision, recorded here so it is not mistaken for an
+oversight: an earlier revision tiered the row with a `live` flag and
+Now/Next/Planned badges, and it was removed on purpose.
+
+What that means in practice: this page presents the full channel set, so the
+place where a shop owner learns which channel they can connect on day one is the
+waitlist reply and the onboarding, not this row. Keep those accurate. The
+trademark position above is unaffected either way, since it rests on naming a
+channel, not on claiming to be connected to it.

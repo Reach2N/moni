@@ -88,9 +88,9 @@ The paths are reproduced unmodified in each brand's published colour, because a
 brand mark redrawn in someone else's palette stops being that brand's mark. They
 are the only colour on the public site that is not black, white or the accent.
 
-Every mark carries a status badge from `copy.channels.platforms`. Telegram is the
-only live channel; Messenger is waiting on Meta app review, and the rest are
-roadmap. See THIRD_PARTY_NOTICES.md for why that is not optional.
+All five are shown at equal weight, each captioned with what Moni handles on that
+channel. See THIRD_PARTY_NOTICES.md for the trademark position and for the note
+on where channel availability is communicated instead.
 
 ## Moni's own marks
 
