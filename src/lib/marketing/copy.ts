@@ -20,29 +20,18 @@ type Faq = { q: string; a: string }
 type Step = { title: string; body: string; panel: string }
 type ShopKind = { name: string; detail: string }
 type Capability = { title: string; body: string }
+/**
+ * A messaging platform, and how true it is TODAY.
+ *
+ * `live` is not decoration. Telegram is the only channel that works, and
+ * Messenger needs Meta app review that takes weeks (CLAUDE.md). Showing five
+ * logos with no status would tell a shop owner they can connect all five now,
+ * which is the one promise this product cannot afford to break before it has
+ * a single user.
+ */
+type Platform = { name: string; note: string; badge: string; live: boolean }
 
 export type Copy = {
-  /**
-   * Micro-labels: badges, hints, units, scroll cues.
-   *
-   * These used to be written inline as `locale === 'km' ? 'ឥឡូវនេះ' : 'Now'`
-   * inside JSX, scattered across page.tsx and the hero. That pattern type checks
-   * and reads fine, which is exactly why a missing locale survives review: there
-   * is nothing to fail. Every user-visible string belongs in this dictionary.
-   */
-  ui: {
-    statusStrip: string
-    capabilities: string
-    explore: string
-    rows: string
-    badgeNow: string
-    badgeNext: string
-    build: string
-    submitHint: string
-    working: string
-    outputLabel: string
-    outputValue: string
-  }
   nav: {
     apply: string
     other: string
@@ -65,9 +54,6 @@ export type Copy = {
     title: string
     typed: string
     tableHead: [string, string, string]
-    caption: string
-    voice: string
-    replay: string
     ready: string
     example: string
     privateNote: string
@@ -87,7 +73,6 @@ export type Copy = {
     eyebrow: string
     title: string
     body: string
-    typing: string
     traceLabel: string
     trace: [string, string, string, string]
     replyNote: string
@@ -123,12 +108,9 @@ export type Copy = {
     eyebrow: string
     title: string
     body: string
-    now: string
-    nowNote: string
-    next: string
-    nextNote: string
-    /** Real-shaped customer messages, marqueed past the channel card. */
+    /** Real-shaped customer messages, listed beside the channel card. */
     samples: [string, string, string, string, string]
+    platforms: [Platform, Platform, Platform, Platform, Platform]
   }
   pricing: {
     eyebrow: string
@@ -166,19 +148,6 @@ export type Copy = {
 }
 
 const km: Copy = {
-  ui: {
-    statusStrip: 'Moni · ជំនួយការហាងរបស់អ្នក',
-    capabilities: 'សំឡេង · សារ · ការកក់ · ការទូទាត់',
-    explore: 'រុករក',
-    rows: 'ជួរ',
-    badgeNow: 'ឥឡូវនេះ',
-    badgeNext: 'បន្ទាប់',
-    build: 'រៀបចំ',
-    submitHint: '⌘↵ ដើម្បីរៀបចំ',
-    working: 'Moni កំពុងរៀបចំ',
-    outputLabel: 'លទ្ធផល',
-    outputValue: 'រួចរាល់ដើម្បីពិនិត្យ',
-  },
   nav: {
     apply: 'ដាក់ពាក្យ',
     other: 'English',
@@ -201,9 +170,6 @@ const km: Copy = {
     title: 'អ្វីដែលម្ចាស់ហាងប្រាប់ Moni',
     typed: 'កាត់សក់ ១៥០០០ រៀល លាងសក់ ៨០០០ រៀល បើក ៨ ព្រឹក ដល់ ៥ ល្ងាច',
     tableHead: ['សេវាកម្ម', 'តម្លៃ', 'រយៈពេល'],
-    caption: 'មួយឃ្លាចូល។ បញ្ជីសេវាកម្មរួចរាល់។',
-    voice: 'សាកស្តាប់ការបង្ហាញសំឡេង',
-    replay: 'ចាក់ការបង្ហាញម្ដងទៀត',
     ready: 'បញ្ជីតម្លៃរួចរាល់',
     example: 'ទិន្នន័យឧទាហរណ៍',
     privateNote: 'ការបង្ហាញនេះមិនផ្ញើទិន្នន័យទេ',
@@ -222,7 +188,6 @@ const km: Copy = {
     eyebrow: 'អ្នកជំនួយដែលនិយាយជំនួសអ្នក',
     title: 'Moni ឆ្លើយអតិថិជន ដោយប្រើទិន្នន័យពិតរបស់អ្នក',
     body: 'អតិថិជនសរសេរមកធម្មតា។ Moni អានបញ្ជីតម្លៃ ពិនិត្យម៉ោងទំនេរ ហើយឆ្លើយវិញភ្លាមៗ។ អ្នកមើលឃើញរាល់ជំហានដែលវាធ្វើ។',
-    typing: 'Moni កំពុងឆ្លើយ',
     traceLabel: 'អ្វីដែល Moni បានធ្វើ',
     trace: [
       'អានបញ្ជីតម្លៃរបស់អ្នក',
@@ -274,16 +239,19 @@ const km: Copy = {
     eyebrow: 'អតិថិជននៅកន្លែងណា Moni នៅទីនោះ',
     title: 'ចាប់ផ្តើមពីបណ្តាញដែលអ្នកប្រើរួច',
     body: 'សារមកក្នុងប្រអប់តែមួយ។ Telegram ចាប់ផ្តើមមុន ព្រោះភ្ជាប់បានលឿន។ Messenger គឺជាជំហានបន្ទាប់។',
-    now: 'Telegram',
-    nowNote: 'កំពុងរៀបចំសម្រាប់ការចាប់ផ្តើម',
-    next: 'Messenger',
-    nextNote: 'ជំហានបន្ទាប់',
     samples: [
       'ថ្ងៃស្អែកម៉ោង ១០ ទំនេរទេ?',
       'កាត់សក់ថ្លៃប៉ុន្មាន?',
       'បើកម៉ោងប៉ុន្មានថ្ងៃអាទិត្យ?',
       'ខ្ញុំចង់ប្តូរម៉ោងកក់',
       'អាចបង់ប្រាក់តាម KHQR បានទេ?',
+    ],
+    platforms: [
+      { name: 'Telegram', note: 'កំពុងរៀបចំសម្រាប់ហាងដំបូង', badge: 'ឥឡូវនេះ', live: true },
+      { name: 'Messenger', note: 'រង់ចាំការអនុម័តពី Meta', badge: 'បន្ទាប់', live: false },
+      { name: 'Facebook', note: 'សារលើទំព័រ បន្ទាប់ពី Messenger', badge: 'គ្រោងទុក', live: false },
+      { name: 'Instagram', note: 'សារផ្ទាល់ បន្ទាប់ពី Messenger', badge: 'គ្រោងទុក', live: false },
+      { name: 'Grab', note: 'ការបញ្ជាទិញ កំពុងសិក្សា', badge: 'កំពុងសិក្សា', live: false },
     ],
   },
   pricing: {
@@ -328,19 +296,6 @@ const km: Copy = {
 }
 
 const en: Copy = {
-  ui: {
-    statusStrip: 'Moni · the assistant for your shop',
-    capabilities: 'Voice · messages · bookings · payments',
-    explore: 'Explore',
-    rows: 'rows',
-    badgeNow: 'Now',
-    badgeNext: 'Next',
-    build: 'Build',
-    submitHint: '⌘↵ to build',
-    working: 'Moni is organising',
-    outputLabel: 'Output',
-    outputValue: 'Ready to check',
-  },
   nav: { apply: 'Apply', other: 'ភាសាខ្មែរ', otherHref: 'km', how: 'How it works', proof: 'See the proof', faq: 'Questions' },
   hero: {
     eyebrow: 'For small shops in Cambodia',
@@ -356,9 +311,6 @@ const en: Copy = {
     title: 'What a shop owner tells Moni',
     typed: 'Haircut 15000 riel, wash 8000 riel, open 8am to 5pm',
     tableHead: ['Service', 'Price', 'Time'],
-    caption: 'One sentence in. A service list ready to check.',
-    voice: 'Play the voice preview',
-    replay: 'Replay the preview',
     ready: 'Price list ready',
     example: 'Example data',
     privateNote: 'This preview does not send data',
@@ -377,7 +329,6 @@ const en: Copy = {
     eyebrow: 'The assistant that does the talking',
     title: 'Moni answers your customers, from your own data',
     body: 'Customers write normally. Moni reads your price list, checks what is actually free, and replies straight away. You can see every step it took.',
-    typing: 'Moni is replying',
     traceLabel: 'What Moni did',
     trace: [
       'Read your price list',
@@ -429,16 +380,19 @@ const en: Copy = {
     eyebrow: 'Wherever your customers already are',
     title: 'Start with the channel you already use',
     body: 'Every message comes into one inbox. Telegram ships first because it is quick to connect. Messenger is next.',
-    now: 'Telegram',
-    nowNote: 'Preparing for the first shops',
-    next: 'Messenger',
-    nextNote: 'Coming next',
     samples: [
       'Is 10am free tomorrow?',
       'How much is a haircut?',
       'What time do you open on Sunday?',
       'I need to move my booking',
       'Can I pay with KHQR?',
+    ],
+    platforms: [
+      { name: 'Telegram', note: 'Preparing for the first shops', badge: 'Now', live: true },
+      { name: 'Messenger', note: 'Waiting on Meta app review', badge: 'Next', live: false },
+      { name: 'Facebook', note: 'Page messages, after Messenger', badge: 'Planned', live: false },
+      { name: 'Instagram', note: 'Direct messages, after Messenger', badge: 'Planned', live: false },
+      { name: 'Grab', note: 'Delivery orders, being looked at', badge: 'Exploring', live: false },
     ],
   },
   pricing: {

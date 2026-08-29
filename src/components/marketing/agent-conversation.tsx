@@ -64,7 +64,7 @@ export function AgentConversation({ copy }: { copy: Copy }) {
             <IconMessage className="size-4.5" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-label">{copy.channels.now}</p>
+            <p className="truncate text-sm font-semibold text-label">{copy.channels.platforms[0].name}</p>
             <p className="truncate text-xs text-label-3">{copy.demo.example}</p>
           </div>
         </div>

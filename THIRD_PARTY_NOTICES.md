@@ -76,3 +76,38 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## simple-icons
+
+The five channel marks in `src/components/marketing/channel-marks.tsx` are the
+official brand glyphs, taken from simple-icons (https://simple-icons.org) at the
+paths its maintainers verify against each company's own brand resource page.
+
+The simple-icons ICON FILES are released under CC0 1.0 Universal:
+
+  https://creativecommons.org/publicdomain/zero/1.0/
+
+CC0 waives simple-icons' own copyright in the files. It does NOT and cannot
+waive anyone's TRADEMARK, and simple-icons says so explicitly in its own legal
+disclaimer. Telegram, Messenger, Facebook, Instagram and Grab remain the
+trademarks of their respective owners.
+
+They are used here nominatively: to name a messaging channel a shop's customers
+already use, which is what trademark law permits without a licence. Each mark is
+reproduced unmodified in its published brand colour, is not used as part of
+Moni's own logo or wordmark, and does not imply endorsement, partnership, or
+certification by any of these companies.
+
+Brand colours and sources, as published:
+
+  Telegram   #26A5E4  https://telegram.org/tour/screenshots
+  Messenger  #0866FF  https://about.meta.com/brand/resources/facebook/messenger-icon
+  Facebook   #0866FF  https://about.meta.com/brand/resources/facebook/logo
+  Instagram  #FF0069  https://about.meta.com/brand/resources/instagram
+  Grab       #00B14F  https://en.wikipedia.org/wiki/File:Grab_(application)_logo.svg
+
+IMPORTANT, and the reason this notice is long: only Telegram is a channel Moni
+actually supports. `copy.channels.platforms` carries a `live` flag and a status
+badge per platform for exactly this reason. Displaying a company's mark beside
+an unqualified claim of support would be a misrepresentation, not a trademark
+question. Do not remove those badges.

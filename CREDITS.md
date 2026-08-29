@@ -77,6 +77,21 @@ Both registries are public and need no API key, which is why no 21st.dev install
 spent: `~/.config/21st/auth.json` does not exist on this machine, and without it every
 `npx shadcn add "https://21st.dev/r/..."` fails with `[Authentication required]`.
 
+## simple-icons: the channel marks
+
+- Project: [simple-icons](https://simple-icons.org)
+- Icon files: CC0 1.0 Universal. The trademarks they depict are NOT waived and
+  remain the property of Telegram, Meta and Grab.
+- Local adaptation: `src/components/marketing/channel-marks.tsx`
+
+The paths are reproduced unmodified in each brand's published colour, because a
+brand mark redrawn in someone else's palette stops being that brand's mark. They
+are the only colour on the public site that is not black, white or the accent.
+
+Every mark carries a status badge from `copy.channels.platforms`. Telegram is the
+only live channel; Messenger is waiting on Meta app review, and the rest are
+roadmap. See THIRD_PARTY_NOTICES.md for why that is not optional.
+
 ## Moni's own marks
 
 `src/components/marketing/icons.tsx` is authored, not adopted. Lucide is round-cap and

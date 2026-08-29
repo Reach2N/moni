@@ -5,6 +5,7 @@ import { Hero } from '@/components/marketing/hero.tsx'
 import { HowSequence } from '@/components/marketing/how-sequence.tsx'
 import { AgentConversation } from '@/components/marketing/agent-conversation.tsx'
 import { Capabilities } from '@/components/marketing/capabilities.tsx'
+import { ChannelList } from '@/components/marketing/channel-list.tsx'
 import { MessageLog } from '@/components/marketing/message-log.tsx'
 import { PricingFigure } from '@/components/marketing/pricing-figure.tsx'
 import { WaitlistForm } from '@/components/marketing/waitlist-form.tsx'
@@ -144,26 +145,7 @@ export default async function MarketingHome({
 
               <Sheet>
                 <SheetHead title={copy.channels.eyebrow} />
-                <ul className="divide-y divide-label/10">
-                  <li className="flex items-center justify-between gap-4 px-4 py-4 sm:px-5">
-                    <div className="min-w-0">
-                      <p className="text-lg font-semibold text-label">{copy.channels.now}</p>
-                      <p className="mt-1 text-sm text-label-2">{copy.channels.nowNote}</p>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-green px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-green">
-                      {copy.ui.badgeNow}
-                    </span>
-                  </li>
-                  <li className="flex items-center justify-between gap-4 px-4 py-4 sm:px-5">
-                    <div className="min-w-0">
-                      <p className="text-lg font-semibold text-label">{copy.channels.next}</p>
-                      <p className="mt-1 text-sm text-label-2">{copy.channels.nextNote}</p>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-separator px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-label-2">
-                      {copy.ui.badgeNext}
-                    </span>
-                  </li>
-                </ul>
+                <ChannelList copy={copy} />
               </Sheet>
             </Reveal>
           </div>
