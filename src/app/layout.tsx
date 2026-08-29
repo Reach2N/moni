@@ -48,7 +48,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         </head>
       ) : null}
       <body className="min-h-full">
-        {children}
+          {children}
       </body>
     </html>
   )

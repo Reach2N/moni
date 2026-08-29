@@ -34,6 +34,10 @@ const needsClerk = createRouteMatcher([
   '/app/(.*)',
   '/sign-in(.*)',
   '/sign-up(.*)',
+  // Clerk's own auto-proxy endpoints. Without this the hosted sign-in and
+  // sign-up flows 404 on their callbacks, which presents as a form that
+  // submits and does nothing.
+  '/__clerk(.*)',
   '/api/ask',
   '/api/setup',
   '/api/transcribe',
@@ -78,6 +82,7 @@ export const config = {
     '/app/:path*',
     '/sign-in/:path*',
     '/sign-up/:path*',
+    '/__clerk/:path*',
     // Owner-facing endpoints. `auth()` inside a route handler returns nothing
     // unless the proxy has run for that path, so an endpoint left off this list
     // fails open into "signed out" rather than closed.
