@@ -1,3 +1,7 @@
+import { ClerkProvider } from '@clerk/nextjs'
+import { JoinScreen } from '@/components/app/join-screen.tsx'
+import { memberGate } from '@/lib/auth/member.ts'
+
 /**
  * The Invitation world, scoped.
  *
@@ -7,29 +11,29 @@
  *
  * PLAN.md Phase 5 rebuilds this dashboard in the Apple palette. When it does,
  * this file and the Invitation tokens in globals.css go in the same commit.
+ *
+ * This is also THE call site of the waitlist gate (PLAN.md Phase 2). Signing in
+ * is enforced earlier, by `proxy.ts`; membership is enforced here, because it
+ * needs the database. At launch the gate is deleted by removing the `refused`
+ * branch below and nothing else.
  */
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export const dynamic = 'force-dynamic'
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const gate = await memberGate()
+
   return (
-    <div className="min-h-dvh bg-paper text-ink [color-scheme:light]">
-      <div
-        hidden
-        dangerouslySetInnerHTML={{
-          __html: `<!--
-  THESIS: The owner sees what requires her now, tells Moni what to handle, and watches
-  the shop plan change. Refuses a revenue CMS and a customer-booking-only dashboard.
-  OWN-WORLD: Khmer wedding invitation. Note paper #F8FAFC as the single ground, plate
-  ink #0F172A, ruled ornament #475569, one metallic ink #059669. Ruled frame, kbach
-  corner brackets, centred plate, struck seals. One family, Busra.
-  STORY: She sees what needs her now, gives Moni one task, then reads the changed day.
-  FIRST VIEWPORT: a compact framed shop plate; one ink region for what needs her;
-  one task-oriented Moni control; then the ruled day ledger with appointments and
-  meaningful gaps. Bottom nav is Moni, Day, Inbox and stays pinned to the viewport.
-  FORM: The Invitation, candidate 4 of the grounded list, seed f1fef148.
-  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish
-  review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
--->` }}
-      />
-      {children}
-    </div>
+    <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up">
+      {gate.status === 'member' ? (
+        <div className="moni-invitation min-h-dvh bg-paper text-ink [color-scheme:light]">
+          {children}
+        </div>
+      ) : (
+        // `signed_out` cannot normally reach here (the proxy redirects first),
+        // but rendering the join screen rather than the dashboard is the safe
+        // failure: a stranger never sees a shop's bookings.
+        <JoinScreen email={gate.status === 'refused' ? gate.email : null} />
+      )}
+    </ClerkProvider>
   )
 }

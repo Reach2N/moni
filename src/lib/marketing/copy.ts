@@ -16,10 +16,32 @@ export const isLocale = (value: unknown): value is Locale =>
   typeof value === 'string' && (LOCALES as readonly string[]).includes(value)
 
 type Faq = { q: string; a: string }
-type Step = { title: string; body: string }
+/** `panel` captions the product panel the pinned step sequence shows alongside. */
+type Step = { title: string; body: string; panel: string }
 type ShopKind = { name: string; detail: string }
 
 export type Copy = {
+  /**
+   * Micro-labels: badges, hints, units, scroll cues.
+   *
+   * These used to be written inline as `locale === 'km' ? 'ឥឡូវនេះ' : 'Now'`
+   * inside JSX, scattered across page.tsx and the hero. That pattern type checks
+   * and reads fine, which is exactly why a missing locale survives review: there
+   * is nothing to fail. Every user-visible string belongs in this dictionary.
+   */
+  ui: {
+    statusStrip: string
+    capabilities: string
+    explore: string
+    rows: string
+    badgeNow: string
+    badgeNext: string
+    build: string
+    submitHint: string
+    working: string
+    outputLabel: string
+    outputValue: string
+  }
   nav: {
     apply: string
     other: string
@@ -84,6 +106,8 @@ export type Copy = {
     nowNote: string
     next: string
     nextNote: string
+    /** Real-shaped customer messages, marqueed past the channel card. */
+    samples: [string, string, string, string, string]
   }
   pricing: {
     eyebrow: string
@@ -91,6 +115,10 @@ export type Copy = {
     headline: string
     body: string
     points: [string, string, string]
+    /** The free-tier allowance, counted up on entry. A number, not a string:
+        it is a quantity, so it renders through src/lib/format/khmer.ts. */
+    figure: number
+    figureUnit: string
   }
   faq: { title: string; items: [Faq, Faq, Faq, Faq] }
   waitlist: {
@@ -117,6 +145,19 @@ export type Copy = {
 }
 
 const km: Copy = {
+  ui: {
+    statusStrip: 'Moni · ជំនួយការហាងរបស់អ្នក',
+    capabilities: 'សំឡេង · សារ · ការកក់ · ការទូទាត់',
+    explore: 'រុករក',
+    rows: 'ជួរ',
+    badgeNow: 'ឥឡូវនេះ',
+    badgeNext: 'បន្ទាប់',
+    build: 'រៀបចំ',
+    submitHint: '⌘↵ ដើម្បីរៀបចំ',
+    working: 'Moni កំពុងរៀបចំ',
+    outputLabel: 'លទ្ធផល',
+    outputValue: 'រួចរាល់ដើម្បីពិនិត្យ',
+  },
   nav: {
     apply: 'ដាក់ពាក្យ',
     other: 'English',
@@ -151,9 +192,9 @@ const km: Copy = {
     title: 'មួយឃ្លា បីជំហាន ទៅហាងដែលរៀបរួច',
     body: 'Moni រៀនពីរបៀបដែលអ្នកនិយាយអំពីហាងរបស់អ្នក។ អ្នកពិនិត្យអ្វីដែលវារៀបចំ ហើយបើកឲ្យវាជួយឆ្លើយ។',
     items: [
-      { title: 'ប្រាប់ពីហាងរបស់អ្នក', body: 'វាយ ឬនិយាយអំពីសេវាកម្ម តម្លៃ និងម៉ោងបើក។ មិនចាំបាច់គូរលំហូរសារ។' },
-      { title: 'ពិនិត្យអ្វីដែលបានរៀបចំ', body: 'បញ្ជីតម្លៃ និងម៉ោងរបស់អ្នកនៅជាកន្លែងតែមួយ។ អ្នកអាចកែបានគ្រប់ពេល។' },
-      { title: 'ឲ្យ Moni ជួយឆ្លើយ', body: 'វាឆ្លើយតាមទិន្នន័យពិត ពិនិត្យម៉ោងទំនេរ និងប្រគល់សារមិនច្បាស់មកអ្នក។' },
+      { title: 'ប្រាប់ពីហាងរបស់អ្នក', body: 'វាយ ឬនិយាយអំពីសេវាកម្ម តម្លៃ និងម៉ោងបើក។ មិនចាំបាច់គូរលំហូរសារ។', panel: 'ឃ្លាមួយពីម្ចាស់ហាង' },
+      { title: 'ពិនិត្យអ្វីដែលបានរៀបចំ', body: 'បញ្ជីតម្លៃ និងម៉ោងរបស់អ្នកនៅជាកន្លែងតែមួយ។ អ្នកអាចកែបានគ្រប់ពេល។', panel: 'បញ្ជីសេវាកម្មដែលរៀបរួច' },
+      { title: 'ឲ្យ Moni ជួយឆ្លើយ', body: 'វាឆ្លើយតាមទិន្នន័យពិត ពិនិត្យម៉ោងទំនេរ និងប្រគល់សារមិនច្បាស់មកអ្នក។', panel: 'ការសន្ទនាជាមួយអតិថិជន' },
     ],
   },
   proof: {
@@ -189,6 +230,13 @@ const km: Copy = {
     nowNote: 'កំពុងរៀបចំសម្រាប់ការចាប់ផ្តើម',
     next: 'Messenger',
     nextNote: 'ជំហានបន្ទាប់',
+    samples: [
+      'ថ្ងៃស្អែកម៉ោង ១០ ទំនេរទេ?',
+      'កាត់សក់ថ្លៃប៉ុន្មាន?',
+      'បើកម៉ោងប៉ុន្មានថ្ងៃអាទិត្យ?',
+      'ខ្ញុំចង់ប្តូរម៉ោងកក់',
+      'អាចបង់ប្រាក់តាម KHQR បានទេ?',
+    ],
   },
   pricing: {
     eyebrow: 'តម្លៃដែលងាយយល់',
@@ -196,6 +244,8 @@ const km: Copy = {
     headline: 'បង់តែពេលហាងអ្នករកបាន',
     body: 'មិនមានថ្លៃប្រចាំខែសម្រាប់ការចាប់ផ្តើមទេ។ យើងនឹងប្រាប់តម្លៃជាមុន នៅពេលការគិតថ្លៃចាប់ផ្តើម។',
     points: ['ប្រតិបត្តិការ ១០០ ដំបូងក្នុងមួយខែ ឥតគិតថ្លៃ', 'គ្មានកាតឥណទានពេលដាក់ពាក្យ', 'ទិន្នន័យហាងជារបស់អ្នក និងអាចនាំចេញបាន'],
+    figure: 100,
+    figureUnit: 'ប្រតិបត្តិការក្នុងមួយខែ ឥតគិតថ្លៃ',
   },
   faq: {
     title: 'សំណួរដែលម្ចាស់ហាងសួរ',
@@ -230,6 +280,19 @@ const km: Copy = {
 }
 
 const en: Copy = {
+  ui: {
+    statusStrip: 'Moni · the assistant for your shop',
+    capabilities: 'Voice · messages · bookings · payments',
+    explore: 'Explore',
+    rows: 'rows',
+    badgeNow: 'Now',
+    badgeNext: 'Next',
+    build: 'Build',
+    submitHint: '⌘↵ to build',
+    working: 'Moni is organising',
+    outputLabel: 'Output',
+    outputValue: 'Ready to check',
+  },
   nav: { apply: 'Apply', other: 'ភាសាខ្មែរ', otherHref: 'km', how: 'How it works', proof: 'See the proof', faq: 'Questions' },
   hero: {
     eyebrow: 'For small shops in Cambodia',
@@ -257,9 +320,9 @@ const en: Copy = {
     title: 'One sentence. Three steps. A shop that is ready.',
     body: 'Moni learns how you talk about your shop. You check what it made, then let it help with the messages you already receive.',
     items: [
-      { title: 'Describe your shop', body: 'Type or speak your services, prices, and hours. There is no flow chart to draw.' },
-      { title: 'Check what it made', body: 'Your catalogue and hours stay in one place. Edit anything, whenever you need.' },
-      { title: 'Let Moni answer', body: 'It replies from your real data, checks availability, and hands uncertain messages back to you.' },
+      { title: 'Describe your shop', body: 'Type or speak your services, prices, and hours. There is no flow chart to draw.', panel: 'One sentence from the owner' },
+      { title: 'Check what it made', body: 'Your catalogue and hours stay in one place. Edit anything, whenever you need.', panel: 'The service list it built' },
+      { title: 'Let Moni answer', body: 'It replies from your real data, checks availability, and hands uncertain messages back to you.', panel: 'A conversation with a customer' },
     ],
   },
   proof: {
@@ -295,6 +358,13 @@ const en: Copy = {
     nowNote: 'Preparing for the first shops',
     next: 'Messenger',
     nextNote: 'Coming next',
+    samples: [
+      'Is 10am free tomorrow?',
+      'How much is a haircut?',
+      'What time do you open on Sunday?',
+      'I need to move my booking',
+      'Can I pay with KHQR?',
+    ],
   },
   pricing: {
     eyebrow: 'A price you can understand',
@@ -302,6 +372,8 @@ const en: Copy = {
     headline: 'You pay when your shop gets paid',
     body: 'There is no monthly fee while we set up the founding shops. We will tell you the rate before charging begins.',
     points: ['The first 100 transactions each month are free', 'No card needed to apply', 'Your shop data is yours and exportable'],
+    figure: 100,
+    figureUnit: 'transactions a month, free',
   },
   faq: {
     title: 'Questions shop owners ask',

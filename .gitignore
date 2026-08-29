@@ -40,13 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# impeccable working files: review captures and capture scripts
-.impeccable/review/
+# capture output from `npm run shoot`
+screenshots/
 
 # references SUPABASE_ACCESS_TOKEN by env var; never commit
 .mcp.json
 
 # supabase CLI scratch: holds project ref and pooler connection details
 supabase/.temp/
-.impeccable/questions/
-.impeccable/seal-after-press.png

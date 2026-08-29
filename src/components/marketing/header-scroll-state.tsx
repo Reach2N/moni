@@ -1,0 +1,41 @@
+'use client'
+
+/**
+ * Sets data-scrolled on the sticky header once the page leaves the top.
+ *
+ * A tiny client island rather than making SiteHeader itself a client component:
+ * the header is otherwise static markup and links, and it renders on the legal
+ * pages too, so there is no reason to ship it all to the browser for one boolean.
+ *
+ * ScrollTrigger owns this rather than a scroll listener because it is already
+ * running on this page and it batches its reads into one rAF with every other
+ * trigger. A separate listener would be a second, unthrottled layout read on
+ * every scroll event.
+ */
+
+import { useEffect } from 'react'
+import { ScrollTrigger } from '@/lib/motion/gsap.ts'
+
+export function HeaderScrollState() {
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>('[data-site-header]')
+    if (!header) return
+
+    const apply = (scrolled: boolean) => {
+      header.dataset.scrolled = String(scrolled)
+    }
+    apply(window.scrollY > 24)
+
+    // No trigger element: start/end are absolute scroll positions on the page,
+    // so isActive is simply "scrolled past 24px and not yet at the very end".
+    const trigger = ScrollTrigger.create({
+      start: 24,
+      end: () => ScrollTrigger.maxScroll(window),
+      onToggle: (self) => apply(self.isActive),
+    })
+
+    return () => trigger.kill()
+  }, [])
+
+  return null
+}

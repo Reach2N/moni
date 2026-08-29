@@ -70,8 +70,15 @@
   --text-lg--line-height: 1.6;
   --text-xl--line-height: 1.45;
   --text-2xl--line-height: 1.3;
+  --text-3xl--line-height: 1.2;
   --text-4xl--line-height: 1.15;
   --text-5xl--line-height: 1.1;
+  /* The landing display sizes. Still above Tailwind's default, because a coeng
+     subscript clips at any leading tuned for Latin caps alone. The Khmer hero
+     headline is the one string on the site where that failure is unmissable. */
+  --text-6xl--line-height: 1.06;
+  --text-7xl--line-height: 1.04;
+  --text-8xl--line-height: 1.02;
 
   --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -101,7 +108,11 @@
   --label-tertiary:       rgba(60, 60, 67, 0.30);
   --separator:            rgba(60, 60, 67, 0.29);
   --accent:               #34C759;              /* systemGreen */
+  /* Text and icons ON the accent. systemGreen is a light green in both schemes,
+     so this stays dark in both: it is not a second theme value. */
+  --on-accent:            #0B2E16;
   --destructive:          #FF3B30;              /* systemRed, sparingly */
+
 
   /* Continuous, generous. No 0px corners: that was the Invitation. */
   --radius-card: 14px;
@@ -117,7 +128,9 @@
     --label-tertiary:       rgba(235, 235, 245, 0.30);
     --separator:            rgba(84, 84, 88, 0.60);
     --accent:               #30D158;
+    --on-accent:            #08240F;
     --destructive:          #FF453A;
+
   }
 }
 
@@ -132,22 +145,24 @@
   --color-label-3:    var(--label-tertiary);
   --color-separator:  var(--separator);
   --color-green:      var(--accent);
+  --color-on-green:   var(--on-accent);
   --color-red:        var(--destructive);
 }
 
-/* The public Moni surface is deliberately monochrome. Keep the dashboard's
-   inherited Invitation palette untouched until its later rebuild. */
+/* The public Moni surface. Its only job is to opt this subtree into both schemes
+   so the browser's own chrome, form controls and overscroll follow the page.
+
+   It deliberately overrides NO colour. An earlier revision pinned this class to
+   `color-scheme: light` and repainted every token monochrome, which silently
+   killed the accent (`--accent: #000000`) and made the whole
+   `prefers-color-scheme: dark` block above dead code, because this subtree is
+   the only thing that reads these tokens. PLAN.md section 3 is the contract:
+   black, white, one green, light and dark from day one. Do not reintroduce
+   colour here; change the palette at :root where both schemes are defined. */
 .moni-hig {
-  color-scheme: light;
-  --background:           #FFFFFF;
-  --background-secondary: #F7F7F5;
-  --label:                #000000;
-  --label-secondary:      rgba(0, 0, 0, 0.62);
-  --label-tertiary:       rgba(0, 0, 0, 0.38);
-  --separator:            rgba(0, 0, 0, 0.18);
-  --accent:               #000000;
-  --destructive:          #000000;
+  color-scheme: light dark;
 }
+
 
 /* Unlayered on purpose. Tailwind emits utilities inside @layer utilities and
    unlayered rules beat layered ones by cascade layer, which is how this defeats
@@ -158,18 +173,51 @@
   line-height: 1.75;
 }
 
+/* Khmer takes no letter-spacing. A cluster is drawn as one unit: the coeng
+   hangs under its base and the vowel signs attach to it, so tracking pulls the
+   parts away from the consonant they belong to and the word stops reading as a
+   word. Latin small-caps tracking (the eyebrow labels are uppercase with
+   0.2em) reached the Khmer copy and did exactly that.
+
+   Unlayered, for the same cascade-layer reason as the rule above: it beats
+   Tailwind's tracking-* utilities without !important. */
+:is(:lang(km), .km),
+:is(:lang(km), .km) * {
+  letter-spacing: normal;
+}
+
 /* ── browser surfaces ───────────────────────────────────────────────────────
    The parts nobody draws still carry the design. Left at their defaults they
    belong to no design system at all. */
-::selection            { background: var(--accent); color: #FFFFFF; }
-:root                  { caret-color: var(--color-seal); accent-color: var(--color-seal); }
-:focus-visible         { outline: 2px solid var(--color-seal); outline-offset: 2px; border-radius: 1px; }
+/* These followed the Invitation's --color-seal and --color-paper directly, which
+   are the DASHBOARD's tokens. On the public site that painted the caret, the
+   focus ring and both scrollbars in the retired palette, and pinned the
+   scrollbar track to a light paper colour that stayed light in dark mode.
+
+   The indirection is what keeps both worlds honest: the defaults follow the
+   scheme-aware Apple tokens, and .moni-invitation (the /app ground) points them
+   back at the seal. Delete that block in Phase 5 with the rest of the palette. */
+:root {
+  --ui-accent:    var(--accent);
+  --ui-ground:    var(--background);
+  --ui-hairline:  var(--separator);
+  --ui-thumb:     var(--label-tertiary);
+}
+.moni-invitation {
+  --ui-accent:    var(--color-seal);
+  --ui-ground:    var(--color-paper);
+  --ui-hairline:  var(--color-hairline);
+  --ui-thumb:     var(--color-rule);
+}
+::selection            { background: var(--ui-accent); color: var(--ui-ground); }
+:root                  { caret-color: var(--ui-accent); accent-color: var(--ui-accent); }
+:focus-visible         { outline: 2px solid var(--ui-accent); outline-offset: 2px; border-radius: 1px; }
 ::-webkit-scrollbar         { width: 10px; height: 10px; }
-::-webkit-scrollbar-track   { background: var(--color-paper); }
-::-webkit-scrollbar-thumb   { background: var(--color-hairline); border: 3px solid var(--color-paper); }
-::-webkit-scrollbar-thumb:hover { background: var(--color-rule); }
-* { scrollbar-color: var(--color-hairline) var(--color-paper); scrollbar-width: thin; }
-button, a { touch-action: manipulation; -webkit-tap-highlight-color: color-mix(in srgb, var(--color-seal) 18%, transparent); }
+::-webkit-scrollbar-track   { background: var(--ui-ground); }
+::-webkit-scrollbar-thumb   { background: var(--ui-hairline); border: 3px solid var(--ui-ground); }
+::-webkit-scrollbar-thumb:hover { background: var(--ui-thumb); }
+* { scrollbar-color: var(--ui-hairline) var(--ui-ground); scrollbar-width: thin; }
+button, a { touch-action: manipulation; -webkit-tap-highlight-color: color-mix(in srgb, var(--ui-accent) 18%, transparent); }
 
 html, body {
   /* No ground here. Two design worlds now live under this document: the

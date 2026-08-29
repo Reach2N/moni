@@ -61,7 +61,7 @@ export function WaitlistForm({ copy, locale, appUrl }: { copy: Copy; locale: Loc
         aria-live="polite"
       >
         <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-green text-label">
+          <span className="flex size-10 shrink-0 items-center justify-center bg-green text-on-green">
             <Check className="size-5" strokeWidth={2.5} aria-hidden />
           </span>
           <div>
@@ -73,7 +73,7 @@ export function WaitlistForm({ copy, locale, appUrl }: { copy: Copy; locale: Loc
         <ol className="mt-6 space-y-3">
           {c.nextSteps.map((step, index) => (
             <li key={step} className="flex items-start gap-3 text-sm text-label-2">
-              <span className="tnum flex size-6 shrink-0 items-center justify-center rounded-full border border-separator text-xs font-semibold text-label">
+              <span className="tnum flex size-6 shrink-0 items-center justify-center border border-label/20 text-xs font-semibold text-label">
                 {index + 1}
               </span>
               <span>{step}</span>
@@ -83,7 +83,7 @@ export function WaitlistForm({ copy, locale, appUrl }: { copy: Copy; locale: Loc
 
         <a
           href={appUrl}
-          className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-full bg-label px-5 text-sm font-semibold text-surface transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-green"
+          className="mt-7 inline-flex min-h-11 items-center gap-2 bg-label px-5 text-sm font-semibold text-surface transition-opacity hover:opacity-85 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-green"
         >
           {c.appLink}
           <ExternalLink className="size-4" aria-hidden />
@@ -110,7 +110,7 @@ export function WaitlistForm({ copy, locale, appUrl }: { copy: Copy; locale: Loc
             dir="ltr"
             placeholder={c.placeholder}
             disabled={state === 'sending'}
-            className="mt-2 block h-12 w-full rounded-[var(--radius-well)] border border-separator bg-surface-2 px-4 text-base text-label placeholder:text-label-2 focus-visible:border-accent-strong focus-visible:ring-2 focus-visible:ring-green disabled:opacity-60"
+            className="mt-2 block h-12 w-full border border-label/20 bg-surface px-4 text-base text-label placeholder:text-label-2 focus-visible:ring-2 focus-visible:ring-green disabled:opacity-60"
           />
         </div>
 
@@ -124,7 +124,7 @@ export function WaitlistForm({ copy, locale, appUrl }: { copy: Copy; locale: Loc
             rows={3}
             disabled={state === 'sending'}
             placeholder={c.notePlaceholder}
-            className="mt-2 block w-full resize-y rounded-[var(--radius-well)] border border-separator bg-surface-2 px-4 py-3 text-base text-label placeholder:text-label-2 focus-visible:border-accent-strong focus-visible:ring-2 focus-visible:ring-green disabled:opacity-60"
+            className="mt-2 block w-full resize-y border border-label/20 bg-surface px-4 py-3 text-base text-label placeholder:text-label-2 focus-visible:ring-2 focus-visible:ring-green disabled:opacity-60"
           />
         </div>
       </div>
@@ -138,7 +138,7 @@ export function WaitlistForm({ copy, locale, appUrl }: { copy: Copy; locale: Loc
       <button
         type="submit"
         disabled={state === 'sending'}
-        className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-well)] bg-green px-5 text-base font-semibold text-label transition-transform active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-green disabled:opacity-70"
+        className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 bg-green px-5 text-base font-semibold text-on-green transition-transform active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-green disabled:opacity-70"
       >
         {state === 'sending' && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {state === 'sending' ? c.submitting : c.submit}

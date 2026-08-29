@@ -93,7 +93,16 @@ Rules:
   hairline separators, never solid borders heavier than 1px.
 - Radii are continuous and generous (12 to 16px on cards, pill buttons). No 0px
   corners: that was the Invitation system.
-- Motion via the `motion` package, spring physics, 200 to 350ms. Nothing linear.
+- Motion splits by role, decided 29 August 2026. **`motion` owns state**: in-app
+  transitions and anything keyed to a React state change, spring physics, 200 to 350ms,
+  nothing linear. **GSAP owns scroll**: everything on the public site keyed to scroll
+  position. The reason is not preference. `motion`'s `whileInView` is an
+  IntersectionObserver and cannot be settled on demand, so a full-page screenshot
+  photographs every below-fold reveal at `opacity: 0`; the 29 August landing capture came
+  out blank below the hero with 18 elements stuck invisible. ScrollTrigger exposes
+  `refresh()` and a real scroll position, so a capture can drive it. Plugin registration
+  lives only in `src/lib/motion/gsap.ts`, the same way only `src/lib/ai/models.ts` may name
+  a model. GSAP 3.15 is free for commercial use including the formerly Club-only plugins.
 - Icons from lucide-react only. Never emoji.
 - Light and dark from day one; the tokens above define both.
 

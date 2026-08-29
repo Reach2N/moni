@@ -1,15 +1,22 @@
 import Link from 'next/link'
 import type { Copy, Locale } from '@/lib/marketing/copy'
+import { HeaderScrollState } from '@/components/marketing/header-scroll-state.tsx'
 
-/** The wordmark. An authored mark, not an emoji and not a font glyph. */
-function Wordmark({ dark = false }: { dark?: boolean }) {
+/**
+ * The wordmark: a square plate with the seal struck in it.
+ *
+ * Squared off from the earlier rounded-rect-and-circle. A pill-cornered badge
+ * with a dot in it is the generic app-icon shape; the shop's paper has corners,
+ * and the green square reads as a stamp rather than a status light.
+ */
+function Wordmark() {
   return (
     <span className="inline-flex items-center gap-2">
       <svg viewBox="0 0 24 24" className="size-5" aria-hidden fill="none">
-        <rect x="2" y="2" width="20" height="20" rx="7" className={dark ? 'fill-white' : 'fill-label'} />
-        <circle cx="12" cy="12" r="4" className={dark ? 'fill-[#30D158]' : 'fill-green'} />
+        <rect x="2.5" y="2.5" width="19" height="19" rx="1" className="fill-label" />
+        <rect x="9" y="9" width="6" height="6" className="fill-green" />
       </svg>
-      <span className={dark ? 'text-[17px] font-semibold tracking-tight text-white' : 'text-[17px] font-semibold tracking-tight text-label'}>Moni</span>
+      <span className="text-[17px] font-semibold tracking-tight text-label">Moni</span>
     </span>
   )
 }
@@ -18,21 +25,38 @@ const otherHref = (locale: Locale) => (locale === 'km' ? '/?lang=en' : '/')
 const homeHref = (locale: Locale) => (locale === 'km' ? '/' : '/?lang=en')
 const sectionHref = (locale: Locale, section: string) => `${homeHref(locale)}#${section}`
 
-export function SiteHeader({ copy, locale, dark = false }: { copy: Copy; locale: Locale; dark?: boolean }) {
+/**
+ * The `dark` prop this used to take is gone.
+ *
+ * It existed only because the hero hardcoded its own near-black ground, so the
+ * header had to be told about it, and the telling was a ternary at every single
+ * node: nine of them, each duplicating the class list. With the hero reading the
+ * scheme-aware tokens there is one correct header in both schemes and nothing to
+ * branch on. If a section ever needs light chrome over a dark ground again, that
+ * is what .moni-invert is for, and it needs no prop.
+ *
+ * The header starts transparent over the hero and gains its ground and hairline
+ * once the page scrolls: that state is a data attribute set by HeaderScrollState.
+ */
+export function SiteHeader({ copy, locale }: { copy: Copy; locale: Locale }) {
   return (
-    <header className={dark ? 'sticky top-0 z-40 border-b border-white/10 bg-[#070a09]/80 text-white backdrop-blur-xl' : 'sticky top-0 z-40 border-b border-separator bg-surface/80 backdrop-blur-xl'}>
+    <header
+      data-site-header
+      className="sticky top-0 z-40 border-b border-transparent transition-colors duration-300 data-[scrolled=true]:border-separator data-[scrolled=true]:bg-surface/80 data-[scrolled=true]:backdrop-blur-xl"
+    >
+      <HeaderScrollState />
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
         <Link href={homeHref(locale)} aria-label="Moni">
-          <Wordmark dark={dark} />
+          <Wordmark />
         </Link>
-        <nav className={dark ? 'hidden items-center gap-5 text-sm text-white/60 md:flex' : 'hidden items-center gap-5 text-sm text-label-2 md:flex'} aria-label="Primary">
-          <Link href={sectionHref(locale, 'how')} className={dark ? 'transition-colors hover:text-white' : 'transition-colors hover:text-label'}>
+        <nav className="hidden items-center gap-5 text-sm text-label-2 md:flex" aria-label="Primary">
+          <Link href={sectionHref(locale, 'how')} className="transition-colors hover:text-label">
             {copy.nav.how}
           </Link>
-          <Link href={sectionHref(locale, 'proof')} className={dark ? 'transition-colors hover:text-white' : 'transition-colors hover:text-label'}>
+          <Link href={sectionHref(locale, 'proof')} className="transition-colors hover:text-label">
             {copy.nav.proof}
           </Link>
-          <Link href={sectionHref(locale, 'faq')} className={dark ? 'transition-colors hover:text-white' : 'transition-colors hover:text-label'}>
+          <Link href={sectionHref(locale, 'faq')} className="transition-colors hover:text-label">
             {copy.nav.faq}
           </Link>
         </nav>
@@ -40,13 +64,13 @@ export function SiteHeader({ copy, locale, dark = false }: { copy: Copy; locale:
           <Link
             href={otherHref(locale)}
             hrefLang={copy.nav.otherHref}
-            className={dark ? 'rounded-full px-3 py-2 text-sm text-white/60 transition-colors hover:text-white' : 'rounded-full px-3 py-2 text-sm text-label-2 transition-colors hover:text-label'}
+            className="px-3 py-2 text-sm text-label-2 transition-colors hover:text-label"
           >
             {copy.nav.other}
           </Link>
           <a
             href={sectionHref(locale, 'apply')}
-            className={dark ? 'rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition-transform active:scale-[0.98]' : 'rounded-full bg-label px-4 py-2 text-sm font-medium text-surface transition-transform active:scale-[0.98]'}
+            className="bg-label px-4 py-2 text-sm font-medium text-surface transition-opacity hover:opacity-85 active:scale-[0.99]"
           >
             {copy.nav.apply}
           </a>

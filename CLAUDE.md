@@ -122,16 +122,36 @@ its own default styling inside a committed design is a lapse, not a shortcut.
   the installed Chrome so nothing is downloaded. `npm run shoot`.
 - **`fullPage: true` renders `position: fixed` at its first-viewport position**, so a pinned
   bottom nav appears stranded mid-page in a stitched capture. Always take a viewport-only
-  shot as well before reporting fixed chrome as broken. `.impeccable/review/mobile-viewport.png`
+  shot as well before reporting fixed chrome as broken. `screenshots/mobile-viewport.png`
   is that shot.
+- **`whileInView` and a full-page screenshot cannot both be right.** `motion`'s
+  `whileInView` is an IntersectionObserver, and `page.screenshot({fullPage:true})` stitches
+  rather than scrolls, so a reveal below the fold never fires and photographs at
+  `opacity: 0`. The 29 August landing capture came out blank under the hero with 18
+  elements stuck invisible, which looks exactly like a broken stylesheet. `npm run shoot`
+  now walks the page before every full-page shot and then waits for GSAP's global timeline
+  to go idle, and it reports an `invisible=` count so the failure names itself. This is
+  also why scroll animation on the public site is GSAP, not `motion`: see PLAN.md section 3.
+- **Khmer takes no letter-spacing.** A cluster is drawn as one unit, so `tracking-*` pulls
+  the coeng and the vowel signs off the consonant they attach to. The uppercase eyebrow
+  labels carried `0.2em` into the Khmer copy. `globals.css` neutralises it for
+  `:lang(km)`, unlayered, the same cascade-layer trick as the 1.75 line height.
+- **A grid item defaults to `min-width: auto`**, so any child wider than the column raises
+  the column's floor. A `w-max` marquee track inside a `1.15fr` column resolved it to
+  2445px inside a 1088px container and dragged the whole band off axis, while
+  `overflow-x: clip` on `body` hid the document-level symptom. `min-w-0` on the item is the
+  fix, and the capture script's `overflowing=` counter is what surfaced it.
+- **The screenshot script emulates the colour scheme now.** Headless Chrome reports the
+  host's setting, which is how a set of "the landing page is dark" screenshots got taken of
+  a page that is white for half its visitors. `npm run shoot` states `prefers-color-scheme`
+  per capture and also takes one `prefers-reduced-motion: reduce` shot, which is the proof
+  that a reveal is decorating content rather than hiding it. Output is `screenshots/`,
+  gitignored. Capture against `next start`, not `next dev`: the dev overlay's indicator
+  renders into the corner of every shot.
 - **`next start` fails silently on a busy port.** It logs `errno: -48` (EADDRINUSE) and exits,
   the OLD server keeps serving a stale build, and its CSS chunk 404s, so the page renders
   completely unstyled and looks like the stylesheet broke. Always
   `lsof -ti:3000 | xargs kill -9` before restarting, and check the CSS URL returns 200.
-- **A JSX comment never reaches the DOM.** `{/* ... */}` is a JavaScript comment and the
-  compiler strips it. The impeccable direction contract has to survive the production build,
-  so it is emitted through `dangerouslySetInnerHTML` on a `hidden` div in the root layout.
-  Audit it with `curl -s localhost:3000/app | grep "seed f1fef148"`.
 - **Node and Chrome swap the km-KH number separators.** With
   `{ numberingSystem: 'khmr' }`, Node (ICU 78) formats 15000 as `១៥.០០០` and 5.00 as `៥,០០`;
   Chrome 151 formats them as `១៥,០០០` and `៥.០០`. On a server rendered page that is a

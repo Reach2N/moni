@@ -107,9 +107,10 @@ export function AgentPromptBar({
           {trailing}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {/* One glyph, not two. This drew a return arrow AND the literal "⌘↵"
+              beside it, so the hint read as "↵ ⌘↵". */}
           <span className="km hidden items-center gap-1 text-[11px] text-rule sm:inline-flex" aria-hidden>
             <CornerDownLeft className="size-3" strokeWidth={1.75} />
-            ⌘↵
           </span>
           <Button
             type="submit"

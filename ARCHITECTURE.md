@@ -295,7 +295,7 @@ records that Meta review gates public availability and not the demo.
 
 **Reuse, never rewrite:** `src/lib/payments.ts`, `src/lib/format/khmer.ts`, `src/lib/ai/models.ts`
 and its fallback logic, `src/lib/ai/parse.ts` and its `sanityCheck` pattern, `src/lib/agent/slots.ts`,
-`src/components/app/panel.tsx`, `db/test.mjs`, `scripts/mvp-acceptance.mjs`, `.impeccable/shoot.mjs`.
+`src/components/app/panel.tsx`, `db/test.mjs`, `scripts/mvp-acceptance.mjs`, `scripts/shoot.mjs`.
 
 **Delete when the time comes:** `src/lib/database.types.ts`, `src/lib/queries/demo-business.ts`.
 
