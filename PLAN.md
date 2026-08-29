@@ -195,7 +195,17 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
 
 ### Phase 2: Clerk auth, the waitlist gate, and real tenancy (one day)
 
-- `npx clerk@latest init`: `proxy.ts`, ClerkProvider, sign-in routes.
+- DONE 29 Aug, except the Clerk application itself, which is a human task
+  (`npx clerk@latest init` or `clerk env pull`, then two keys in `.env.local`).
+  Everything below is shipped and typechecks, lints and builds without those keys;
+  `/app` and the sign-in screens are the only surfaces that need them.
+- `@clerk/nextjs` 7.8.3, `src/proxy.ts` (Next 16's name for middleware).
+  **ClerkProvider is mounted twice, in `src/app/app/layout.tsx` and
+  `src/app/(auth)/layout.tsx`, never at the root**, and the proxy matcher covers
+  only `/app`, the auth screens and the owner API routes. The public marketing
+  site therefore carries no Clerk script, does no session lookup, and still
+  serves on a checkout with no Clerk keys at all. Verified: `/` answers 200 with
+  the keys absent.
 - **The gate**: after sign-in, a server-side check on the Clerk email. In
   `waitlist` (or `approved_at` set by us manually), you pass. Otherwise you get a
   polite "join the waitlist" screen linking to the public site. The gate lives in
@@ -211,10 +221,22 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
   defence in depth. Tenancy is enforced by one `requireMember()` helper plus a
   `businessId` argument on every query, which is auditable in one place. The commented
   policies in schema.sql stay commented.
+- Shipped with it, because the gate made them wrong otherwise: `/api/ask` and
+  `/api/setup` resolve their tenant from the session and no longer accept a slug
+  (401 signed out, 403 on the list refused, before the body is even read, so an
+  owner endpoint is never a validation oracle). `AskMoni` and `ChatPanel` name no
+  tenant at all. `npm run test:mvp` needs `MONI_ACCEPTANCE_OWNER_COOKIE` now, and
+  says so.
 - Acceptance: a non-waitlisted email signs in and is refused with the join screen;
   a waitlisted email passes and sees the composer; two different members see two
   different businesses and cannot read each other's rows (tested at the database
   level, not just the UI).
+- Acceptance status: the database half is proved, 21 new assertions in
+  `npm run db:test` (118 passing) covering the gate rules, case-insensitive email
+  matching against `waitlist_email_uniq`, both approved and waiting states, two
+  Clerk ids resolving to two shops, a scoped read that is load bearing, and a
+  cross-tenant write that changes nothing. The two browser halves are blocked on
+  the Clerk keys and are the first thing to run once they exist.
 
 ### Phase 3: Onboarding, chat and voice (one to two days)
 
@@ -222,8 +244,11 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
   hold-to-record. Voice goes up as an AI SDK `file` part (webm from
   MediaRecorder) through the gateway to Gemini, transcript shown for
   confirmation before parsing.
-- Parse result renders as an editable services table (existing `/api/parse` and
-  `/api/setup`, retargeted from the demo business to the session's business).
+- Parse result renders as an editable services table (`/api/setup` was retargeted
+  to the session's business in Phase 2; `/api/parse` is stateless and needs
+  nothing). `/api/chat` is still the fixed demo shop, so the dashboard's "try it
+  as a customer" panel previews the demo assistant rather than the member's:
+  retargeting it is Phase 3 work and the panel says so in a comment.
 - `ai_instructions` field: "anything your assistant should always know or do".
 - Ends with the assistant live on the web chat and a prompt to connect Telegram.
 - Acceptance: a fresh account goes from empty to a parsed, edited, saved shop with
@@ -368,7 +393,11 @@ reserved, with seams that must not be casually implemented or deleted:
 - Create an **AI Gateway key** in the Vercel dashboard and put
   `AI_GATEWAY_API_KEY` in `.env.local` (deployments need nothing, OIDC is
   automatic; until then local dev keeps running on the direct Gemini key).
-- Create the **Clerk** application (then `clerk env pull` or paste keys).
+- Create the **Clerk** application (then `clerk env pull` or paste keys). This is
+  now the ONLY thing between Phase 2 and its browser-side acceptance check.
+  `npx clerk@latest init` claims to create one non-interactively with no account,
+  which is worth trying first. Two keys land in `.env.local`:
+  `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
 - Create the **Resend** account and verified sending domain.
 - Hand-pick the landing page components (candidates listed in Phase 1).
 - Create the **Meta developer app** and a test page for Messenger dev mode.

@@ -32,7 +32,7 @@ function ToolSheetHeader({ title, description }: { title: string; description: s
   )
 }
 
-export function SecondaryTools({ slug }: { slug: string }) {
+export function SecondaryTools() {
   const router = useRouter()
   const [setupOpen, setSetupOpen] = useState(false)
 
@@ -82,7 +82,7 @@ export function SecondaryTools({ slug }: { slug: string }) {
         </SheetTrigger>
         <SheetContent side="right" showCloseButton={false} className="w-full max-w-none gap-0 overscroll-contain bg-paper p-0 shadow-none transition-none sm:max-w-xl">
           <ToolSheetHeader title="សាកជាអតិថិជន" description="ផ្ញើសារសាកល្បង ដើម្បីឃើញអ្វីដែលអតិថិជនរបស់អ្នកនឹងទទួល។" />
-          <ChatPanel slug={slug} onChanged={refresh} />
+          <ChatPanel onChanged={refresh} />
         </SheetContent>
       </Sheet>
     </div>

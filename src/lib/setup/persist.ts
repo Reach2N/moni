@@ -3,7 +3,7 @@ import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
 import type { Json } from '../database.types.ts'
 import { businessType } from '../types.ts'
-import { getDemoBusiness } from '../queries/demo-business.ts'
+import { getBusinessById } from '../queries/business.ts'
 import { normalizeServiceName, type SetupRequest } from './schema.ts'
 
 const RESOURCE_LABEL: Record<string, string> = {
@@ -35,8 +35,13 @@ function nextResourceNames(kind: string, count: number, existing: Set<string>) {
   return names
 }
 
-export async function persistDemoSetup(input: SetupRequest): Promise<PersistSetupResult> {
-  const business = await getDemoBusiness()
+/**
+ * Saves a parsed shop against ONE business. `businessId` comes from
+ * `requireMember()`; it is never read from the request, so a member cannot write
+ * a catalogue into someone else's shop by editing a payload.
+ */
+export async function persistSetup(businessId: string, input: SetupRequest): Promise<PersistSetupResult> {
+  const business = await getBusinessById(businessId)
   const type = businessType(input.shop.business_type)
   const attributes = {
     ...((business.attributes as Record<string, Json | undefined>) ?? {}),
@@ -62,7 +67,6 @@ export async function persistDemoSetup(input: SetupRequest): Promise<PersistSetu
     .from('businesses')
     .update(businessUpdate)
     .eq('id', business.id)
-    .eq('slug', business.slug)
     .select('id')
     .single()
   requireDbData('save setup business', updatedBusiness)

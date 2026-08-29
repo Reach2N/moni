@@ -93,11 +93,19 @@ async function testSourceWiring() {
     assert.doesNotMatch(page, /from\s+['"]@\/lib\/demo/)
     return 'RSC reads Supabase, not fixtures'
   })
+  await check('the owner surface resolves its tenant from the session', () => {
+    // Phase 2. The dashboard reads one shop, and which shop is decided by
+    // requireMember(), never by a slug the browser could change.
+    assert.match(page, /await\s+requireMember\s*\(\s*\)/)
+    assert.match(page, /getDashboardSnapshot\s*\(\s*member\.businessId\s*\)/)
+    assert.doesNotMatch(askMoni, /slug/)
+    return 'requireMember() to businessId, no tenant in the client'
+  })
   await check('owner and setup mutations trigger a server refresh', () => {
     assert.match(askMoni, /startTransition\s*\(\s*\(\)\s*=>\s*router\.refresh\s*\(\s*\)\s*\)/)
     assert.match(secondaryTools, /startTransition\s*\(\s*\(\)\s*=>\s*router\.refresh\s*\(\s*\)\s*\)/)
     assert.match(secondaryTools, /<ShopSetup\s+onSaved=\{refresh\}/)
-    assert.match(secondaryTools, /<ChatPanel\s+slug=\{slug\}\s+onChanged=\{refresh\}/)
+    assert.match(secondaryTools, /<ChatPanel\s+onChanged=\{refresh\}/)
     return 'router.refresh follows every write surface'
   })
 }
@@ -198,6 +206,23 @@ async function post(route, body, options = {}) {
     ? await response.json()
     : { raw: (await response.text()).slice(0, 500) }
   return { response, payload, cookie: cookieFrom(response) }
+}
+
+/**
+ * Owner routes are authenticated since PLAN.md Phase 2: `/api/ask` and
+ * `/api/setup` resolve the tenant from the Clerk session, so this harness needs
+ * a real session cookie for a waitlisted member. Export it as
+ * MONI_ACCEPTANCE_OWNER_COOKIE (the `__session=...` pair from a signed-in
+ * browser, or a Clerk testing token session). Customer routes stay anonymous,
+ * because customers never sign in.
+ */
+function ownerCookie() {
+  return process.env.MONI_ACCEPTANCE_OWNER_COOKIE?.trim() || null
+}
+
+async function ownerPost(route, body, options = {}) {
+  const cookie = [options.cookie, ownerCookie()].filter(Boolean).join('; ')
+  return post(route, body, { ...options, cookie: cookie || undefined })
 }
 
 function cookieFrom(response) {
@@ -345,7 +370,7 @@ async function routeGuardChecks() {
   })
   await check('guard requires JSON content type', async () => {
     const { response } = await request(
-      '/api/setup',
+      '/api/chat',
       { origin, 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' },
       '{}',
     )
@@ -369,7 +394,7 @@ async function routeGuardChecks() {
         JSON.stringify({ slug: 'another-shop', text: 'hello' }),
       ),
       request(
-        '/api/ask',
+        '/api/chat',
         { origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
         JSON.stringify({ text: 'hello', admin: true }),
       ),
@@ -377,6 +402,26 @@ async function routeGuardChecks() {
     assert.equal(slugResponse.status, 400)
     assert.equal(keyResponse.status, 400)
     return 'both 400'
+  })
+  // Phase 2. A well formed, same-origin request from a signed-out visitor must
+  // not reach an owner tool. 401 and not 400: the body is never even read, so
+  // the endpoint cannot be used as a validation oracle for a shop's catalogue.
+  await check('owner routes refuse a signed-out visitor before reading the body', async () => {
+    const [{ response: askResponse }, { response: setupResponse }] = await Promise.all([
+      request(
+        '/api/ask',
+        { origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+        JSON.stringify({ text: 'raise every price' }),
+      ),
+      request(
+        '/api/setup',
+        { origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+        JSON.stringify({ raw_description: 'x', shop: {} }),
+      ),
+    ])
+    assert.equal(askResponse.status, 401)
+    assert.equal(setupResponse.status, 401)
+    return 'both 401'
   })
 }
 
@@ -424,7 +469,7 @@ async function runVerticalSlice() {
   const marker = `${(snapshot.business.raw_description ?? 'Sokha Beauty demo shop').slice(0, 7_900)}\nMVP acceptance catalogue check.`
 
   await check('setup persists edited catalogue to fixed demo shop', async () => {
-    const { response, payload } = await post('/api/setup', setupBody(chosen, setupPrice, marker))
+    const { response, payload } = await ownerPost('/api/setup', setupBody(chosen, setupPrice, marker))
     assert.equal(response.status, 200, scrub(JSON.stringify(payload)))
     assert.equal(payload.businessId, snapshot.business.id)
     const business = expectNoError(
@@ -445,7 +490,7 @@ async function runVerticalSlice() {
 
   const { getDashboardSnapshot } = await import('../src/lib/queries/dashboard.ts')
   await check('dashboard snapshot reads the persisted catalogue', async () => {
-    const dashboard = await getDashboardSnapshot(new Date())
+    const dashboard = await getDashboardSnapshot(snapshot.business.id, new Date())
     const service = dashboard.services.find((row) => row.id === chosen.id)
     assert(service, 'service missing from dashboard snapshot')
     assert.equal(service.priceMinor, setupPrice)
@@ -527,7 +572,7 @@ async function runVerticalSlice() {
   })
 
   await check('dashboard snapshot reflects the new booking', async () => {
-    const dashboard = await getDashboardSnapshot(new Date(booking.starts_at))
+    const dashboard = await getDashboardSnapshot(snapshot.business.id, new Date(booking.starts_at))
     const row = dashboard.today.bookings.find((candidate) => candidate.id === booking.id)
     assert(row, 'new booking absent from dashboard snapshot for its Cambodia day')
     assert.equal(row.priceMinor, setupPrice)
@@ -582,7 +627,7 @@ async function runVerticalSlice() {
 
   await check('owner agent mutation is visible on the refresh snapshot', async () => {
     const prompt = `Use adjust_prices exactly once now. Set by_minor to 211 and name_contains exactly to ${chosen.name}. Do not ask a question.`
-    const result = await post('/api/ask', { text: prompt })
+    const result = await ownerPost('/api/ask', { text: prompt })
     assert.equal(result.response.status, 200, scrub(JSON.stringify(result.payload)))
     assert(result.payload.steps?.some((step) => step.tool === 'adjust_prices'), 'owner agent did not call adjust_prices')
     const service = expectNoError(
@@ -590,7 +635,7 @@ async function runVerticalSlice() {
       await db.from('services').select('price_minor').eq('business_id', snapshot.business.id).eq('id', chosen.id).single(),
     )
     assert.equal(service.price_minor, ownerPrice)
-    const dashboard = await getDashboardSnapshot(new Date())
+    const dashboard = await getDashboardSnapshot(snapshot.business.id, new Date())
     assert.equal(dashboard.services.find((row) => row.id === chosen.id)?.priceMinor, ownerPrice)
     const events = await captureEvents(
       'owner mutation',
@@ -761,6 +806,11 @@ async function main() {
       || process.env.ANTHROPIC_API_KEY?.trim(),
   )
   if (!hasAi) throw new Error('live vertical slice requires a configured Gemini or Anthropic API key')
+  if (!ownerCookie()) {
+    throw new Error(
+      'owner routes are authenticated since Phase 2: set MONI_ACCEPTANCE_OWNER_COOKIE to a Clerk session cookie for a waitlisted member',
+    )
+  }
 
   register('./mvp-loader.mjs', import.meta.url)
   db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {

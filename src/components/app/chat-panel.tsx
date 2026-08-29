@@ -22,7 +22,15 @@ const CUSTOMER_STEP: Record<string, string> = {
   escalate_to_owner: 'Moni បានផ្ទេរសារមកម្ចាស់ហាង',
 }
 
-export function ChatPanel({ slug, onChanged }: { slug: string; onChanged?: () => void }) {
+/**
+ * "Try it as a customer". `/api/chat` is the public customer endpoint and picks
+ * its shop server side, so no tenant is named here.
+ *
+ * Honest limitation until Phase 3 retargets that route: it still answers as the
+ * fixed demo shop, not as the signed-in member's. The owner sees the assistant's
+ * behaviour, not their own catalogue.
+ */
+export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
   const [turns, setTurns] = useState<Turn[]>([])
   const [text, setText] = useState('')
   const [lastMessage, setLastMessage] = useState('')
@@ -53,7 +61,7 @@ export function ChatPanel({ slug, onChanged }: { slug: string; onChanged?: () =>
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug, visitor_id: visitorId(), text: trimmed }),
+        body: JSON.stringify({ visitor_id: visitorId(), text: trimmed }),
       })
       const body = await response.json()
       if (!response.ok || body.error) throw new Error(body.error ?? 'request failed')

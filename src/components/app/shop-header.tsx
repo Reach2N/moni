@@ -21,7 +21,7 @@ export function ShopHeader({ snapshot }: { snapshot: DashboardSnapshot }) {
           shortMeta="សាកល្បង"
         />
       </div>
-      <SecondaryTools slug={snapshot.business.slug} />
+      <SecondaryTools />
     </header>
   )
 }

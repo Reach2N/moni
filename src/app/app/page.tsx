@@ -19,11 +19,15 @@ export default async function OwnerCommandCentre() {
   // Keep database configuration out of the build-time module graph. This route
   // is dynamic and needs credentials only when an owner opens the dashboard;
   // importing the query modules above made `next build` fail on a clean clone.
-  const [{ getDashboardSnapshot }, { shopSignals }] = await Promise.all([
+  const [{ requireMember }, { getDashboardSnapshot }, { shopSignals }] = await Promise.all([
+    import('@/lib/auth/member.ts'),
     import('@/lib/queries/dashboard.ts'),
     import('@/lib/queries/signals.ts'),
   ])
-  const snapshot = await getDashboardSnapshot()
+  // The gated layout already resolved this member; `memberGate` is request
+  // cached, so asking again costs nothing and keeps the tenant id out of props.
+  const member = await requireMember()
+  const snapshot = await getDashboardSnapshot(member.businessId)
   const signals = shopSignals(snapshot)
   const urgent = signals.filter((signal) => signal.tone === 'act').length
 
@@ -46,7 +50,7 @@ export default async function OwnerCommandCentre() {
               </div>
 
               <div className="order-2 xl:order-none xl:col-start-1 xl:row-start-1">
-                <AskMoni slug={snapshot.business.slug} />
+                <AskMoni />
               </div>
 
               <div className="order-3 xl:order-none xl:col-start-1 xl:row-start-2">

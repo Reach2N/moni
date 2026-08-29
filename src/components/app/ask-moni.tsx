@@ -190,7 +190,12 @@ function wait(duration: number) {
   return new Promise((resolve) => window.setTimeout(resolve, duration))
 }
 
-export function AskMoni({ slug }: { slug: string }) {
+/**
+ * The shop is whoever is signed in. `/api/ask` resolves the tenant from the
+ * Clerk session, so this component no longer names one: a component that can
+ * name a tenant is a component that can be made to name the wrong one.
+ */
+export function AskMoni() {
   const router = useRouter()
   const reduceMotion = useReducedMotion()
   const [category, setCategory] = useState<CategoryId>('plan')
@@ -231,7 +236,7 @@ export function AskMoni({ slug }: { slug: string }) {
       const response = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug, text: trimmed }),
+        body: JSON.stringify({ text: trimmed }),
       })
       const body = await response.json()
       if (!response.ok || body.error) throw new Error(body.error ?? 'request failed')

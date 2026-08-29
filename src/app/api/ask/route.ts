@@ -8,7 +8,7 @@ import { ownerTools } from '@/lib/agent/owner-tools.ts'
 import { OWNER_SYSTEM, ownerContext } from '@/lib/agent/owner-prompt.ts'
 import { costMicroUsd, withFallback } from '@/lib/ai/models.ts'
 import { ApiRequestError, assertSameOriginBrowserPost, readJsonBody, validationPayload } from '@/lib/http/post.ts'
-import { DEMO_BUSINESS_SLUG, getDemoBusiness } from '@/lib/queries/demo-business.ts'
+import { requireMemberApi } from '@/lib/auth/member.ts'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -22,8 +22,6 @@ const TurnSchema = z
 
 const AskBodySchema = z
   .object({
-    // Accepted only for the existing client contract. It cannot select a tenant.
-    slug: z.literal(DEMO_BUSINESS_SLUG).optional(),
     text: z.string().trim().min(1).max(4_000),
     history: z.array(TurnSchema).max(16).optional().default([]),
   })
@@ -32,8 +30,12 @@ const AskBodySchema = z
 export async function POST(req: Request) {
   try {
     assertSameOriginBrowserPost(req)
+    // The tenant comes from the Clerk session, never from the request. The old
+    // `slug` field is gone rather than ignored, so a client that still sends one
+    // fails loudly here instead of quietly addressing someone else's shop.
+    const member = await requireMemberApi()
     const body = AskBodySchema.parse(await readJsonBody(req, 72_000))
-    const business = await getDemoBusiness()
+    const business = { id: member.businessId, name: member.name }
     const messages = [...body.history, { role: 'user' as const, content: body.text }]
 
     const { result, ref } = await withFallback('chat', (model) =>

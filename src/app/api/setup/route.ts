@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { ApiRequestError, assertSameOriginBrowserPost, readJsonBody, validationPayload } from '@/lib/http/post.ts'
-import { persistDemoSetup } from '@/lib/setup/persist.ts'
+import { requireMemberApi } from '@/lib/auth/member.ts'
+import { persistSetup } from '@/lib/setup/persist.ts'
 import { SetupRequestSchema } from '@/lib/setup/schema.ts'
 
 export const runtime = 'nodejs'
@@ -9,8 +10,9 @@ export const runtime = 'nodejs'
 export async function POST(req: Request) {
   try {
     assertSameOriginBrowserPost(req)
+    const member = await requireMemberApi()
     const input = SetupRequestSchema.parse(await readJsonBody(req, 48_000))
-    return NextResponse.json(await persistDemoSetup(input))
+    return NextResponse.json(await persistSetup(member.businessId, input))
   } catch (error) {
     if (error instanceof ApiRequestError) {
       return NextResponse.json({ error: error.message }, { status: error.status })

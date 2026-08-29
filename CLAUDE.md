@@ -57,9 +57,20 @@ and are superseded where they conflict with PLAN.md.
 - **21st.dev is not blanket MIT.** Licence is per component and often blank, which means
   default copyright, not permissive. Only install components whose metadata says `mit` and
   credit the author. Free tier is 2 installs per day.
-- **Clerk supports Next 16 from `@clerk/nextjs` 7.2.5.** On Next 16 the middleware file
-  is `proxy.ts`, not `middleware.ts` (same contents). Scaffold with `npx clerk@latest init`,
-  keys via `clerk env pull`. `auth()` is async, always awaited.
+- **Clerk is `@clerk/nextjs` 7.8.3**, installed 29 August 2026. Its peer range is
+  `next: ^16.1.0-0`, so 16.3.1 is fine. On Next 16 the middleware file is `proxy.ts`, not
+  `middleware.ts`; the export you put in it is still `clerkMiddleware`, which is the part
+  that reads wrong at first. Scaffold with `npx clerk@latest init`, keys via
+  `clerk env pull`. `auth()` is async, always awaited, and returns a signed-out object
+  unless the proxy actually ran for that path: an API route left off the matcher fails
+  OPEN into "signed out", not closed. `ClerkProvider` is mounted per subtree here
+  (`src/app/app/layout.tsx` and `src/app/(auth)/layout.tsx`), never at the root, so the
+  public marketing site loads no Clerk script and a checkout with no Clerk keys still
+  builds and serves. Without keys every matched path 500s in the proxy before the route
+  runs, which makes the matcher the isolation boundary and worth keeping narrow.
+  `appearance.variables` was renamed at some point and the old names are a type error, not
+  a silent no-op: it is `colorForeground`, `colorInput`, `colorBorder` and
+  `colorPrimaryForeground`, not `colorText` or `colorInputBackground`.
 - **Vercel AI Gateway is the only LLM gateway** (decided 27 August 2026, replacing the
   earlier OpenRouter pick; `package.json` and PLAN.md already agreed, this paragraph was
   the last stale copy). `@ai-sdk/gateway` plugs into the Vercel AI SDK; model refs are
@@ -214,6 +225,10 @@ db/test.mjs         the proof. Full assertion suite, no server required
 src/lib/format/khmer.ts   every user facing quantity. One implementation, on purpose
 src/lib/queries/signals.ts what the shop needs from its owner, ranked. Pure, and tested
 src/components/app/panel.tsx  the panel grammar: header, rows, note, count badge
+src/proxy.ts        Clerk, scoped to /app, the auth screens and owner API routes
+src/lib/auth/gate.ts   the waitlist gate as pure rules, so db/test.mjs can prove them
+src/lib/auth/member.ts requireMember(): the ONE place tenancy is decided. RLS has zero
+                    policies, so a query that forgets its businessId has nothing to catch it
 src/lib/types.ts    source of truth: money, taxonomies, row types, tool surface, plans
 src/lib/payments.ts KHQR provider adapter interface. Provider choice is config
 src/lib/ai/models.ts the only file allowed to name a model or provider

@@ -17,6 +17,14 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { cambodiaDayBounds, cambodiaMonthBounds } from '../src/lib/time/cambodia.ts'
 import { assertSameOriginBrowserPost, readJsonBody } from '../src/lib/http/post.ts'
 import { SetupRequestSchema } from '../src/lib/setup/schema.ts'
+import {
+  escapeLikePattern,
+  isApproved,
+  normalizeEmail,
+  passesGate,
+  slugAttempt,
+  slugFromEmail,
+} from '../src/lib/auth/gate.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const sql = (f) => readFileSync(join(here, f), 'utf8')
@@ -368,7 +376,10 @@ const rls = await one(db, `
   where n.nspname = 'public' and t.relkind = 'r' and not t.relrowsecurity`)
 eq('every public table has RLS enabled (deny by default, service role bypasses)', Number(rls.c), 0)
 const noPolicy = await one(db, `select count(*) c from pg_policies where schemaname = 'public'`)
-eq('and zero policies exist until Clerk lands (Phase 2)', Number(noPolicy.c), 0)
+// Phase 2 planned member policies over Clerk JWTs and that step is CANCELLED
+// (ARCHITECTURE.md section 1). Zero is now the permanent answer, not a waiting
+// room: tenancy lives in requireMember() plus a businessId on every query.
+eq('and zero policies exist, permanently', Number(noPolicy.c), 0)
 const views = await one(db, `
   select count(*) c from pg_class v join pg_namespace n on n.oid = v.relnamespace
   where n.nspname = 'public' and v.relkind = 'v'
@@ -379,6 +390,88 @@ const fn = await one(db, `
   from pg_proc where proname = 'moni_touch'`)
 if (fn.cfg.includes('search_path=')) ok('moni_touch has a pinned search_path')
 else no('moni_touch search_path', `proconfig is "${fn.cfg}"`)
+
+// ── 15. the waitlist gate and tenant isolation (PLAN.md Phase 2) ───────────
+// The acceptance check for this phase is explicitly "tested at the database
+// level, not just the UI", because with RLS deny-all and no policies, a query
+// that forgets its business_id is the only way a tenant leaks. There is no
+// second wall to catch it.
+console.log('\nthe waitlist gate')
+eq('emails normalise to one form, matching the lower(email) unique index',
+  normalizeEmail('  Sokha@Example.COM '), 'sokha@example.com')
+eq('an address that is not on the list is refused', passesGate(null), false)
+eq('being on the list is enough to pass',
+  passesGate({ approved_at: null, converted_business_id: null }), true)
+eq('approval is a stronger claim than passing',
+  isApproved({ approved_at: null, converted_business_id: null }), false)
+eq('and is true once we set it by hand',
+  isApproved({ approved_at: '2026-08-29T00:00:00Z', converted_business_id: null }), true)
+eq('like wildcards in an address are escaped, so one email matches one row',
+  escapeLikePattern('a_b%c@example.com'), 'a\\_b\\%c@example.com')
+eq('a slug is derived from the email local part', slugFromEmail('Sokha.Beauty+kh@gmail.com'), 'sokha-beauty-kh')
+eq('a reserved subdomain is never handed to a shop', slugFromEmail('admin@moni.cam'), 'admin-shop')
+eq('an unusable local part falls back rather than failing a sign-in', slugFromEmail('a@b.com'), 'shop')
+eq('a slug collision retries with a suffix', slugAttempt('sokha', 1), 'sokha-2')
+
+await expectOk(db, 'the landing page writes an application, still waiting',
+  `insert into waitlist (email, locale, source) values ('Dara@Example.com', 'km', 'landing')`)
+const found = await one(db, `
+  select approved_at from waitlist where lower(email) = '${normalizeEmail('  DARA@Example.com ')}'`)
+if (found) ok('the gate finds the row whatever case the member signs in with')
+else no('gate lookup', 'a case difference hid an existing application')
+
+// Both gate states matter: one application we approved by hand, one still
+// waiting. Both pass, because being on the list is the rule (see passesGate).
+const states = await db.query(`
+  select email, approved_at from waitlist where lower(email) in ('sokha@example.com','dara@example.com')
+   order by email`)
+eq('an application still waiting passes the gate anyway',
+  passesGate(states.rows[0]) && !isApproved(states.rows[0]), true)
+eq('one we approved by hand passes and reads as approved',
+  passesGate(states.rows[1]) && isApproved(states.rows[1]), true)
+
+console.log('\ntenant isolation, enforced by business_id and nothing else')
+await expectOk(db, 'a second member attaches to the other business',
+  `update businesses set clerk_user_id = 'user_9zzzYYY888' where id = '${B_HOUSE}'`)
+const salonTenant = await one(db, `select id from businesses where clerk_user_id = 'user_2abcDEF123'`)
+const houseTenant = await one(db, `select id from businesses where clerk_user_id = 'user_9zzzYYY888'`)
+eq('two members resolve to two different shops', salonTenant.id === houseTenant.id, false)
+
+const leak = await one(db, `
+  select count(*) c from bookings where business_id = '${B_SALON}'
+    and service_id in (select id from services where business_id = '${B_HOUSE}')`)
+eq('a booking scoped to one shop never carries the other shop\'s services', Number(leak.c), 0)
+
+const scoped = await one(db, `
+  select count(*) c from v_bookings_agent where business_id = '${B_SALON}'`)
+const total = await one(db, `select count(*) c from v_bookings_agent`)
+if (Number(scoped.c) > 0 && Number(scoped.c) < Number(total.c)) {
+  ok(`the scoped read returns ${scoped.c} of ${total.c} rows, so the filter is load bearing`)
+} else {
+  no('scoped read', `scoped ${scoped.c} of ${total.c}: the business_id filter is not doing anything`)
+}
+
+// The shape of every mutation in src/lib/queries: the tenant id is an AND, not
+// the whole predicate. A row id guessed or leaked from another shop must still
+// miss, or one wrong argument in a route handler becomes a cross-tenant write.
+const foreignService = await one(db, `select id from services where business_id = '${B_HOUSE}' limit 1`)
+const crossWrite = await db.query(`
+  update services set price_minor = 1 where business_id = '${B_SALON}' and id = '${foreignService.id}'
+  returning id`)
+eq('a cross-tenant write scoped by business_id changes nothing', crossWrite.rows.length, 0)
+
+const conversion = await db.query(`
+  update waitlist set converted_business_id = '${B_HOUSE}'
+   where lower(email) = 'visal@example.com' and converted_business_id is null
+  returning converted_business_id`)
+eq('a passing member closes the loop from application to live shop',
+  conversion.rows[0]?.converted_business_id, B_HOUSE)
+const alreadyConverted = await db.query(`
+  update waitlist set converted_business_id = '${B_SALON}'
+   where lower(email) = 'visal@example.com' and converted_business_id is null
+  returning id`)
+eq('and a later sign-in does not relabel which shop that lead became',
+  alreadyConverted.rows.length, 0)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

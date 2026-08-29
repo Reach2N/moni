@@ -3,7 +3,7 @@ import { db } from '../db.ts'
 import { throwIfDbError } from '../db-result.ts'
 import { cambodiaDayBounds, cambodiaDayOfWeek, cambodiaMonthBounds, parseClock } from '../time/cambodia.ts'
 import type { BookingStatus, CurrencyCode, OpeningHours } from '../types.ts'
-import { getDemoBusiness } from './demo-business.ts'
+import { getBusinessById } from './business.ts'
 
 export type DashboardSnapshot = {
   business: {
@@ -90,11 +90,15 @@ export type DashboardSnapshot = {
 }
 
 /**
- * One serializable snapshot for the fixed Sokha Beauty demo. The business row
- * is the only dependency; every remaining read starts together after it lands.
+ * One serializable snapshot for one shop. The business row is the only
+ * dependency; every remaining read starts together after it lands.
+ *
+ * `businessId` comes from `requireMember()` and from nowhere else. Every query
+ * below is scoped by it, which is the entirety of tenant isolation here
+ * (ARCHITECTURE.md section 2): there are no RLS policies to fall back on.
  */
-export async function getDashboardSnapshot(now = new Date()): Promise<DashboardSnapshot> {
-  const business = await getDemoBusiness()
+export async function getDashboardSnapshot(businessId: string, now = new Date()): Promise<DashboardSnapshot> {
+  const business = await getBusinessById(businessId)
   const day = cambodiaDayBounds(now)
   const month = cambodiaMonthBounds(now)
   const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
