@@ -112,6 +112,21 @@ export class ProviderError extends Error {
   }
 }
 
+/**
+ * A 429 carries a wait, and the wait is the useful part. Separate from
+ * ProviderError so a caller can hold a customer's QR open for the stated
+ * seconds instead of failing them, and so `shouldFallback` is never asked to
+ * make that decision.
+ */
+export class RateLimitedError extends ProviderError {
+  readonly retryAfterSeconds: number
+  constructor(message: string, retryAfterSeconds: number) {
+    super(message, 429)
+    this.name = 'RateLimitedError'
+    this.retryAfterSeconds = retryAfterSeconds
+  }
+}
+
 const minorToMajor = (minor: number, currency: CurrencyCode): number =>
   minor / 10 ** CURRENCIES[currency].decimals
 const majorToMinor = (major: unknown, currency: CurrencyCode): number =>
@@ -164,10 +179,29 @@ export function cutluyAdapter(cfg: {
       })
       const body = await readJson(res)
       if (!res.ok) {
-        throw new ProviderError(
-          typeof body.message === 'string' ? body.message : `CutLuy returned ${res.status}`,
-          res.status,
-        )
+        // Their failures are typed: { error: code, message }. The code is worth
+        // more than the status here, because three of them need a human and one
+        // needs a wait, and a shop owner deserves to be told which.
+        const code = typeof body.error === 'string' ? body.error : ''
+        const message = typeof body.message === 'string' ? body.message : `CutLuy returned ${res.status}`
+        if (res.status === 429 || code === 'rate_limited') {
+          // Creates are 60/minute per key, reads 600/minute. Honour their own
+          // Retry-After rather than guessing, and never retry in a tight loop:
+          // the caller decides, because only the caller knows if a customer is
+          // still standing there.
+          const retryAfter = Number(res.headers.get('retry-after')) || 0
+          throw new RateLimitedError(message, retryAfter)
+        }
+        if (code === 'quota_exceeded' || res.status === 402) {
+          throw new ProviderError(`CutLuy quota exceeded: ${message}`, 402)
+        }
+        if (code === 'unauthorized' || res.status === 401) {
+          throw new ProviderError(`CutLuy rejected the API key: ${message}`, 401)
+        }
+        if (code === 'account_suspended' || res.status === 403) {
+          throw new ProviderError(`CutLuy account suspended: ${message}`, 403)
+        }
+        throw new ProviderError(message, res.status)
       }
       return body
     } finally {
@@ -220,6 +254,10 @@ export function cutluyAdapter(cfg: {
       // here, because nothing in this codebase should cancel a booking off the
       // back of a network response. The booking stops being payable when its own
       // expiry passes, which is a decision we own.
+      // Their vocabulary is pending, scanned, paid, expired, failed. ONLY paid
+      // means the money moved. `scanned` means the customer opened the QR in
+      // their banking app and has not paid, and treating it as success would
+      // give away goods for an intention.
       if (raw.status !== 'paid') return { status: 'pending', raw }
       if (!amountsMatch(expected_minor, amount_minor)) {
         return { status: 'pending', amount_minor, raw }

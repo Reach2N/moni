@@ -28,6 +28,10 @@ import { sanityCheck } from '../src/lib/ai/storefront-check.ts'
 import { buildKhqrPayload, crc16, amountField, khqrMd5 } from '../src/lib/khqr/payload.ts'
 import { createOrder, allocateInvoiceNumber, OrderError } from '../src/lib/orders/create.ts'
 import { KHQR, CURRENCY, TAG } from 'ts-khqr'
+import {
+  expectedSignature, isFulfillingEvent, parseSignatureHeader,
+  statusFromEvent, verifyCutluyDelivery, withinReplayWindow,
+} from '../src/lib/payments/cutluy-webhook.ts'
 import { THEMES } from '../src/lib/types.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
@@ -863,6 +867,64 @@ await expectFail(db, 'a line total that disagrees with its own parts is refused 
   `insert into order_items (order_id, name, unit_price_minor, quantity, line_total_minor)
    values ('${firstOrder.orderId}', 'ប្រេង', 12000, 2, 1)`,
   'order_items_total_ok')
+
+// ── 22. CutLuy webhooks: the only honest way to know money moved ───────────
+console.log('\nCutLuy webhook deliveries')
+const CUT_SECRET = 'whsec_test_endpoint_secret'
+const CUT_BODY = '{"id": "PUETcMUOKStjZsCb", "status": "paid", "amount": "1.50", "reference_id": "MN4K2P"}'
+const nowSec = Math.floor(Date.now() / 1000)
+const sign = (body, t = nowSec, secret = CUT_SECRET) => `t=${t},v1=${expectedSignature(t, body, secret)}`
+
+eq('a genuine delivery verifies',
+  verifyCutluyDelivery(CUT_BODY, sign(CUT_BODY), CUT_SECRET).ok, true)
+// The signature covers the BYTES CutLuy sent. Parsing and re-serialising changes
+// key order and whitespace, and this is the failure that looks like a working
+// integration everywhere except production.
+eq('the same JSON re-serialised does NOT verify',
+  verifyCutluyDelivery(JSON.stringify(JSON.parse(CUT_BODY)), sign(CUT_BODY), CUT_SECRET).ok, false)
+eq('an unsigned delivery is refused',
+  verifyCutluyDelivery(CUT_BODY, null, CUT_SECRET).reason, 'no_signature')
+eq('a malformed signature header is refused',
+  verifyCutluyDelivery(CUT_BODY, 'garbage', CUT_SECRET).reason, 'bad_format')
+eq('a forged signature is refused',
+  verifyCutluyDelivery(CUT_BODY, `t=${nowSec},v1=${'a'.repeat(64)}`, CUT_SECRET).reason, 'mismatch')
+eq('the wrong endpoint secret is refused',
+  verifyCutluyDelivery(CUT_BODY, sign(CUT_BODY, nowSec, 'whsec_someone_else'), CUT_SECRET).reason, 'mismatch')
+// A captured delivery replayed an hour later must not settle a payment again.
+eq('a delivery older than the replay window is refused',
+  verifyCutluyDelivery(CUT_BODY, sign(CUT_BODY, nowSec - 3_600), CUT_SECRET).reason, 'stale')
+eq('and one from the future is refused too',
+  verifyCutluyDelivery(CUT_BODY, sign(CUT_BODY, nowSec + 3_600), CUT_SECRET).reason, 'stale')
+eq('a delivery four minutes old is still inside the window', withinReplayWindow(nowSec - 240, nowSec), true)
+eq('a tampered body invalidates the signature',
+  verifyCutluyDelivery(CUT_BODY.replace('1.50', '9.99'), sign(CUT_BODY), CUT_SECRET).reason, 'mismatch')
+eq('the header is parsed into its parts', parseSignatureHeader(`t=${nowSec},v1=abcd`)?.timestamp, nowSec)
+
+// ONLY completed means the money moved. scanned means the customer opened the
+// QR in their banking app and has not paid; fulfilling on it gives away goods
+// for an intention.
+eq('payment.completed fulfils', isFulfillingEvent('payment.completed'), true)
+eq('payment.scanned does NOT fulfil', isFulfillingEvent('payment.scanned'), false)
+eq('and scanned leaves the payment row alone', statusFromEvent('payment.scanned'), 'pending')
+eq('payment.expired marks it expired', statusFromEvent('payment.expired'), 'expired')
+eq('payment.failed marks it failed', statusFromEvent('payment.failed'), 'failed')
+eq('an event we do not know is treated as no news', statusFromEvent('payment.refunded'), 'pending')
+
+// Idempotency, keyed off the payment id and enforced by the transition itself.
+// The handler updates only rows still pending, so a redelivery changes nothing.
+await db.exec(`
+  insert into payments (id, business_id, amount_minor, currency, provider, provider_ref, status, idempotency_key)
+  values ('f0000000-0000-4000-8000-0000000000c1','${B_SALON}', 150, 'USD', 'cutluy', 'PUETcMUOKStjZsCb', 'pending', 'cutluy-test-1')`)
+const firstSettle = await db.query(`
+  update payments set status = 'paid', paid_at = now()
+   where provider = 'cutluy' and provider_ref = 'PUETcMUOKStjZsCb' and status = 'pending'
+  returning id`)
+eq('the first delivery settles the payment', firstSettle.rows.length, 1)
+const replay = await db.query(`
+  update payments set status = 'paid', paid_at = now()
+   where provider = 'cutluy' and provider_ref = 'PUETcMUOKStjZsCb' and status = 'pending'
+  returning id`)
+eq('and the same event arriving twice changes nothing', replay.rows.length, 0)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
