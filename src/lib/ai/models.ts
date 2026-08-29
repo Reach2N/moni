@@ -19,7 +19,6 @@
  * keeps local dev working with no gateway key at all), then Anthropic. The
  * first provider with a configured key that does not throw wins.
  */
-import { gateway } from '@ai-sdk/gateway'
 import { google } from '@ai-sdk/google'
 import { anthropic } from '@ai-sdk/anthropic'
 import type { LanguageModel } from 'ai'
@@ -28,10 +27,18 @@ import type { LanguageModel } from 'ai'
 export type Task = 'parse' | 'chat' | 'classify' | 'transcribe'
 
 /**
- * "provider:model". Kept as a string so an env var can override it verbatim.
- * gateway ids are "creator/model-name" slugs, e.g. gateway:google/gemini-3.7-flash.
+ * Two shapes, and the shape IS the routing.
+ *
+ * A bare "creator/model" slug goes through the Vercel AI Gateway. That needs no
+ * provider package and no import: `ai` depends on @ai-sdk/gateway internally and
+ * documents that "if not set, the default provider is the Vercel AI gateway
+ * provider", so handing generateText the string is the whole integration.
+ *
+ * A "provider:model" ref with a colon goes DIRECT, through that provider's own
+ * package and its own key. This is the escape hatch, and the only reason
+ * GEMINI_API_KEY exists: a laptop with no gateway key still runs the product.
  */
-type ModelRef = `gateway:${string}` | `google:${string}` | `anthropic:${string}`
+type ModelRef = `${string}/${string}` | `google:${string}` | `anthropic:${string}`
 
 /**
  * Direct-Google ids verified against the live model list on this account,
@@ -45,14 +52,14 @@ type ModelRef = `gateway:${string}` | `google:${string}` | `anthropic:${string}`
 const DEFAULTS: Record<Task, ModelRef[]> = {
   // structured extraction, runs once per shop, quality matters most
   parse: [
-    'gateway:google/gemini-3.7-flash',
+    'google/gemini-3.7-flash',
     'google:gemini-3.7-flash',
     'anthropic:claude-sonnet-5',
     'google:gemini-3.5-flash',
   ],
   // customer conversation with tool calling, runs constantly, latency matters
   chat: [
-    'gateway:google/gemini-3.7-flash',
+    'google/gemini-3.7-flash',
     'google:gemini-3.7-flash',
     'google:gemini-3.5-flash',
     'anthropic:claude-sonnet-5',
@@ -62,23 +69,28 @@ const DEFAULTS: Record<Task, ModelRef[]> = {
   // Anthropic is deliberately absent because it takes no audio input, so a
   // fallback to it would fail on every request rather than degrade.
   transcribe: [
-    'gateway:google/gemini-3.7-flash',
+    'google/gemini-3.7-flash',
     'google:gemini-3.7-flash',
     'google:gemini-3.5-flash',
   ],
   // "is this a booking request or a complaint", cheapest possible
   classify: [
-    'gateway:google/gemini-3.5-flash-lite',
+    'google/gemini-3.5-flash-lite',
     'google:gemini-3.5-flash-lite',
     'google:gemini-3.7-flash',
   ],
 }
 
-/** Env override, e.g. MONI_MODEL_PARSE="gateway:anthropic/claude-opus-4.8". */
+/** Env override, e.g. MONI_MODEL_PARSE="anthropic/claude-opus-4.8" for the gateway. */
 function refsFor(task: Task): ModelRef[] {
   const override = process.env[`MONI_MODEL_${task.toUpperCase()}`]?.trim()
   if (override) return override.split(',').map((s) => s.trim() as ModelRef)
   return DEFAULTS[task]
+}
+
+/** A ref with no colon is a gateway slug; a colon names a direct provider. */
+function providerOf(ref: ModelRef): string {
+  return ref.includes(':') ? ref.slice(0, ref.indexOf(':')) : 'gateway'
 }
 
 function hasKeyFor(provider: string): boolean {
@@ -99,9 +111,14 @@ function hasKeyFor(provider: string): boolean {
 }
 
 function build(ref: ModelRef): LanguageModel {
-  const [provider, ...rest] = ref.split(':')
-  const id = rest.join(':')
-  if (provider === 'gateway') return gateway(id)
+  // No colon: hand the slug straight to the AI SDK, which routes it through the
+  // gateway. Passing a string IS the supported integration; wrapping it in a
+  // gateway() call from a package we also depend on directly was one layer of
+  // indirection doing nothing.
+  if (!ref.includes(':')) return ref as LanguageModel
+
+  const provider = ref.slice(0, ref.indexOf(':'))
+  const id = ref.slice(ref.indexOf(':') + 1)
   if (provider === 'google') return google(id)
   if (provider === 'anthropic') return anthropic(id)
   throw new Error(`unknown provider in "${ref}"`)
@@ -110,7 +127,7 @@ function build(ref: ModelRef): LanguageModel {
 /** Every configured candidate for a job, in preference order. */
 export function modelsFor(task: Task): Array<{ ref: ModelRef; model: LanguageModel }> {
   const out = refsFor(task)
-    .filter((ref) => hasKeyFor(ref.split(':')[0]!))
+    .filter((ref) => hasKeyFor(providerOf(ref)))
     .map((ref) => ({ ref, model: build(ref) }))
   if (out.length === 0) {
     throw new Error(
@@ -164,7 +181,7 @@ export async function withFallback<T>(
 
   for (let i = 0; i < candidates.length; i++) {
     const { ref, model } = candidates[i]!
-    const provider = ref.split(':')[0]!
+    const provider = providerOf(ref as ModelRef)
     if (exhaustedProviders.has(provider)) continue
 
     try {
@@ -176,7 +193,7 @@ export async function withFallback<T>(
 
       if (isQuota(msg)) {
         exhaustedProviders.add(provider)
-        const another = candidates.slice(i + 1).find((c) => !exhaustedProviders.has(c.ref.split(':')[0]!))
+        const another = candidates.slice(i + 1).find((c) => !exhaustedProviders.has(providerOf(c.ref)))
         if (another) {
           console.warn(`[ai] ${provider} is over quota, switching provider`)
           continue
@@ -207,8 +224,8 @@ export async function withFallback<T>(
  * Rounded up, because under-reporting your own cost is the failure that hurts.
  */
 const RATES: Record<string, { in: number; out: number }> = {
-  'gateway:google/gemini-3.7-flash': { in: 0.3, out: 2.5 },
-  'gateway:google/gemini-3.5-flash-lite': { in: 0.1, out: 0.4 },
+  'google/gemini-3.7-flash': { in: 0.3, out: 2.5 },
+  'google/gemini-3.5-flash-lite': { in: 0.1, out: 0.4 },
   'google:gemini-3.7-flash': { in: 0.3, out: 2.5 },
   'google:gemini-3.5-flash': { in: 0.3, out: 2.5 },
   'google:gemini-3.5-flash-lite': { in: 0.1, out: 0.4 },
