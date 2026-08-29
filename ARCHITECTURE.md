@@ -1,16 +1,21 @@
 # Moni: architecture and stack research
 
-Written 29 August 2026. This document is the **end-state architecture**: the data model,
+This document is the **target architecture**: the data model,
 the seams, the guardrails, and the record of which third-party things were adopted and
 which were rejected and why.
 
-It sits alongside two other documents and does not replace either:
+It sits below the active agent contract and build plan:
 
-- `CLAUDE.md` is the harness: hard rules and toolchain gotchas.
+- `AGENTS.md` is the active agent contract and current-surface declaration.
 - `PLAN.md` is the build order: phases and acceptance checks.
-- **This file is the what and the why.** Where it conflicts with PLAN.md on
+- `docs/HOMEPAGE.md` is the active frontend contract for the homepage.
+- **This file is the architectural what and why.** Where it conflicts with PLAN.md on
   architecture, this file wins and PLAN.md is corrected in the same commit, per
   PLAN.md guardrail 8.
+
+The current requested surface is the light-only marketing homepage. The target
+database migration, storefront, and dashboard rebuild below are future phases and must not
+be pulled into homepage work.
 
 ---
 
@@ -18,17 +23,15 @@ It sits alongside two other documents and does not replace either:
 
 Moni is an agentic assistant for Cambodian local businesses. The owner describes the shop
 by voice or text, and the catalogue, the booking logic, the customer conversations and the
-web store are all derived from that. It is being built for the AI in Motion program, where
-70 applicants are cut to 30. The window is roughly nine weeks, from 29 August to the end of
-October 2026.
+web store are all derived from that. It is being built for the AI in Motion program.
+Execution is linear and acceptance-driven; this document does not promise a delivery date
+or estimate how long a step will take.
 
-The repository today is about 70% documentation and 10% shipped app. What is built is
-genuinely good and must not be thrown away: a 16-table Postgres schema with `tstzrange`
-occupancy and a GiST exclusion constraint, 97 PGlite assertions, a model router with
-provider-aware fallback, a parse loop whose `sanityCheck()` catches the 100x currency bug,
-two agent tool loops, and one polished dashboard. What is missing is everything that makes
-it a product: auth, tenancy, marketing, onboarding, voice, Telegram, calendar, inbox,
-payment collection, and the design system PLAN.md section 3 already specifies.
+The repository contains a 16-table Postgres schema with `tstzrange` occupancy and a GiST
+exclusion constraint, a model router with provider-aware fallback, a parse loop whose
+`sanityCheck()` catches the 100x currency bug, agent tool loops, authentication, onboarding,
+voice, Telegram, and a public homepage. The dashboard and later product breadth are still
+being rebuilt in later phases. Do not describe future work as if it is already installed.
 
 Two forces shaped this document. The scope grew to include hosted web stores on subdomains,
 products and orders for retail, and invoices. And the brief was to design for the end state,
@@ -48,7 +51,7 @@ reach it. This is a functional blocker for the current scope, not a matter of ta
 one: RLS on with zero policies, service role only, `server-only` on `src/lib/db.ts`, and the
 browser never touching Supabase. That is Supabase used as managed Postgres, which is what you
 would build on RDS or Neon too. PLAN.md Phase 2 planned to reverse it by adding member policies
-over Clerk JWTs, which ships the anon key to the browser and makes roughly twenty hand-written
+over Clerk JWTs, which ships the anon key to the browser and makes hand-written
 SQL policies the only boundary between tenants. That is the misconfiguration class that produces
 real breaches. **That step is cancelled.**
 
@@ -68,13 +71,18 @@ the right region. What changes is the client.
 
 | Layer | From | To | Why |
 |---|---|---|---|
-| DB client | `@supabase/supabase-js` (PostgREST) | `drizzle-orm` + `postgres` over Supavisor transaction mode | Transactions. Types inferred from schema, so `database.types.ts` stops being a hand-refreshed file that drifts. Portable: moving to Neon or RDS becomes a connection string, not a rewrite. |
+| DB client | `@supabase/supabase-js` (PostgREST) | **`postgres` over Supavisor transaction mode, adopted 30 Aug where a transaction is actually needed** (`src/lib/orders/`); `drizzle-orm` layers onto the same driver later with no connection change | Transactions. Types inferred from schema, so `database.types.ts` stops being a hand-refreshed file that drifts. Portable: moving to Neon or RDS becomes a connection string, not a rewrite. |
 | Tenant isolation | RLS policies per table (planned) | One server-side `requireMember()` plus a `businessId` argument on every query | One auditable choke point instead of twenty SQL policies. RLS stays on with zero policies as defence in depth. |
 | Live updates | Supabase Realtime (planned) | Own SSE route `GET /api/stream/[businessId]` | Data API stays shut, satisfies the API-first rule, and Swift consumes SSE with `URLSession` and no vendor SDK. |
 | LLM gateway | CLAUDE.md said OpenRouter | Vercel AI Gateway | PLAN.md and `package.json` already agreed. CLAUDE.md was the stale document and is corrected. |
 
 Supabase keeps two jobs: managed Postgres, and Storage for shop photos. `@supabase/supabase-js`
 stays installed for Storage uploads only.
+
+This table describes the target after the later migration. The current homepage-first
+session does not install Drizzle, change the database client, or touch owner-app queries.
+Until that migration is explicitly started, existing Supabase query code is the current
+implementation and must not be “partially modernized” by a homepage change.
 
 **One configuration detail that will bite otherwise:** under Supavisor transaction mode you must
 set `prepare: false` on the postgres.js client. Without it, the second request to any route fails
@@ -85,40 +93,44 @@ statements across sessions.
 
 ## 3. What not to build, because it exists
 
-Every capability in scope, checked against what already ships. Adoption is only recommended
-where it survives the project's own rules: MIT or similarly permissive, restylable into the
-black/white/green token system, and not carrying its own database.
+Every capability in scope is checked against what already ships. For showcase work,
+selection is based on the strongest complete interaction and visual result, with Beautiful
+UI preferred for every UI surface and required as the first check for agentic surfaces.
+Defer all license review and licensing decisions until distribution work. A
+selected component must still be inspectable, installable, and compatible with the route;
+do not invent a replacement when no fit exists.
 
 ### Adopt
 
 | Need | Take | Why it wins |
 |---|---|---|
-| **Agent execution trace** | **21st.dev Agent Elements ToolGroup** (local adaptation) | The repository already owns a strict Khmer adaptation at `src/components/app/owner-tool-trace.tsx`. It retains grouped disclosure and step states without importing Agent Elements' Base UI, Tabler, or theme variables. |
-| **Agent approval gate** | **Beautiful UI Approval Card** (local adaptation) | Owner mutations need a visible human decision. `src/components/agent/approval-card.tsx` makes the proposed command, scope, and confirm/cancel actions reusable and testable instead of hiding them in a generic modal. |
-| **Chat and composer UI** | **AI Elements** (`vercel/ai-elements`) for the future streaming surface; **Moni Prompt Bar** for current owner/customer flows | AI Elements remains the long-term AI SDK integration candidate. The current `src/components/agent/prompt-bar.tsx` adopts the 21st.dev InputBar interaction model while composing Moni's existing shadcn Textarea/Button, so it works with today's JSON endpoints and can grow into attachments, voice, modes, and model selection without another composer fork. |
+| **Agent execution trace** | **Beautiful UI agent patterns** for new showcase surfaces | Existing local adaptations such as `src/components/app/owner-tool-trace.tsx` are historical implementation context, not the homepage source of truth. New work selects and installs the strongest complete Beautiful UI source before any route code is written. |
+| **Agent approval gate** | **Beautiful UI Approval Card** | Use the published component source and its documented theme hooks. Do not redraw or substantially rewrite it; if it does not fit, stop and report the gap. |
+| **Chat and composer UI** | **Beautiful UI** first; 21st.dev or another established library only when Beautiful UI has no complete fit | Install the selected source and keep the interaction model intact. shadcn/Radix primitives are low-level fallbacks, not a reason to invent a new composer. |
 | **Telegram** | **grammY** | Typed update objects and `webhookCallback` for serverless, which is precisely the fiddly part. TS-native, actively maintained. Keep the agent loop outside grammY middleware so Messenger reuses it unchanged. |
 | **Transactional email** | **react-email** with Resend | Same vendor as the already-chosen sender. Templates are React, so the Khmer `line-height: 1.75` rule applies naturally instead of fighting inlined email CSS. Ships receipt and invoice templates. |
-| **Voice capture** | **Nothing. Hand built** at `src/lib/voice/use-recorder.ts` (~90 lines), searched and rejected 29 August 2026 | This row used to say adopt `react-audio-voice-recorder` or equivalent. The search was done and nothing survived it. AI Elements, which this row said to check first, ships 30 components and **not one touches `getUserMedia` or `MediaRecorder`**, so there is no voice component there at all. On npm, `react-audio-voice-recorder` has not been published since September 2023 and depends on `@ffmpeg/ffmpeg`, a WASM build in the bundle; `react-media-recorder` is maintained but pulls the `extendable-media-recorder` plus wav-encoder worklet chain; `use-audio-recorder` is a 2022 stub. All three exist to transcode, and we want the browser's own Opus in webm and nothing else. The hook owns only the fiddly part: permission states, elapsed time, a duration cap, releasing the microphone, and refusing `audio/mp4` (CLAUDE.md records it being silently ignored, and Safari's MediaRecorder reaches for it first). |
-| **Subdomain routing** | Read `vercel/platforms`, copy the pattern, install nothing | Its `proxy.ts` handles subdomain extraction across local, preview and production hosts, which is the part that wastes a day. The rest of the kit is a blog CMS on its own schema and would fight the existing 16 tables. Its Vercel Domains API usage becomes relevant later for custom domains. |
-| **Invoice document** | Steal the markup from `invoify` or a Postmark receipt template | Render as a Next route with a print stylesheet. Browser makes the PDF. No PDF library in the serverless bundle. |
+| **Voice capture** | Select and install a complete Beautiful UI recorder when the voice surface is in scope | Browser `MediaRecorder`/`getUserMedia` can remain an integration seam, but it is not permission to invent a visual recorder. If no library component meets the interaction and accessibility requirements, pause and report the missing fit. |
+| **Subdomain routing** | Read `vercel/platforms`, copy the pattern, install nothing | Its `proxy.ts` handles subdomain extraction across local, preview and production hosts. The rest of the kit is a blog CMS on its own schema and would fight the existing 16 tables. Its Vercel Domains API usage becomes relevant later for custom domains. |
+| **Invoice document** | Use the markup pattern from `invoify` or a Postmark receipt template as the source | Render as a Next route with a print stylesheet. Browser makes the PDF. No PDF library in the serverless bundle. |
 | **Observability** | **PostHog only** | Free tier is 100k errors and 5k session recordings against Sentry's 5k and 50, and it bundles product analytics and feature flags. For a program application, evidence of usage (shops onboarded, bookings completed, onboarding funnel) is worth more than stack traces. One script, one vendor. Add Sentry later only if error volume justifies it. |
-| **Structural UI shells** | shadcn blocks (sidebar, dashboard shells), Origin UI | They install as source and get restyled, which is already the project's rule. |
+| **Structural UI shells** | Beautiful UI first; shadcn blocks or Origin UI when a complete Beautiful UI shell is unavailable | Install or copy the selected source and use its documented theme hooks. Do not hand-redraw or substantially rewrite a library shell. |
 
 ### Reject, with the reason recorded so it is not revisited
 
 | Candidate | Verdict |
 |---|---|
-| **Cal.com / cal.diy** | Wrong model, not just heavy. Cal.com does *personal* scheduling: one person, calendar sync, event types. Moni does *resource occupancy*: three chairs, twelve hotel rooms, two repair bays, with a database-level exclusion constraint preventing double-booking. That is a different and, here, better model. `agent/slots.ts` (121 lines) already computes free slots correctly. Adopting Cal.com means running a second schema and syncing it. Also relevant: Cal.com went closed-source in April 2026; only the MIT fork `cal.diy` remains, with Teams and Workflows dropped. |
-| **FullCalendar** | Its core is MIT but **resource timeline is a paid plugin**, and resource lanes are exactly what a salon calendar is. Evaluate **schedule-x** (fully MIT) for resource views first; if it lacks them, hand-build, because UI-PLAN.md already specs roughly 150 lines of CSS grid and it needs Khmer line height and `formatMoney()` anyway. |
-| **SaaS boilerplates** (`ixartz/SaaS-Boilerplate`, Next.js SaaS Starter, Open SaaS) | If the repo were empty, `ixartz` would be the right answer: MIT, Next 16, Clerk, Drizzle, Tailwind v4, multi-tenancy, Playwright, CI. The repo is not empty, and its domain schema is better than any boilerplate's. Adopting one means porting a good schema into someone else's conventions. **Mine it for three things only:** the Clerk-plus-Drizzle wiring, the tenant resolution pattern, and the Playwright and CI setup. |
-| **next-intl** | Two independent reasons. It requires a `[locale]` route segment, which restructures every route and fights the subdomain rewrite. And CLAUDE.md documents that Node and Chrome disagree on `km-KH` number separators, a hydration mismatch on every money string; next-intl's formatter walks straight back into it. Use a plain `messages/{km,en}.ts` dictionary, keep money in the existing `formatMoney()` and `toKhmerDigits`. Khmer has no plural forms, so ICU pluralization buys nothing. Roughly twenty lines beats a library here. |
+| **Cal.com / cal.diy** | Wrong model, not just heavy. Cal.com does *personal* scheduling: one person, calendar sync, event types. Moni does *resource occupancy*: three chairs, twelve hotel rooms, two repair bays, with a database-level exclusion constraint preventing double-booking. The existing slot calculation already models the right domain. Adopting Cal.com means running a second schema and syncing it. |
+| **FullCalendar** | Not a complete fit for the required resource-lane interaction in the current showcase scope. |
+| **schedule-x** | The evaluated package did not provide a complete resource view. Do not hand-build a replacement. Re-evaluate Beautiful UI or another complete library component when the calendar phase begins; if none fits, pause and report. |
+| **SaaS boilerplates** (`ixartz/SaaS-Boilerplate`, Next.js SaaS Starter, Open SaaS) | The repo is not empty, and its domain schema is better than a boilerplate's. Mine these projects only for useful wiring, tenant-resolution, testing, and CI patterns; do not import their visual system into the homepage. |
+| **next-intl** | It requires a `[locale]` route segment that fights the subdomain rewrite, and its formatter does not solve the existing Khmer money-formatting constraint. Use the existing message dictionaries plus `formatMoney()` and `toKhmerDigits()`. |
 | **tweakcn presets** | PLAN.md section 3 specifies exact Apple semantic token names so a SwiftUI port is find-and-replace. A generated preset destroys that mapping. Hand-write the token block once. |
 | **Medusa / Saleor / Vendure** | Each is a full backend with its own database and admin. Products and orders for a shop with under fifty SKUs is two tables. |
 | **Prisma** | Heavier, worse on serverless, and a second migration system. |
-| **tRPC** | Breaks the API-first rule: a Swift client cannot consume it. oRPC is the honest upgrade later because it emits OpenAPI, but adopting it now is a refactor with no payoff inside nine weeks. |
+| **tRPC** | Breaks the API-first rule because a Swift client cannot consume it. Keep the existing JSON route contracts; revisit an OpenAPI-emitting option only as a separately approved architecture change. |
 | **A second database for customers** | One Postgres, `business_id` on every row. A second store doubles the failure surface, breaks every join, and invents a consistency problem that does not currently exist. |
 | **uploadthing / Vercel Blob** | Supabase Storage is already provisioned. One vendor. |
-| **Redis, a queue, a monorepo, Instagram, TikTok** | No payoff in the window. Instagram and TikTok each need their own app review, measured in weeks. |
+| **Redis, a queue, a monorepo, Instagram, TikTok** | Outside the current linear scope. Revisit only when the corresponding product need and external approvals are active. |
 | **AI-generated storefront markup** | The model fills a validated content object and never emits markup, so a bad generation is a bad string and never a white screen shipped to a real shop owner. |
 
 ### The KHQR question specifically
@@ -129,6 +141,26 @@ actively maintained) exists, so **write one test that generates the same payload
 asserts they match**. If the TLV encoding or CRC diverges, one of them is wrong, and you want to
 find that out before a customer scans a bad QR, not after. That is a test, not a dependency. Add
 `qrcode` only for rendering the payload to an image.
+
+
+### Adoption note, 30 August 2026 (Phase 8)
+
+The row above originally said adopt `drizzle-orm` plus `postgres` and rewrite the
+data layer. What shipped is the `postgres` half, **only where it is needed**:
+`src/lib/orders/` takes a two-method `Tx` interface, and every other read still
+goes through `src/lib/db.ts` and PostgREST.
+
+Two reasons, and they are the reasons this row exists at all. Stock decrement and
+gapless per-business invoice numbering are precisely the operations PostgREST
+cannot express, and they now run inside one real transaction. And a thin `Tx`
+seam lets `db/test.mjs` run the REAL order code against PGlite, which is the same
+Postgres engine, so "all or nothing" is asserted rather than asserted about: the
+oversell, the repeated line, the cross-tenant product and the duplicate invoice
+number are all proved against real row locks.
+
+Drizzle sits on this exact driver, so adding its query builder later changes no
+connection string and no SQL. `prepare: false` is set, per the warning recorded
+above.
 
 ---
 
@@ -144,7 +176,8 @@ The fix is one authenticated endpoint `POST /api/cron/tick` plus an external fre
 one endpoint, no platform lock-in, works on Hobby, and it is an HTTP endpoint so it fits the
 API-first rule. Inngest is the upgrade if workflows ever get genuinely multi-step.
 
-**Booking reminders are a Tier 1 feature in FEATURES.md and absent from PLAN.md.** They are also
+**Booking reminders are a Tier 1 feature in the archived feature research and absent from the
+current homepage scope.** They are also
 the highest-value retention feature for a Cambodian salon, because no-shows are the real cost.
 The cron endpoint above is the whole implementation.
 
@@ -156,17 +189,16 @@ existing `stepCountIs` guard.
 **Webhook abuse.** `/api/webhooks/telegram/[connectionId]` is a public URL. It needs the
 per-connection secret check (already planned), plus a rate limit per chat id and a body size cap.
 
-**Backups do not exist on the free tier.** Until the Pro upgrade in demo week, add a weekly
-`pg_dump` to the same cron endpoint, writing to Supabase Storage. Real shops will be entering real
-data from week 5.
+**Backups do not exist on the free tier.** Until the Pro upgrade, add a recurring
+`pg_dump` to the same cron endpoint, writing to Supabase Storage before real-shop data is used.
 
 **Privacy policy and terms pages gate Meta app review.** They appear in PLAN.md Phase 1's footer
-and nowhere else. Messenger review cannot be submitted without them, and review is the long pole,
-so they ship in week 2, not week 8.
+and nowhere else. Messenger review cannot be submitted without them, so keep them in the homepage
+surface before any review submission.
 
 **Owner notifications.** When a conversation escalates to `needs_owner`, the owner needs to know
-within seconds. A Telegram message to the owner's own chat is roughly ten lines once the bot
-exists, and is worth more than most of the dashboard.
+within seconds. Route the notification through the existing Telegram integration once that phase
+is active.
 
 ---
 
@@ -196,7 +228,7 @@ clinic are `time`, cafe and pharmacy and print_shop are `both`, a shoe shop is `
 | `order_items` | order_id, product_id, service_id, booking_id, name_snapshot, unit_price_minor, qty, line_total_minor | `check (num_nonnulls(product_id, service_id) = 1)`. Name and price are **snapshotted** so editing a product never rewrites history. |
 | `invoices` | business_id, number, order_id, booking_id, issued_at, total_minor, currency, status, snapshot jsonb | `unique (business_id, number)`, allocated inside a transaction with `select coalesce(max(number),0)+1 ... for update`. This exact operation is what PostgREST cannot express, and is the clearest single proof of the Drizzle decision. |
 | `storefronts` | business_id PK, theme_id, tokens jsonb, content jsonb, draft jsonb, published_at | Draft and published separate, so the AI proposes without going live. |
-| `media` | business_id, storage_key, kind, width, height, alt | Supabase Storage keys. Reserved now, filled week 6. |
+| `media` | business_id, storage_key, kind, width, height, alt | Supabase Storage keys. Reserved for the storefront phase. |
 
 ### Altered
 
@@ -250,37 +282,32 @@ Each item maps to a failure already visible in the repository, not to a hypothet
 | G1 | `src/lib/env.ts`, a zod-parsed env object imported at the top of `db.ts` and `models.ts`. Throws at boot naming the missing key. | "Database configured wrong." A missing `SUPABASE_*` key currently surfaces as an opaque runtime failure. |
 | G2 | `npm run db:check`: `drizzle-kit pull` into a temp file, diff against the committed schema, exit 1 on drift. In CI. | `src/lib/database.types.ts` is hand-refreshed today and silently drifts from the live schema. That file is deleted. |
 | G3 | `customerTools()` and `ownerTools()` typed `satisfies Record<CustomerTool, Tool>`. | Real drift today: `types.ts` declares 9 customer tools but 6 exist; declares 12 owner tools but 14 exist, 5 of them undeclared. This makes that a compile error forever. |
-| G4 | `src/lib/api/contracts.ts`: one zod request and response pair per endpoint, plus a roughly 60-line `defineRoute()` and `callApi()`. No new dependency. | Route handlers and their callers agree only by convention today. Also produces the JSON contract the Swift client needs. |
-| G5 | `noUncheckedIndexedAccess: true` now, plus `tsc --noEmit` in CI and a pre-commit hook. | CLAUDE.md defers this to "after the demo". At 68 files it is a morning. After the demo it is a week. |
+| G4 | `src/lib/api/contracts.ts`: one zod request and response pair per endpoint, plus shared `defineRoute()` and `callApi()` helpers. No new dependency. | Route handlers and their callers agree only by convention today. Also produces the JSON contract the Swift client needs. |
+| G5 | Turn on `noUncheckedIndexedAccess` during the post-homepage hardening phase, with `tsc --noEmit` in CI. | The current homepage-first scope keeps the existing compiler setting stable; enabling it is a deliberate later migration, not an instruction for this session. |
 | G6 | `StorefrontContent` zod schema plus `sanityCheck()`, and the `satisfies` theme registry. | A bad generation can never render a broken page to a real shop owner. |
-| G7 | Extend `scripts/mvp-acceptance.mjs` (813 lines, already boots a server and asserts against the database) to cover order, invoice and storefront paths. | The best asset in the repo, and what makes the week 1 migration provably safe. |
+| G7 | Extend `scripts/mvp-acceptance.mjs` (already boots a server and asserts against the database) to cover order, invoice and storefront paths. | The best asset in the repo and the migration's safety net. |
 | G8 | `.github/workflows/ci.yml` running `tsc --noEmit`, `eslint`, `db:test`, `db:check`, `test:signals`. | There is no CI at all today. |
 | G9 | Per-business monthly AI spend ceiling, per-conversation cost cap, webhook rate limit and body cap. | Nothing currently bounds cost or webhook abuse. |
-| G10 | Weekly `pg_dump` to Supabase Storage via the cron endpoint, until the Pro upgrade. | Free tier has no backups, and real shop data starts arriving in week 5. |
+| G10 | Recurring `pg_dump` to Supabase Storage via the cron endpoint, until the Pro upgrade. | Free tier has no backups, so protect data before using real shops. |
 
 ---
 
-## 8. Sequencing
+## 8. Linear sequencing
 
-The booking spine is the part a real shop can use on day one. Storefront, orders and invoices are
-demo breadth. Finish the spine first, get real shops onto it in week 5, and build breadth while
-they generate real usage. Twelve real shops and four hundred real bookings beats any feature list
-in front of a shortlist panel.
+Work proceeds in this order. Finish the current item's acceptance check before starting the
+next item. Do not parallelize work, pull later scope forward, or add an ETA.
 
-| Week | Work | Acceptance |
+| Order | Work | Acceptance |
 |---|---|---|
-| 1 (Sep 1) | **Harness plus the fused migration.** G1, G2, G5, G8. Drizzle replaces supabase-js across `lib/queries/*`, `agent/tools.ts`, `agent/owner-tools.ts`, `agent/slots.ts`, `setup/persist.ts`, each function gaining a `businessId` argument in the same pass. G3 and G4 land here. New design tokens replace the Invitation palette in `globals.css`. | `db:test` and `test:mvp` both pass against rewritten queries. `sokha-beauty` appears nowhere. Tokens render light and dark. |
-| 2 (Sep 8) | **Clerk, the gate, the landing page.** `proxy.ts`, `requireMember()`, waitlist form, Resend confirmation via react-email, privacy and terms pages, PostHog. | A non-waitlisted email is refused. Two members cannot read each other's rows, tested at the database level. |
-| 3 (Sep 15) | **Onboarding and voice.** `/onboarding` composer on AI Elements, `useAudioRecorder` webm as an AI SDK `file` part, editable catalogue table, `ai_instructions`. `products` and `capabilities` ship in the schema here. | A fresh account reaches a saved shop with a working web chat in under three minutes, by voice alone. |
-| 4 (Sep 22) | **Telegram** via grammY, the full customer booking loop, owner escalation notifications, the cron endpoint and reminders. | A real phone books end to end while the owner does nothing. A reminder arrives 1 hour before. |
-| 5 (Sep 29) | **Dashboard, inbox, calendar, SSE.** Rebuilt in the new language. **First real shops onboarded.** | A Telegram booking appears on an open dashboard in under two seconds, right amount, right currency. |
-| 6 (Oct 6) | **Storefront.** Subdomain routing, four themes, AI content generation, draft and publish, media uploads. | Three different verticals produce three coherent live sites on their own subdomains. |
-| 7 (Oct 13) | **Money.** Implement `create_payment` and `check_payment`, wire `payments.ts`, the `ts-khqr` cross-check test, orders and stock, numbered invoices. | A customer pays by KHQR in Telegram, stock decrements atomically, a numbered invoice renders. |
-| 8 (Oct 20) | **Messenger and real usage.** Meta test-user flow, same inbox. Onboard to target shop count. Fix what real owners actually broke. | A test-user conversation books into the same inbox and calendar as Telegram. |
-| 9 (Oct 27) | **Supabase Pro, rehearsal, buffer.** | The demo runs three times without a save. |
-
-Weeks 8 and 9 carry the slack. If something slips, Messenger is cut first, because PLAN.md already
-records that Meta review gates public availability and not the demo.
+| 1 | Harness, security, and the target database migration. | Database tests, typecheck, lint, and schema checks pass. |
+| 2 | Clerk, the waitlist gate, and the public homepage. | A refused member is blocked, a permitted member reaches the app, and the homepage waitlist works in light mode. |
+| 3 | Onboarding and voice. | A fresh account reaches a saved shop with a working web chat by voice or text. |
+| 4 | Telegram and the complete customer booking loop. | A real phone can book while the owner does nothing. |
+| 5 | Owner dashboard, inbox, calendar, and SSE. | A Telegram booking appears on the open dashboard without refresh. |
+| 6 | Hosted shop site. | A shop can publish a coherent catalogue and booking or order action. |
+| 7 | Payments, orders, stock, and invoices. | A KHQR payment, atomic stock update, and numbered invoice complete end to end. |
+| 8 | Messenger and real usage. | Messenger and Telegram conversations land in the same inbox and calendar. |
+| 9 | Operations, backup, and rehearsal. | The full acceptance run completes without a save. |
 
 ---
 
@@ -289,7 +316,7 @@ records that Meta review gates public availability and not the demo.
 **Later, when building:** `src/lib/env.ts`, `src/lib/db/{schema,client}.ts`,
 `src/lib/api/contracts.ts`, `src/lib/auth/require-member.ts`, `src/lib/storefront/content.ts`,
 `src/themes/registry.ts`, `proxy.ts`, `drizzle.config.ts`, `.github/workflows/ci.yml`,
-`src/app/(marketing)/`, `src/app/s/[slug]/`, `src/app/onboarding/`,
+`src/app/(marketing)/`, `src/app/s/[slug]/`, `src/app/app/onboarding/`,
 `src/app/api/webhooks/telegram/[connectionId]/`, `src/app/api/stream/[businessId]/`,
 `src/app/api/cron/tick/`.
 
@@ -308,13 +335,16 @@ Nothing is called done until all five pass:
 1. `npm run db:test` on PGlite, extended from 97 assertions to cover orders, invoice number
    allocation under concurrency, and the `order_items` single-reference constraint.
 2. `npm run db:check` for schema drift.
-3. `tsc --noEmit` with `noUncheckedIndexedAccess` on, plus `eslint`.
-4. `npm run test:mvp` against a booted server and the live database, extended each week.
+3. `tsc --noEmit` with the current compiler settings, plus `eslint`. The
+   `noUncheckedIndexedAccess` migration is a later hardening task, not a homepage gate.
+4. `npm run test:mvp` against a booted server and the live database, extended as each accepted
+   feature is added.
 5. `npm run shoot` at desktop and mobile widths, viewport shot included, per the `fullPage` and
    Chrome 500px clamp gotchas already recorded in CLAUDE.md.
 
-Two manual checks no script covers, weekly from week 4: a real phone completing a Telegram booking
-in Khmer, and a real shop owner completing onboarding by voice without being told what to say.
+Two manual checks no script covers: a real phone completing a Telegram booking in Khmer, and a real
+shop owner completing onboarding by voice without being told what to say. Run them when the related
+phase is active.
 
 ---
 
@@ -327,12 +357,12 @@ in Khmer, and a real shop owner completing onboarding by voice without being tol
 - [vercel/ai-elements](https://github.com/vercel/ai-elements), [AI Elements announcement](https://vercel.com/changelog/introducing-ai-elements)
 - [grammY](https://grammy.dev/guide/), [grammY long polling vs webhooks](https://grammy.dev/guide/deployment-types)
 - [ts-khqr](https://www.npmjs.com/package/ts-khqr), [bakong-khqr](https://www.npmjs.com/package/bakong-khqr)
-- [schedule-x](https://github.com/schedule-x/schedule-x), [FullCalendar licensing](https://fullcalendar.io/license)
+- [schedule-x](https://github.com/schedule-x/schedule-x), [FullCalendar](https://fullcalendar.io/)
 - [Vercel limits](https://vercel.com/docs/limits), [Vercel cron jobs changelog](https://vercel.com/changelog/cron-jobs-now-support-100-per-project-on-every-plan)
 - [ixartz/SaaS-Boilerplate](https://github.com/ixartz/SaaS-Boilerplate), [invoify](https://github.com/al1abb/invoify)
 - [next-intl App Router setup](https://next-intl.dev/docs/getting-started/app-router)
 - [PostHog vs Sentry](https://posthog.com/blog/posthog-vs-sentry)
 - [react-audio-voice-recorder](https://www.npmjs.com/package/react-audio-voice-recorder)
-- Cal.com licence change and the `cal.diy` MIT fork: [self-hosted Calendly alternatives, 2026](https://pinggy.io/blog/self_hosted_calendly_alternatives/)
-- [Beautiful UI](https://www.beautifului.dev/) AI-native interaction patterns and its [MIT source repository](https://github.com/Kainiko943/beautiful-ui)
-- [Velora UI](https://github.com/ColorlibHQ/velora-ui) MIT shadcn registry and [component catalog](https://velora.colorlib.com/components)
+- Cal.com and `cal.diy`: [self-hosted Calendly alternatives, 2026](https://pinggy.io/blog/self_hosted_calendly_alternatives/)
+- [Beautiful UI](https://www.beautifului.dev/) AI-native interaction patterns and its [source repository](https://github.com/Kainiko943/beautiful-ui)
+- [Velora UI](https://github.com/ColorlibHQ/velora-ui) shadcn registry and [component catalog](https://velora.colorlib.com/components)

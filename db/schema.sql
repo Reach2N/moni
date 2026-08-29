@@ -342,6 +342,77 @@ create table if not exists events (
 comment on table events is 'Append-only: who did what, before and after. Doubles as the agent''s memory of its own actions and as the owner''s undo history. Never UPDATE or DELETE here.';
 create index if not exists events_biz_time on events (business_id, created_at desc);
 
+-- ═══════════════════════════════════════════════════════ products and orders
+-- A shop with under fifty SKUs is two tables. Bookings and orders are separate
+-- on purpose: a booking occupies a resource for a range, an order does not.
+
+create table if not exists products (
+  id           uuid primary key default gen_random_uuid(),
+  business_id  uuid not null references businesses(id) on delete cascade,
+  name         text not null,
+  name_en      text,
+  description  text,
+  price_minor  integer not null,
+  currency     text not null default 'KHR',
+  stock        integer,
+  active       boolean not null default true,
+  sort_order   integer not null default 0,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  constraint products_price_nonneg check (price_minor >= 0),
+  constraint products_stock_nonneg check (stock is null or stock >= 0)
+);
+comment on column products.stock is 'NULL means this product is not stock counted, which is different from zero. A kitchen does not count soup.';
+create index if not exists products_business on products (business_id) where active;
+
+create table if not exists orders (
+  id           uuid primary key default gen_random_uuid(),
+  business_id  uuid not null references businesses(id) on delete cascade,
+  customer_id  uuid references customers(id) on delete set null,
+  code         text not null default upper(substr(encode(gen_random_bytes(4), 'hex'), 1, 6)),
+  status       text not null default 'pending',
+  channel      text not null default 'telegram',
+  total_minor  integer not null default 0,
+  currency     text not null default 'KHR',
+  note         text,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  constraint orders_status_ok check (status in ('pending','confirmed','fulfilled','cancelled')),
+  constraint orders_total_nonneg check (total_minor >= 0),
+  unique (business_id, code)
+);
+create index if not exists orders_business_created on orders (business_id, created_at desc);
+
+create table if not exists order_items (
+  id               uuid primary key default gen_random_uuid(),
+  order_id         uuid not null references orders(id) on delete cascade,
+  product_id       uuid references products(id) on delete set null,
+  name             text not null,
+  unit_price_minor integer not null,
+  quantity         integer not null,
+  line_total_minor integer not null,
+  constraint order_items_qty_positive check (quantity > 0),
+  constraint order_items_price_nonneg check (unit_price_minor >= 0),
+  constraint order_items_total_ok check (line_total_minor = unit_price_minor * quantity)
+);
+comment on table order_items is 'Name and unit price are COPIED at the time of sale. A product renamed or repriced next month must not rewrite what a customer already bought.';
+comment on constraint order_items_total_ok on order_items is 'The line total cannot disagree with its own parts. Arithmetic is not a thing to trust application code with.';
+create index if not exists order_items_order on order_items (order_id);
+
+create table if not exists invoices (
+  id           uuid primary key default gen_random_uuid(),
+  business_id  uuid not null references businesses(id) on delete cascade,
+  order_id     uuid references orders(id) on delete set null,
+  booking_id   uuid references bookings(id) on delete set null,
+  number       integer not null,
+  total_minor  integer not null,
+  currency     text not null default 'KHR',
+  issued_at    timestamptz not null default now(),
+  unique (business_id, number)
+);
+comment on table invoices is 'Numbers are per business and gapless. Allocated with select coalesce(max(number),0)+1 ... for update inside the same transaction that inserts the row, which is the operation PostgREST cannot express.';
+comment on constraint invoices_business_id_number_key on invoices is 'The unique index is the last line of defence: if two transactions ever raced past the row lock, one of them fails here rather than two customers holding invoice 41.';
+
 -- ═══════════════════════════════════════════ platform tables (ours, not the tenant's)
 -- The owner's data above is exportable and theirs. These two are operations data:
 -- when RLS lands they get NO member policy, service-role access only.
@@ -402,6 +473,10 @@ create index if not exists webhook_events_pending
 -- Clerk: they are new, the landing page feeds waitlist from the public
 -- internet, and only the service role has any business reading them. RLS on
 -- with no policy means exactly that.
+alter table products       enable row level security;
+alter table orders         enable row level security;
+alter table order_items    enable row level security;
+alter table invoices       enable row level security;
 alter table storefronts    enable row level security;
 alter table waitlist       enable row level security;
 alter table webhook_events enable row level security;
@@ -426,6 +501,12 @@ create trigger bookings_touch before update on bookings
   for each row execute function moni_touch();
 drop trigger if exists payments_touch on payments;
 create trigger payments_touch before update on payments
+  for each row execute function moni_touch();
+drop trigger if exists products_touch on products;
+create trigger products_touch before update on products
+  for each row execute function moni_touch();
+drop trigger if exists orders_touch on orders;
+create trigger orders_touch before update on orders
   for each row execute function moni_touch();
 drop trigger if exists storefronts_touch on storefronts;
 create trigger storefronts_touch before update on storefronts

@@ -550,3 +550,74 @@ export type Storefront = {
   created_at: string
   updated_at: string
 }
+
+// ─────────────────────────────────────────────── products, orders, invoices
+// A shop with under fifty SKUs is two tables, which is why ARCHITECTURE.md
+// rejects Medusa, Saleor and Vendure: each is a full backend with its own
+// database and admin, to solve a problem this size.
+
+export const ORDER_STATUSES = ['pending', 'confirmed', 'fulfilled', 'cancelled'] as const
+export type OrderStatus = (typeof ORDER_STATUSES)[number]
+
+export type Product = {
+  id: string
+  business_id: string
+  name: string
+  name_en: string | null
+  description: string | null
+  price_minor: number
+  currency: CurrencyCode
+  /** NULL means "we do not count this one", not "none left". */
+  stock: number | null
+  active: boolean
+  sort_order: number
+}
+
+export type OrderItem = {
+  id: string
+  order_id: string
+  product_id: string | null
+  /** Copied at the time of sale. A product renamed or repriced later must not rewrite history. */
+  name: string
+  unit_price_minor: number
+  quantity: number
+  line_total_minor: number
+}
+
+export type Order = {
+  id: string
+  business_id: string
+  customer_id: string | null
+  code: string
+  status: OrderStatus
+  channel: Channel | string
+  total_minor: number
+  currency: CurrencyCode
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Invoice numbers are per business and gapless, which is a legal expectation in
+ * most places and an accounting one everywhere. That is why they are allocated
+ * with `select coalesce(max(number),0)+1 ... for update` INSIDE the same
+ * transaction that writes the row: two customers checking out in the same second
+ * must not receive the same number, and PostgREST cannot express it, which is
+ * the whole reason this project keeps a real Postgres driver.
+ */
+export type Invoice = {
+  id: string
+  business_id: string
+  order_id: string | null
+  booking_id: string | null
+  number: number
+  total_minor: number
+  currency: CurrencyCode
+  issued_at: string
+}
+
+/** Human quotable, unambiguous, and never confusable with a booking code. */
+export function invoiceLabel(businessSlug: string, number: number): string {
+  return `${businessSlug.slice(0, 6).toUpperCase()}-${String(number).padStart(4, '0')}`
+}

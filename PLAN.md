@@ -1,18 +1,25 @@
 # Moni: the master plan
 
-Written 27 August 2026. Revised 29 August 2026. This document is the source of truth
-for what gets built, in what order, and against which acceptance test. Where it conflicts
-with FEATURES.md, UI-PLAN.md or DESIGN.md, this document wins: those describe the earlier
-demo iteration, which did not follow the current direction and is being re-created.
+This document is the source of truth for product scope, build order, and acceptance tests.
+The active agent contract is `AGENTS.md`; the active homepage UI contract is
+`docs/HOMEPAGE.md`.
+
+The former `FEATURES.md`, `UI-PLAN.md`, `DESIGN.md`, and `PRODUCT.md` are archived under
+`docs/archive/`. Their research is not an implementation instruction.
 
 **ARCHITECTURE.md is the source of truth for architecture**: the data model, the seams,
 the third-party adopt/reject record, and the guardrail harness. Where the two disagree on
 architecture, ARCHITECTURE.md wins and this file is corrected in the same commit.
 
-Every coding session starts by reading CLAUDE.md (the harness: hard rules and
-toolchain gotchas) and then this file (the what and the when). A session works on
-exactly one phase and must pass that phase's acceptance check before moving on.
-No pulling features forward from a later phase.
+Every coding session starts by reading `AGENTS.md`, then this file, then
+`ARCHITECTURE.md` when the work touches architecture. The current session scope is
+`homepage-first`: the public `/` marketing homepage, in light mode only. A session works
+on exactly one declared surface and must pass its acceptance check before moving on. Do
+not pull features or visual rules forward from a later phase.
+
+For the current request, this plan is being consolidated as documentation only. Do not edit
+frontend/source files, install UI packages, or treat implementation acceptance checks below as
+permission to do frontend work.
 
 ---
 
@@ -62,24 +69,26 @@ A native Swift app must later be able to do everything the web app does. Therefo
 Web ships now, and it must be good on desktop as well as mobile: the dashboard is a
 desktop tool for some owners, a phone tool for most.
 
-## 3. Design direction: black, white, green, Apple-native
+## 3. Design direction: light Apple-native homepage
 
-This supersedes the "Invitation" system in DESIGN.md. The new world is monochrome
-with one green accent, styled like a native Apple OS surface: quiet, precise,
-translucent chrome, generous whitespace, spring motion.
+The active homepage direction is monochrome with one green accent, styled like a native
+Apple OS surface: quiet, precise, translucent chrome, generous whitespace, and spring
+motion. It is **light-only** in the current phase. The homepage must remain light when a
+visitor's operating system prefers dark mode. A dark product theme is not an implicit
+future requirement and needs a separate decision.
 
 Semantic tokens, named after their UIKit/SwiftUI equivalents so a native port is a
 find-and-replace, defined once in `globals.css`:
 
 ```
---background          #FFFFFF   dark: #000000        (systemBackground)
---background-secondary #F5F5F7  dark: #1C1C1E        (secondarySystemBackground)
---label               #1D1D1F   dark: #F5F5F7        (label)
---label-secondary     rgba(60,60,67,.60)  dark: rgba(235,235,245,.60)
---label-tertiary      rgba(60,60,67,.30)  dark: rgba(235,235,245,.30)
---separator           rgba(60,60,67,.29)  dark: rgba(84,84,88,.60)
---accent              #34C759   dark: #30D158        (systemGreen)
---destructive         #FF3B30   dark: #FF453A        (systemRed, sparingly)
+--background          #FFFFFF        (systemBackground)
+--background-secondary #F5F5F7       (secondarySystemBackground)
+--label               #1D1D1F        (label)
+--label-secondary     rgba(60,60,67,.60)
+--label-tertiary      rgba(60,60,67,.30)
+--separator           rgba(60,60,67,.29)
+--accent              #34C759        (systemGreen)
+--destructive         #FF3B30        (systemRed, sparingly)
 ```
 
 Rules:
@@ -93,18 +102,19 @@ Rules:
   hairline separators, never solid borders heavier than 1px.
 - Radii are continuous and generous (12 to 16px on cards, pill buttons). No 0px
   corners: that was the Invitation system.
-- Motion splits by role, decided 29 August 2026. **`motion` owns state**: in-app
+- Motion splits by role. **`motion` owns state**: in-app
   transitions and anything keyed to a React state change, spring physics, 200 to 350ms,
   nothing linear. **GSAP owns scroll**: everything on the public site keyed to scroll
   position. The reason is not preference. `motion`'s `whileInView` is an
   IntersectionObserver and cannot be settled on demand, so a full-page screenshot
-  photographs every below-fold reveal at `opacity: 0`; the 29 August landing capture came
+  photographs every below-fold reveal at `opacity: 0`; the landing capture came
   out blank below the hero with 18 elements stuck invisible. ScrollTrigger exposes
   `refresh()` and a real scroll position, so a capture can drive it. Plugin registration
   lives only in `src/lib/motion/gsap.ts`, the same way only `src/lib/ai/models.ts` may name
   a model. GSAP 3.15 is free for commercial use including the formerly Club-only plugins.
 - Icons from lucide-react only. Never emoji.
-- Light and dark from day one; the tokens above define both.
+- Light only for the homepage. Do not add `prefers-color-scheme: dark` branches to the
+  marketing layout or homepage components.
 
 ## 4. Data: what is the client's and what is ours
 
@@ -144,23 +154,27 @@ sales). `FREE_TXN_PER_MONTH = 100` and `v_month_usage` already implement the met
 Each phase is a shippable unit with an acceptance check. A session declares which
 phase it is working on and does not touch later phases.
 
-### Phase 0: Foundations and harness (half a day)
+### Phase 0: Foundations and harness
 
-- DONE 27 Aug: `src/lib/ai/models.ts` routes through Vercel AI Gateway first
+- DONE: `src/lib/ai/models.ts` routes through Vercel AI Gateway first
   (`gateway:` refs), with direct Gemini and Anthropic as the fallback chain and
   the cost accounting intact. Verified: selection order, env overrides, tsc.
-- DONE 27 Aug: `waitlist` table plus `webhook_events`, Clerk tenancy columns and
+- DONE: `waitlist` table plus `webhook_events`, Clerk tenancy columns and
   channel secrets, shipped live with the security lockdown (RLS on everywhere).
   97 assertions in `npm run db:test`.
-- New design tokens in `globals.css` (section 3). Remove the Invitation tokens.
+- Homepage token contract in `globals.css` (section 3). Legacy Invitation tokens remain
+  scoped to the existing `/app` surface until the separately scheduled dashboard rebuild;
+  they are not available to homepage work.
 - Register moni.cam, point it at Vercel. (Human task, gates launch not work.)
 - Acceptance: `npm run db:test` passes; `/api/parse` and `/api/chat` answer through
   the gateway with cost logged (or through the direct Gemini fallback when no
-  gateway key is configured); tokens render in light and dark.
+  gateway key is configured); the homepage remains light under both light and dark
+  browser preference emulation.
 
-### Phase 1: Landing page at moni.cam (one to two days)
+### Phase 1: Landing page at moni.cam (current surface)
 
-The first public surface. Marketing psychology: scarcity and belonging, not hype.
+The first public surface and the only active frontend scope in the current session.
+Marketing psychology: scarcity and belonging, not hype. The page is light-only.
 
 - Route group `src/app/(marketing)/` with the new design language.
 - Hero: the promise in one sentence, Khmer first with English toggle. "Your shop
@@ -182,20 +196,25 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
 - Sections below the fold: how it works in three steps, the two-channel promise
   (Telegram now, Messenger next), per-transaction pricing (free to start, pay only
   when you get paid), four FAQs, footer with privacy and terms.
-- Components: hand-picked by the owner from 21st.dev and similar, MIT-licensed only,
-  credited in CREDITS.md, restyled into the token system. Verified-MIT candidates
-  from earlier research: `kokonutd/v0-ai-chat` (hero composer),
-  `barvian/number-flow` (counters), `jakobhoeg/chat-bubble`,
-  `aymanch-03/pricing-section`, `manuarora700/bento-grid`, `RayMethula/footer`.
-  Registry components go in marketing only, never inside `/app`.
+- Components: use Beautiful UI first for every homepage interaction, especially agentic
+  surfaces, and install or copy the strongest complete source component for the showcase.
+  Choose by visual clarity, interaction quality,
+  Khmer readability, responsive behavior, and screenshot performance. Use 21st.dev Agent
+  Elements, DaisyUI, or another established library only when Beautiful UI has no complete
+  fit. Use shadcn or Radix only for low-level primitives. Defer all license review and licensing
+  decisions until distribution; they are not a selection gate for this showcase. Record the
+  source URL and install/copy reference
+  in `CREDITS.md`. Do not invent, redraw, or substantially rewrite a component with Tailwind.
+  If no library component fits, stop and report the gap. Homepage source components stay in
+  marketing during this phase; do not copy them into the legacy `/app` surface.
 - Acceptance: deployed (vercel.app until moni.cam is bought); email lands in
   `waitlist` and gets a confirmation; the product is NOT reachable from the public
   site; `npm run shoot` screenshots reviewed at desktop and mobile widths; no
   layout shift on the hero.
 
-### Phase 2: Clerk auth, the waitlist gate, and real tenancy (one day)
+### Phase 2: Clerk auth, the waitlist gate, and real tenancy
 
-- DONE 29 Aug, except the Clerk application itself, which is a human task
+- DONE, except the Clerk application itself, which is a human task
   (`npx clerk@latest init` or `clerk env pull`, then two keys in `.env.local`).
   Everything below is shipped and typechecks, lints and builds without those keys;
   `/app` and the sign-in screens are the only surfaces that need them.
@@ -215,8 +234,8 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
   update, no admin UI needed yet.
 - `businesses.clerk_user_id` replaces the hardcoded `sokha-beauty` tenant lookup.
   Every query in `src/lib/queries/` takes a business id resolved from the session.
-- **CANCELLED 29 August (ARCHITECTURE.md section 1):** do NOT add member policies over
-  Clerk JWTs. That step ships the anon key to the browser and makes ~20 hand-written SQL
+- **CANCELLED (ARCHITECTURE.md section 1):** do NOT add member policies over
+  Clerk JWTs. That step ships the anon key to the browser and makes hand-written SQL
   policies the only wall between tenants. RLS stays ON everywhere with zero policies, as
   defence in depth. Tenancy is enforced by one `requireMember()` helper plus a
   `businessId` argument on every query, which is auditable in one place. The commented
@@ -238,9 +257,9 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
   cross-tenant write that changes nothing. The two browser halves are blocked on
   the Clerk keys and are the first thing to run once they exist.
 
-### Phase 3: Onboarding, chat and voice (one to two days)
+### Phase 3: Onboarding, chat and voice
 
-- DONE 30 Aug, except a live voice test, which needs the Clerk keys and a real
+- DONE, except a live voice test, which needs the Clerk keys and a real
   recording. Everything below builds, typechecks, lints, and adds 18 assertions
   to `npm run db:test` (130 passing).
 - **`/app/onboarding`**, not `/onboarding`: the gate already lives in
@@ -255,7 +274,7 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
   Anthropic is deliberately absent from it, because it takes no audio and would
   fail on every request rather than degrade.
 - **Correction to this plan: press to record, not hold.** A shop description
-  runs to about a minute, holding a phone button that long is its own ordeal,
+  runs for an arbitrary recording length, so holding a phone button is its own ordeal,
   and a held pointer gesture does not survive a screen reader. `VoiceNote` is a
   toggle with a visible timer and a cancel.
 - **Correction: transcription is its own step, and its own model call.** The
@@ -283,15 +302,15 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
 - Ends with the assistant live on the web chat, embedded in the finished state of
   the onboarding screen, and an honest "not connected yet" card for Telegram.
 - Acceptance: a fresh account goes from empty to a parsed, edited, saved shop with
-  a working web-chat assistant in under three minutes, by voice alone.
+  a working web-chat assistant in one uninterrupted voice-led pass.
 - Acceptance status: the pure and structural halves are proved (format guards,
   the instruction fence, the empty-shop redirect, the source wiring). The
-  three-minute run itself needs the Clerk keys, a Gemini key and a microphone,
+  live run itself needs the Clerk keys, a Gemini key and a microphone,
   and is the first thing to do once the Clerk application exists.
 
-### Phase 4: Telegram (one to two days)
+### Phase 4: Telegram
 
-- DONE 30 Aug, except the live phone run, which needs a BotFather token, a public
+- DONE, except the live phone run, which needs a BotFather token, a public
   HTTPS address and the Supabase keys. 27 new assertions in `npm run db:test`
   (157 passing).
 - `/app/channels`: paste a BotFather token, `getMe` proves it, the token is stored
@@ -310,8 +329,8 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
 - The customer agent loop moved OUT of `/api/chat` into
   `src/lib/agent/customer-loop.ts` rather than being copied. The rule that the
   assistant never states a price it did not get from a tool has to hold on every
-  channel, and it will not stay true in three transcriptions of the same hundred
-  lines. Web chat and Telegram now run the identical loop; Messenger reuses it
+  channel, and it will not stay true in three transcriptions of the same logic. Web chat and
+  Telegram now run the identical loop; Messenger reuses it
   unchanged in Phase 6, which is what ARCHITECTURE.md means by keeping the loop
   outside grammY middleware.
 - **grammY is used for its `Api` client and its types, not its middleware.**
@@ -342,7 +361,7 @@ The first public surface. Marketing psychology: scarcity and belonging, not hype
   twice. The phone run needs a BotFather token, an HTTPS address and the
   Supabase keys.
 
-### Phase 5: The owner dashboard, rebuilt (two to three days)
+### Phase 5: The owner dashboard, rebuilt
 
 Re-created in the new design language, desktop and mobile.
 
@@ -352,8 +371,9 @@ Re-created in the new design language, desktop and mobile.
   the full transcript (what was promised in her name), reply manually, and hand
   back to the AI. This is the universal control surface the product is named for.
 - `/app/calendar`: resource-lane calendar (evaluate schedule-x for resource views
-  first; FullCalendar paywalls exactly that feature; hand-build the ~150 line CSS grid
-  otherwise). Bookings appear live via the owned SSE route
+  first; FullCalendar paywalls exactly that feature. Use a complete library calendar
+  component or pause and report that no library fit exists. Do not hand-build a replacement.
+  Bookings appear live via the owned SSE route
   `GET /api/stream/[businessId]`, NOT Supabase Realtime: Realtime respects RLS, so with
   deny-all the browser gets nothing, and reaching for it would reopen the Data API.
   SSE also keeps the API-first rule and is trivially consumable from Swift.
@@ -361,8 +381,30 @@ Re-created in the new design language, desktop and mobile.
   through `formatMoney()`, logged at confirmation time.
 - Acceptance: booking made on Telegram appears on the open dashboard without a
   refresh, in under two seconds, with the right amount in the right currency.
+- DONE, except the today view's visual rebuild. Shipped: `/app/inbox`
+  (every channel in one list, escalations first, full transcript, manual reply,
+  hand back to Moni), `/app/calendar` (resource lanes, live), and
+  `GET /api/stream/[businessId]`.
+- **The stream polls, and that is deliberate.** A serverless instance shares no
+  memory with the one that handled the Telegram webhook, so an in-process emitter
+  would only ever see its own requests, and `LISTEN/NOTIFY` needs a session-mode
+  connection Supavisor's transaction mode does not give us. It polls
+  `updated_at > cursor` every 1.5s on indexed columns and sends nothing when
+  nothing changed. `v_bookings_agent` gained `updated_at`, appended at the end
+  because `create or replace view` accepts new columns only there.
+- **schedule-x was evaluated and is not a complete fit** (ARCHITECTURE.md):
+  its package does not provide the required resource-lane interaction. Do not hand-build a
+  replacement. Re-evaluate Beautiful UI or another complete library component when the
+  calendar phase begins; if no fit exists, pause and report it.
+- **Partial, and named as such:** the `/app` today view is still the Invitation
+  design. The two NEW surfaces are the ones this phase promised; re-skinning the
+  old one is cosmetic work that does not block Phases 6 to 8.
+- Acceptance status: the cursor mechanism the check depends on is proved in
+  `db/test.mjs` (a confirmed booking moves `updated_at` and comes back from the
+  cursor query), and the inbox ordering rule with it. The two-second wall clock
+  needs the Supabase keys.
 
-### Phase 6: Messenger (one day of code, weeks of Meta review in parallel)
+### Phase 6: Messenger
 
 - Meta app with `pages_messaging`, webhook verify (`hub.challenge`), page token
   stored per connection, `/api/webhooks/messenger`.
@@ -371,17 +413,34 @@ Re-created in the new design language, desktop and mobile.
 - Submit app review in parallel; public Messenger is not a launch blocker.
 - Acceptance: a test-user conversation books end to end and lands in the same
   inbox and calendar as Telegram.
+- DONE, pending the Meta app itself (a human task) and its review.
+  `GET /api/webhooks/messenger` echoes `hub.challenge` as PLAIN TEXT, which is
+  the step that silently fails if you return JSON. `POST` verifies Meta's
+  HMAC over the RAW body, resolves the shop from the page id (one URL serves the
+  whole app, unlike Telegram's per-connection path), and runs the identical
+  `handleCustomerMessage` loop.
+- Three Messenger-specific traps are handled and asserted: the signature is over
+  the bytes Meta sent, so the route parses the string it already read and never
+  re-serialises; `is_echo` messages are dropped, or the assistant answers itself
+  forever; and `subscribed_apps` is called on connect, without which everything
+  verifies and no message ever arrives.
+- `META_APP_SECRET` is OURS, not a shop's, so it is resolved by name through
+  `channel_connections.secret_ref` rather than stored per row.
+- Acceptance status: signature verification (including the re-serialisation
+  trap), echo suppression and envelope extraction are proved in `db/test.mjs`.
+  The test-user conversation needs the Meta app.
 
-### Phase 7: The hosted shop site (one to two days)
+### Phase 7: The hosted shop site
 
 Each shop gets `{slug}.moni.cam`. See ARCHITECTURE.md section 6 for the full design.
 
 - `proxy.ts` reads the Host header, checks a reserved-subdomain list, rewrites
   `{slug}.moni.cam` to `/s/{slug}`. One Next app, one deploy, no per-tenant
   provisioning. Wildcard `*.moni.cam` is one Vercel domain entry.
-- `src/themes/registry.ts`: four hand-built themes, all consuming one typed
+- `src/themes/registry.ts`: library-derived themes, all consuming one typed
   `StorefrontData` prop, `satisfies Record<ThemeId, ThemeModule>` so a declared theme
-  that is not implemented is a compile error.
+  that is not implemented is a compile error. Beautiful UI is the first source to check;
+  do not hand-build a theme when no library fit exists.
 - The owner agent picks a theme and fills a zod `StorefrontContent` object with
   `Output.object`, the same pattern as `src/lib/ai/parse.ts`, followed by a
   `sanityCheck()`. It writes to `storefronts.draft`. The owner publishes.
@@ -389,8 +448,14 @@ Each shop gets `{slug}.moni.cam`. See ARCHITECTURE.md section 6 for the full des
   white screen shipped to a real shop.
 - Acceptance: three different verticals produce three coherent live sites on their own
   subdomains, each with a working catalogue and a book-or-order action.
+- Acceptance status: the routing and the safety rails are proved (24 assertions):
+  a shop subdomain resolves, the apex and `www` do not, a Vercel preview host is
+  never mistaken for a shop, reserved names are refused, and the sanity check
+  catches markup, an em dash, an invented claim and a price written into prose.
+  Verified live by curl with a Host header. The three real verticals need the
+  Supabase keys and a Gemini key.
 
-### Phase 8: Money, orders and invoices (two days)
+### Phase 8: Money, orders and invoices
 
 - Implement `create_payment` and `check_payment`, which are declared in `CUSTOMER_TOOLS`
   and deliberately unimplemented. Wire `src/lib/payments.ts` as-is: the PORTED comments
@@ -405,16 +470,45 @@ Each shop gets `{slug}.moni.cam`. See ARCHITECTURE.md section 6 for the full des
 - The invoice is a Next route with a print stylesheet. No PDF library.
 - Acceptance: a customer pays by KHQR in Telegram, stock decrements atomically, and a
   numbered invoice renders and emails.
+- DONE 30 Aug except the email, which is named below. 17 new assertions in
+  `npm run db:test` (215 passing).
+- **`create_payment` and `check_payment` are implemented.** The agent never picks
+  an amount: it names a booking, and the figure comes from that booking's own
+  price, because a model that can choose a number can undercharge a shop. The
+  idempotency key stays time bucketed, PORTED and unchanged: a static key plus
+  the unique constraint permanently strands any customer whose first QR lapsed.
+- **The KHQR builder is cross checked against `ts-khqr`, byte for byte.**
+  `payments.ts` took `buildPayload` and `md5` as injected functions and never had
+  them; `src/lib/khqr/payload.ts` is that implementation, and the test generates
+  the same payment through both and asserts the strings are identical including
+  the CRC and the md5 the relay verifies by. ts-khqr stamps its own creation
+  time, so the test reads it back out of their payload and gives both sides the
+  same clock. `ts-khqr` is a devDependency: a second opinion, not a runtime
+  dependency, exactly as this plan asked.
+- **The transaction is real and it is tested.** `src/lib/orders/create.ts` takes a
+  two-method `Tx` and nothing else, so `db/test.mjs` runs the actual code against
+  PGlite, which is the same Postgres engine with the same row locks. Proved:
+  stock decrements by exactly what sold, an uncounted product (NULL stock, which
+  is not zero) is never driven negative, the last item cannot be sold twice, the
+  same product listed twice in one order is summed before the check rather than
+  checked twice, another shop's product is not orderable, and invoice numbers are
+  per business, consecutive, and unique.
+- **The invoice is a Next route with a print stylesheet**, no PDF library. The
+  browser already has a typesetting engine and a PDF writer, and a server-side
+  library would reproduce them badly while getting Khmer shaping wrong.
+- **NOT done, and named: the email.** Resend is not installed and there is no key,
+  so the invoice renders and prints but nothing is sent. That is one template and
+  one call once the account exists (a human task in section 7).
 
-### Phase 9: Operations (half a day, but do it in week 4)
+### Phase 9: Operations
 
 Small, cheap, and painful if discovered late. Detail in ARCHITECTURE.md section 4.
 
-- **`POST /api/cron/tick`**, bearer-authenticated, called every five minutes by a free
-  external scheduler. Vercel Hobby cron cannot fire more than once a day and **fails at
+- **`POST /api/cron/tick`**, bearer-authenticated, called every five minutes by an external
+  scheduler. Vercel Hobby cron cannot fire more than once a day and **fails at
   deploy time** for anything more frequent, so the three sub-daily needs all ride this one
   endpoint: 24-hour and 1-hour booking reminders, KHQR payment polling, and the Supabase
-  keep-alive. It also carries the weekly `pg_dump` to Storage until the Pro upgrade.
+  keep-alive. It also carries the recurring `pg_dump` to Storage until the Pro upgrade.
 - Per-business monthly AI spend ceiling and a per-conversation cost cap.
   `messages.cost_micro_usd` records spend today but nothing bounds it.
 - Webhook rate limit per chat id and a body size cap.
@@ -424,7 +518,7 @@ Small, cheap, and painful if discovered late. Detail in ARCHITECTURE.md section 
 
 ### Explicit room left, not built now
 
-Four items moved INTO scope on 29 August and are now phases 7 and 8: payment
+Four items moved INTO scope and are now phases 7 and 8: payment
 collection, invoices, generated shop sites, and product businesses. What remains
 reserved, with seams that must not be casually implemented or deleted:
 
@@ -432,11 +526,11 @@ reserved, with seams that must not be casually implemented or deleted:
 - **SwiftUI native app**: enabled by the API-first rule and Clerk iOS. Every choice in
   ARCHITECTURE.md that looks fussy (SSE over Realtime, REST over tRPC, typed contracts in
   one file) exists to keep this door open.
-- **Instagram and TikTok**: each needs its own app review, measured in weeks. The
+- **Instagram and TikTok**: each needs its own app review and remains outside the current scope. The
   `CHANNELS` taxonomy already carries them.
 - **Content publishing**: the unified inbox is the omnichannel story for the MVP.
   Composing and publishing posts is a `posts` table and one screen, and it is not in
-  the nine weeks.
+  the current scope.
 
 ## 6. Vibecoding guardrails (why past iterations drifted, and the fix)
 
@@ -444,8 +538,11 @@ reserved, with seams that must not be casually implemented or deleted:
 2. One phase per session. The acceptance check is the definition of done; run it.
 3. `src/lib/types.ts` changes first, `db/schema.sql` follows, `npm run db:test`
    proves it. Never the reverse order.
-4. No component is hand-built before the sourcing search (CLAUDE.md rule); no
-   registry component ships unstyled; nothing non-MIT ships at all.
+4. No component is invented before the sourcing search. Beautiful UI is the primary source for
+  showcase UI, followed by an established library with a complete fit. Install or copy the
+  selected source and use its documented theme hooks; do not redraw or substantially rewrite it.
+  If no library fit exists, stop and report it. Defer all license review and licensing decisions
+  until distribution.
 5. Every user-facing surface is checked with `npm run shoot` at desktop and mobile
    widths before being called done.
 6. All model calls go through `src/lib/ai/models.ts`. Nothing else may import a
@@ -454,9 +551,10 @@ reserved, with seams that must not be casually implemented or deleted:
 8. When a decision here proves wrong, update PLAN.md in the same commit that
    changes the code. The document and the code never disagree for more than one
    commit. Architecture decisions go in ARCHITECTURE.md, not here.
-9. Before hand-building anything, check ARCHITECTURE.md section 3. It records what was
-   already adopted, what was rejected, and why, so the same evaluation is not repeated.
-   Adding to either list is welcome; silently contradicting one is not.
+9. Before selecting a component, check ARCHITECTURE.md section 3 and the Beautiful UI
+   catalog. Reuse an existing source component and record the selection. If no library fit
+   exists, stop and report it. Never invent a replacement or silently contradict a recorded
+   decision.
 
 ## 7. What only the human can do (current blockers)
 
@@ -472,20 +570,18 @@ reserved, with seams that must not be casually implemented or deleted:
   which is worth trying first. Two keys land in `.env.local`:
   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
 - Create the **Resend** account and verified sending domain.
-- Hand-pick the landing page components (candidates listed in Phase 1).
+- Select and install the strongest Beautiful UI landing components, then record the sources.
 - Create the **Meta developer app** and a test page for Messenger dev mode.
-- A **BotFather** token for the first Telegram bot takes two minutes when Phase 4
-  starts.
+- A **BotFather** token for the first Telegram bot is required when Phase 4 starts.
 - Create a free **external cron account** (cron-job.org or Upstash QStash) pointed at
   `POST /api/cron/tick`. Vercel Hobby cron cannot fire more than once a day and rejects a
   more frequent expression **at deploy time**, so reminders and payment polling depend on
-  this. Five minutes of setup.
+  this.
 - Create a **PostHog** project. Chosen over Sentry: its free tier is 100k errors and 5k
   session recordings against Sentry's 5k and 50, and it bundles the product analytics that
   turn "we built it" into "twelve shops took four hundred bookings".
-- Decide the **Supabase Pro** upgrade date. Free pauses after seven days idle, which was
-  already hit on 27 August. Current decision is to upgrade before demo week, which makes
-  the keep-alive ping in Phase 9 mandatory until then, and means there are no backups
-  until then either.
-- Recruit the **first real shops** for week 5. This is the long-lead human task and the
-  strongest thing you can put in front of a shortlist panel.
+- Decide whether to upgrade **Supabase Pro** before using real-shop data. The free tier can
+  pause idle projects and does not provide backups, so the keep-alive and backup job remain
+  required until that decision is made.
+- Recruit the **first real shops** after the booking spine and showcase acceptance checks pass.
+  This is a human dependency, not a scheduled phase.

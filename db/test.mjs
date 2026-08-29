@@ -25,6 +25,9 @@ import { scopedExternalId } from '../src/lib/agent/identity.ts'
 import { sortInbox } from '../src/lib/queries/inbox-order.ts'
 import { shopSlugFromHost } from '../src/lib/hosting/subdomain.ts'
 import { sanityCheck } from '../src/lib/ai/storefront-check.ts'
+import { buildKhqrPayload, crc16, amountField, khqrMd5 } from '../src/lib/khqr/payload.ts'
+import { createOrder, allocateInvoiceNumber, OrderError } from '../src/lib/orders/create.ts'
+import { KHQR, CURRENCY, TAG } from 'ts-khqr'
 import { THEMES } from '../src/lib/types.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
@@ -758,6 +761,108 @@ else no('publish', 'published_at was not set')
 // `satisfies Record<ThemeId, ThemeModule>`; this asserts the other direction,
 // that the registry is not quietly a different set.
 eq('four themes are declared', THEMES.length, 4)
+
+// ── 21. money: KHQR, stock and invoice numbers (PLAN.md Phase 8) ───────────
+console.log('\nKHQR payloads')
+// PLAN.md asks for exactly this: generate the same payment through payments.ts
+// and through ts-khqr and assert they match. A divergence in the TLV lengths or
+// the CRC means one of us is wrong, and you want to know on a laptop rather
+// than when a customer's banking app refuses to scan in a shop.
+const khqrConfig = { accountId: 'sokha@wing', merchantName: 'Sokha Beauty', merchantCity: 'Takeo' }
+const expiresAt = Date.now() + 300_000
+const reference = KHQR.generate({
+  tag: TAG.INDIVIDUAL, accountID: khqrConfig.accountId, merchantName: khqrConfig.merchantName,
+  merchantCity: khqrConfig.merchantCity, currency: CURRENCY.KHR, amount: 15000,
+  expirationTimestamp: expiresAt, additionalData: { billNumber: 'MN4K2P' },
+})
+if (reference.data?.qr) {
+  // ts-khqr stamps its own creation time, so read it back out and give both
+  // sides the same clock. Everything else, including the CRC, must be identical.
+  const marker = reference.data.qr.indexOf('9934') + 8
+  const createdAtMs = Number(reference.data.qr.slice(marker, marker + 13))
+  const ours = buildKhqrPayload(khqrConfig, {
+    amount_minor: 15000, currency: 'KHR', reference: 'MN4K2P', createdAtMs, expiresAtMs: expiresAt,
+  })
+  eq('our KHQR payload is byte for byte what ts-khqr produces', ours, reference.data.qr)
+  eq('and the md5 the relay verifies by agrees', khqrMd5(ours), reference.data.md5)
+} else {
+  no('KHQR cross check', `ts-khqr refused to generate: ${reference.status?.message}`)
+}
+// CRC-16/CCITT-FALSE over the payload INCLUDING the literal "6304". Pinned
+// against a known vector so a refactor of the bit loop cannot go quietly wrong.
+eq('the CRC is CCITT-FALSE, not one of the other five CRC-16s', crc16('123456789'), '29B1')
+eq('KHR has no decimals, so 15000 riel is 15000', amountField(15000, 'KHR'), '15000')
+eq('USD has two, so 1500 minor is 15', amountField(1500, 'USD'), '15')
+eq('and 1550 minor is 15.5, not 15.50', amountField(1550, 'USD'), '15.5')
+
+console.log('\nstock and invoice numbers, in one transaction')
+// PGlite is Postgres, so the REAL createOrder() runs here against a real engine
+// with real row locks. A mock would only agree with itself.
+const tx = { query: async (sql, params = []) => (await db.query(sql, params)).rows }
+await db.exec(`
+  insert into products (id, business_id, name, price_minor, currency, stock) values
+   ('e0000000-0000-4000-8000-000000000001','${B_SALON}','ប្រេងលាបសក់', 12000, 'KHR', 3),
+   ('e0000000-0000-4000-8000-000000000002','${B_SALON}','សិតសក់', 5000, 'KHR', null),
+   ('e0000000-0000-4000-8000-000000000003','${B_HOUSE}','ទឹកសុទ្ធ', 2000, 'KHR', 10)`)
+
+const firstOrder = await createOrder(tx, {
+  businessId: B_SALON, customerId: null, channel: 'telegram',
+  lines: [{ productId: 'e0000000-0000-4000-8000-000000000001', quantity: 2 },
+          { productId: 'e0000000-0000-4000-8000-000000000002', quantity: 1 }],
+})
+eq('the order totals from the catalogue, never from the caller', firstOrder.totalMinor, 12000 * 2 + 5000)
+eq('and invoice numbering starts at one', firstOrder.invoiceNumber, 1)
+const stockAfter = await one(db, `select stock from products where id = 'e0000000-0000-4000-8000-000000000001'`)
+eq('stock came down by exactly what was sold', stockAfter.stock, 1)
+const uncounted = await one(db, `select stock from products where id = 'e0000000-0000-4000-8000-000000000002'`)
+// NULL stock means "we do not count this", which is not the same as none left.
+eq('an uncounted product is not driven negative', uncounted.stock, null)
+
+const secondOrder = await createOrder(tx, {
+  businessId: B_SALON, customerId: null, channel: 'web',
+  lines: [{ productId: 'e0000000-0000-4000-8000-000000000001', quantity: 1 }],
+})
+eq('the next invoice number is the next integer, not a random one', secondOrder.invoiceNumber, 2)
+
+// The oversell. Stock is 0 now, and the conditional UPDATE is what refuses,
+// not a read followed by a hopeful write.
+let oversell = 'ALLOWED'
+try {
+  await createOrder(tx, { businessId: B_SALON, customerId: null, channel: 'web',
+    lines: [{ productId: 'e0000000-0000-4000-8000-000000000001', quantity: 1 }] })
+} catch (e) { oversell = e instanceof OrderError ? e.code : 'other' }
+eq('the last item cannot be sold twice', oversell, 'out_of_stock')
+
+// The same product twice in one order is ONE decrement of the sum. Two separate
+// decrements would each pass the stock check on their own and oversell.
+await db.exec(`update products set stock = 2 where id = 'e0000000-0000-4000-8000-000000000001'`)
+let doubled = 'ALLOWED'
+try {
+  await createOrder(tx, { businessId: B_SALON, customerId: null, channel: 'web',
+    lines: [{ productId: 'e0000000-0000-4000-8000-000000000001', quantity: 2 },
+            { productId: 'e0000000-0000-4000-8000-000000000001', quantity: 2 }] })
+} catch (e) { doubled = e instanceof OrderError ? e.code : 'other' }
+eq('a repeated line is summed before the stock check, not checked twice', doubled, 'out_of_stock')
+
+// Tenancy again, at the till: a product id from another shop is not orderable
+// here, however it was obtained.
+let crossTenant = 'ALLOWED'
+try {
+  await createOrder(tx, { businessId: B_SALON, customerId: null, channel: 'web',
+    lines: [{ productId: 'e0000000-0000-4000-8000-000000000003', quantity: 1 }] })
+} catch (e) { crossTenant = e instanceof OrderError ? e.code : 'other' }
+eq('another shop\'s product cannot be sold by this one', crossTenant, 'unknown_product')
+
+// Numbers are per BUSINESS. The guesthouse starts at one while the salon is at two.
+const houseNumber = await allocateInvoiceNumber(tx, B_HOUSE)
+eq('invoice numbers restart per business', houseNumber, 1)
+await expectFail(db, 'and two invoices cannot share a number within one business',
+  `insert into invoices (business_id, number, total_minor) values ('${B_SALON}', 1, 100)`,
+  'invoices_business_id_number_key')
+await expectFail(db, 'a line total that disagrees with its own parts is refused by the database',
+  `insert into order_items (order_id, name, unit_price_minor, quantity, line_total_minor)
+   values ('${firstOrder.orderId}', 'ប្រេង', 12000, 2, 1)`,
+  'order_items_total_ok')
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

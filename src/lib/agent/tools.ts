@@ -7,6 +7,8 @@ import type { Json } from '../database.types.ts'
 import { listSlots } from './slots.ts'
 import { formatMoney, type CurrencyCode } from '../types.ts'
 import { cambodiaDate } from '../time/cambodia.ts'
+import { idempotencyKey, QR_TTL_SECONDS } from '../payments.ts'
+import { railsFor } from '../payments/rails.ts'
 
 const isJsonObject = (value: Json): value is { [key: string]: Json | undefined } =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -207,6 +209,179 @@ export function customerTools(businessId: string, customerId: string, conversati
           .select('code')
           .single()
         return error || !data ? { error: 'no cancellable booking with that code' } : { cancelled: data.code }
+      },
+    }),
+
+    /**
+     * PLAN.md Phase 8. Declared in CUSTOMER_TOOLS since the beginning and
+     * deliberately unimplemented until now.
+     *
+     * The agent never chooses the amount. It names a booking, and the amount
+     * comes from that booking's own price, because a model that can pick a
+     * figure is a model that can undercharge a shop.
+     */
+    create_payment: tool({
+      description:
+        'Produce a KHQR the customer can scan, for a booking they already have. Call this only after create_booking, and only when the customer asks to pay or the service needs a deposit. Never state the amount yourself: read it from what this returns.',
+      inputSchema: z.object({
+        code: codeSchema.describe('the booking code this payment is for'),
+        kind: z.enum(['deposit', 'full']).default('full'),
+      }),
+      execute: async ({ code, kind }) => {
+        const bookingResult = await db
+          .from('bookings')
+          .select('id, code, price_minor, currency, deposit_required_minor, status')
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .eq('code', code)
+          .maybeSingle()
+        throwIfDbError('load booking for payment', bookingResult.error)
+        const booking = bookingResult.data
+        if (!booking) return { error: 'no booking of yours with that code' }
+        if (booking.status === 'cancelled') return { error: 'that booking was cancelled' }
+
+        const currency = booking.currency as CurrencyCode
+        const amount =
+          kind === 'deposit' && booking.deposit_required_minor
+            ? booking.deposit_required_minor
+            : booking.price_minor
+        if (amount <= 0) return { error: 'there is nothing to pay for that booking' }
+
+        const rails = railsFor(currency)
+        if (rails.length === 0) {
+          // Honest failure. A shop with no Bakong account cannot take a QR, and
+          // inventing one would take a real customer's money to nobody.
+          return { error: 'this shop cannot take QR payments yet, please pay at the shop' }
+        }
+
+        // Time bucketed, never static: a static key plus the unique constraint
+        // strands any customer whose first QR lapsed unpaid. PORTED, see
+        // payments.ts, and it was paid for once already.
+        const key = idempotencyKey(booking.code, kind)
+        const existing = await db
+          .from('payments')
+          .select('id, qr_payload, amount_minor, currency, status, expires_at')
+          .eq('business_id', businessId)
+          .eq('idempotency_key', key)
+          .maybeSingle()
+        throwIfDbError('load existing payment', existing.error)
+        if (existing.data?.qr_payload && existing.data.status === 'pending') {
+          return {
+            qr_payload: existing.data.qr_payload,
+            amount: formatMoney(existing.data.amount_minor, existing.data.currency as CurrencyCode),
+            expires_at: existing.data.expires_at,
+            reused: true,
+          }
+        }
+
+        const rail = rails[0]!
+        const charge = await rail.createCharge({
+          amount_minor: amount,
+          currency,
+          reference: booking.code,
+          idempotency_key: key,
+        })
+
+        const saved = await db
+          .from('payments')
+          .insert({
+            business_id: businessId,
+            booking_id: booking.id,
+            customer_id: customerId,
+            kind,
+            amount_minor: amount,
+            currency,
+            provider: rail.id,
+            qr_payload: charge.qr_payload,
+            provider_ref: charge.provider_ref,
+            status: 'pending',
+            expires_at: charge.expires_at,
+            idempotency_key: key,
+          })
+          .select('id')
+          .single()
+        requireDbData('store payment', saved)
+
+        return {
+          qr_payload: charge.qr_payload,
+          amount: formatMoney(amount, currency),
+          expires_at: charge.expires_at,
+          expires_in_seconds: QR_TTL_SECONDS,
+        }
+      },
+    }),
+
+    /**
+     * Bakong confirmation is pull based: nobody calls us when a customer pays,
+     * so somebody has to ask. Here that somebody is the customer saying "I paid".
+     * Phase 9's cron does the same thing on a timer for those who do not.
+     */
+    check_payment: tool({
+      description:
+        'Ask whether a payment has actually arrived. Use it when the customer says they have paid. Never tell a customer a payment succeeded unless this returned paid.',
+      inputSchema: z.object({ code: codeSchema.describe('the booking code the payment was for') }),
+      execute: async ({ code }) => {
+        const paymentResult = await db
+          .from('payments')
+          .select('id, amount_minor, currency, provider, provider_ref, status, bookings!inner(code)')
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .eq('bookings.code', code)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        throwIfDbError('load payment for check', paymentResult.error)
+        const payment = paymentResult.data
+        if (!payment) return { error: 'no payment was started for that booking' }
+        if (payment.status === 'paid') return { status: 'paid', already: true }
+        if (!payment.provider_ref) return { status: payment.status }
+
+        const currency = payment.currency as CurrencyCode
+        const rail = railsFor(currency).find((candidate) => candidate.id === payment.provider)
+        if (!rail) return { status: payment.status, note: 'that rail is not configured on this deployment' }
+
+        const result = await rail.checkCharge(payment.provider_ref, payment.amount_minor, currency)
+
+        // Every provider answer is kept verbatim. When a customer insists they
+        // paid and the row says pending, this is the only thing that can settle it.
+        const audit = await db.from('payment_events').insert({
+          payment_id: payment.id,
+          source: rail.id,
+          status_reported: result.status,
+          raw: result.raw as Json,
+        })
+        if (audit.error) console.error('[check_payment] event not recorded:', audit.error.message)
+
+        const checked = await db
+          .from('payments')
+          .update({
+            status: result.status,
+            provider_txn_id: result.provider_txn_id ?? null,
+            last_checked_at: new Date().toISOString(),
+            // paid_at is required by a CHECK constraint whenever status is paid,
+            // so the two are set together or the row is refused.
+            ...(result.status === 'paid' ? { paid_at: new Date().toISOString() } : {}),
+          })
+          .eq('id', payment.id)
+          .eq('business_id', businessId)
+          .select('status')
+          .single()
+        throwIfDbError('record payment check', checked.error)
+
+        if (result.status === 'paid') {
+          const confirmed = await db
+            .from('bookings')
+            .update({ status: 'confirmed' })
+            .eq('business_id', businessId)
+            .eq('code', code)
+            .eq('status', 'pending')
+          if (confirmed.error) console.error('[check_payment] booking not confirmed:', confirmed.error.message)
+        }
+
+        return {
+          status: result.status,
+          amount: formatMoney(payment.amount_minor, currency),
+        }
       },
     }),
 
