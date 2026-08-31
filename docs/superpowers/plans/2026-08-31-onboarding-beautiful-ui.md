@@ -1099,18 +1099,23 @@ In `parse()`, replace the bare `setState('parsing')` with real lifecycle steps:
 setParsed(null)
 setState('parsing')
 setError('')
+// Two steps, not three, because /api/parse is one non-streaming request and
+// there are only two moments this screen can honestly report: the response
+// arrived, and it parsed. A third step would be decoration, which is the
+// thing forking this component away from its scripted original was meant to end.
 setParseSteps([
-  { label: 'អានពិពណ៌នា', done: false },
-  { label: 'រកសេវា និងតម្លៃ', done: false },
-  { label: 'រៀបម៉ោងបើកទ្វារ', done: false },
+  { label: 'ផ្ញើពិពណ៌នាទៅ Moni', done: false },
+  { label: 'រៀបចំសេវា តម្លៃ និងម៉ោង', done: false },
 ])
 try {
-  setParseSteps((s) => s.map((step, i) => (i === 0 ? { ...step, done: true } : step)))
   const response = await fetch('/api/parse', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ text: description }),
   })
+  // The request is away and a response has arrived. That is the first thing
+  // this screen actually knows, so it is the first thing it claims.
+  setParseSteps((s) => s.map((step, i) => (i === 0 ? { ...step, done: true } : step)))
   const body = await response.json()
   if (!response.ok || body.error) throw new Error(body.error ?? 'parse failed')
   setParseSteps((s) => s.map((step) => ({ ...step, done: true })))
