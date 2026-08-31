@@ -253,7 +253,11 @@ export function ShopSetup({
       ) : (
         <>
           <div>
-            <label htmlFor="shop-description" className="km text-sm font-semibold text-ink">ពិពណ៌នាហាងជាភាសាធម្មតា</label>
+            {/* A paragraph, not a label: AgentPromptBar renders its own sr-only label,
+                and two labels on one field get concatenated into one announced name.
+                `ariaLabel` below carries these exact words so what is heard matches
+                what is read. */}
+            <p className="km text-sm font-semibold text-ink">ពិពណ៌នាហាងជាភាសាធម្មតា</p>
             <p className="km mt-1 text-sm text-rule">ប្រាប់សេវា តម្លៃ ម៉ោងបើក និងចំនួនបុគ្គលិក ឬបន្ទប់។ និយាយក៏បាន វាយក៏បាន។</p>
           </div>
           <AgentPromptBar
@@ -262,7 +266,7 @@ export function ShopSetup({
             onSubmit={parse}
             placeholder="ប្រាប់ Moni ពីហាងរបស់អ្នក៖ សេវា តម្លៃ ម៉ោងបើក"
             submitLabel="រៀបចំឱ្យខ្ញុំ"
-            ariaLabel="ពិពណ៌នាហាង"
+            ariaLabel="ពិពណ៌នាហាងជាភាសាធម្មតា"
             rows={6}
             disabled={busy}
             submitDisabled={busy}
