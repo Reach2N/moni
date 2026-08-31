@@ -343,6 +343,9 @@
   --surface:      #FFFFFF;
   --page:         var(--color-paper);
   --canvas:       var(--color-paper);
+  --inset:        var(--color-paper);
+  --hover:        var(--color-paper);
+  --hover-2:      color-mix(in srgb, #0F172A 8%, #FFFFFF);
   --ink:          #0F172A;
   --ink-2:        var(--color-rule);
   --ink-3:        var(--color-on-ink-dim);

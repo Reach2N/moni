@@ -1009,10 +1009,14 @@ eq('the month view exposes model spend, so the ceiling has something to read', N
 console.log('\nthe setup spine: has this shop ever served a customer')
 
 // The spine's question is "ever", the meter's is "this month". The WINDOW may
-// differ; the counted set may not. These assertions are what stops the two
-// drifting apart into a billing bug. Built from BILLABLE_BOOKING_STATUSES,
-// not hardcoded, so a change to that constant without a matching change here
-// makes this test the one that turns red.
+// differ; the counted set may not. `everTxn` and `meterSet` below are both
+// built from BILLABLE_BOOKING_STATUSES, not hardcoded, but that alone proves
+// nothing: db/schema.sql's v_month_usage view hardcodes
+// status in ('confirmed','completed') directly, so both queries here would
+// silently rewrite themselves to agree with a changed constant while the VIEW
+// stayed on the old list, and this test would stay green through that drift.
+// The assertion after meterSet reads v_month_usage itself, which is the one
+// that actually catches the view falling behind the constant.
 const billable = BILLABLE_BOOKING_STATUSES.map((s) => `'${s}'`).join(',')
 const everTxn = `
   select (exists (select 1 from bookings
@@ -1046,11 +1050,19 @@ await db.exec(`update bookings set status = 'confirmed'
                 where business_id = '${B_NEW}' and status = 'pending'`)
 eq('a CONFIRMED booking is a transaction', await spineSays(B_NEW), true)
 
-// and the counted set matches the meter's, which is the assertion that matters
+// and the counted set matches the meter's re-derivation of the same logic
 const meterSet = await one(db, `
   select count(*) c from bookings
    where business_id = '${B_NEW}' and status in (${billable})`)
 eq('and the meter counts exactly the same booking', Number(meterSet.c), 1)
+
+// This is the assertion that makes BILLABLE_BOOKING_STATUSES load bearing: it
+// reads v_month_usage.txn_used itself, not a query built from the same
+// constant the view is supposed to match. If schema.sql's hardcoded
+// ('confirmed','completed') ever diverges from BILLABLE_BOOKING_STATUSES,
+// this is what turns red.
+const viewSays = await one(db, `select txn_used from v_month_usage where business_id = '${B_NEW}'`)
+eq('and v_month_usage itself agrees: one billable booking is one transaction', Number(viewSays.txn_used), 1)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

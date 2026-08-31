@@ -48,6 +48,12 @@ export function ShopSetup({
   const [state, setState] = useState<SetupState>('describe')
   const [error, setError] = useState('')
   const [parseSteps, setParseSteps] = useState<ThinkingStep[]>([])
+  // Whether the box currently holds the sample text `parse` filled in for an
+  // owner who typed too little to submit. The old submit button used to have a
+  // third label state that announced this; now that the button always reads the
+  // same, this line is the only thing that says a sample landed rather than the
+  // owner's own words.
+  const [sampleFilled, setSampleFilled] = useState(false)
 
   function updateService(
     index: number,
@@ -71,8 +77,10 @@ export function ShopSetup({
   async function parse() {
     if (description.trim().length < 8) {
       setDescription(SAMPLE)
+      setSampleFilled(true)
       return
     }
+    setSampleFilled(false)
     setParsed(null)
     setState('parsing')
     setError('')
@@ -153,10 +161,16 @@ export function ShopSetup({
   // and this screen exists to earn their trust in the parse.
   const liveWarnings = parsed ? sanityCheck(parsed.shop) : []
   const { byIndex: serviceWarnings, other: otherWarnings } = warningsByService(liveWarnings)
+  // An error with a parse still on hand stays on the review step: the owner's
+  // corrections are the only copy of that data, and the retry inside the error
+  // banner below calls save() again, which needs the table it is retrying to be
+  // visible. Only a parse failure, which has no table to show, falls through to
+  // the describe view.
+  const showReview = state === 'review' || state === 'saving' || state === 'saved' || (state === 'error' && parsed !== null)
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8" aria-live="polite" aria-busy={busy}>
-      {state === 'review' || state === 'saving' || state === 'saved' ? (
+      {showReview ? (
         <>
           <div className="flex items-center justify-between gap-3 border-y border-hairline py-2">
             <Button
@@ -165,6 +179,7 @@ export function ShopSetup({
               onClick={() => {
                 setParsed(null)
                 setError('')
+                setSampleFilled(false)
                 setState('describe')
               }}
               disabled={busy}
@@ -226,7 +241,7 @@ export function ShopSetup({
                   {(serviceWarnings.get(index) ?? []).map((issue, warningIndex) => (
                     <p
                       key={`${index}-${warningIndex}`}
-                      className="mt-2 flex items-start gap-1.5 border-t border-hairline pt-2 text-xs text-ink"
+                      className="km mt-2 flex items-start gap-1.5 border-t border-hairline pt-2 text-xs text-ink"
                     >
                       <TriangleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden />
                       {issue}
@@ -241,7 +256,7 @@ export function ShopSetup({
             <div className="border border-rule/70 px-3 py-2">
               <p className="km text-sm font-semibold text-ink">មានព័ត៌មានត្រូវពិនិត្យ</p>
               {otherWarnings.map((issue, warningIndex) => (
-                <p key={warningIndex} className="mt-1 text-xs text-rule">{issue}</p>
+                <p key={warningIndex} className="km mt-1 text-xs text-rule">{issue}</p>
               ))}
             </div>
           ) : null}
@@ -279,18 +294,22 @@ export function ShopSetup({
             <AgentApprovalCard
               title="រក្សាទុកព័ត៌មានហាង"
               description="Moni នឹងឆ្លើយអតិថិជនតាមតម្លៃ និងម៉ោងខាងលើ។"
-              command="POST /api/setup"
+              command="រក្សាទុកសេវា និងម៉ោងទៅក្នុងហាង"
               details={[
                 { label: 'សេវា', value: `${toKhmerDigits(parsed?.shop.services.length ?? 0)}` },
                 { label: 'រូបិយប័ណ្ណ', value: parsed?.shop.default_currency ?? '' },
               ]}
               confirmLabel={state === 'saving' ? 'កំពុងរក្សាទុក' : 'រក្សាទុក'}
-              cancelLabel="កែម្តងទៀត"
+              // Not the back button above: that one discards the parse and returns
+              // to the description box. This one sits below the review table the
+              // owner is still looking at, so cancel here means "not yet, let me
+              // keep editing", not "throw away my corrections". It stays on this
+              // step and only clears a stale save error, if there was one.
+              cancelLabel="មិនទាន់"
               onConfirm={() => void save()}
               onCancel={() => {
-                setParsed(null)
                 setError('')
-                setState('describe')
+                setState('review')
               }}
               disabled={busy}
             />
@@ -308,7 +327,12 @@ export function ShopSetup({
           </div>
           <AgentPromptBar
             value={description}
-            onChange={setDescription}
+            onChange={(value) => {
+              setDescription(value)
+              // The owner is typing over the sample, so the notice about it no
+              // longer describes what is in the box.
+              if (sampleFilled) setSampleFilled(false)
+            }}
             onSubmit={parse}
             placeholder="ប្រាប់ Moni ពីហាងរបស់អ្នក៖ សេវា តម្លៃ ម៉ោងបើក"
             submitLabel="រៀបចំឱ្យខ្ញុំ"
@@ -328,6 +352,11 @@ export function ShopSetup({
             }
             textareaClassName="km"
           />
+          {sampleFilled && (
+            <p className="km text-xs text-rule">
+              Moni បានបំពេញឧទាហរណ៍មួយ ព្រោះពិពណ៌នាខ្លីពេក។ អ្នកអាចកែឧទាហរណ៍នេះ រួចចុច &quot;រៀបចំឱ្យខ្ញុំ&quot; ម្តងទៀត។
+            </p>
+          )}
           {state === 'parsing' && (
             <AgentThinking
               steps={parseSteps}

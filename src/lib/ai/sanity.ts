@@ -12,10 +12,26 @@
  * this file to be importable from a client component, which is the whole reason
  * it was split out.
  */
+import type { CurrencyCode } from '../types.ts'
+import { durationKm, moneyKm, toKhmerDigits } from '../format/khmer.ts'
 import type { ParsedShop } from './parse.ts'
 
 /** Everything that looked wrong enough for a human to check. */
 export type ParseWarning = { field: string; issue: string }
+
+/** `src/lib/format/khmer.ts` is documented client safe: no `server-only`, no AI
+ * SDK, no `models.ts`. `sanityCheck` runs a second time in the browser on every
+ * edit (see the module comment above), so its messages render straight onto the
+ * review screen, in Khmer, with money read through `moneyKm` like every other
+ * amount on that screen. */
+const currencyLabel = (currency: CurrencyCode) => (currency === 'USD' ? 'USD' : '៛')
+
+// `ParsedShop`'s currency fields are `z.enum(CURRENCY_CODES)` built from
+// `Object.keys(CURRENCIES)`, which zod and TypeScript both widen to `string`,
+// not the `CurrencyCode` union `moneyKm` needs. The narrowing ternary is the
+// same one `shop-setup.tsx` already uses when it reads a parsed service's
+// currency, so both call sites treat "not USD" as KHR the same way.
+const asCurrencyCode = (currency: string): CurrencyCode => (currency === 'USD' ? 'USD' : 'KHR')
 
 /**
  * Guard the failures a schema cannot catch. All three have the same shape: the
@@ -25,28 +41,32 @@ export function sanityCheck(shop: ParsedShop): ParseWarning[] {
   const w: ParseWarning[] = []
   for (const [i, s] of shop.services.entries()) {
     const at = `services[${i}] "${s.name}"`
+    const amount = moneyKm(s.price_minor, asCurrencyCode(s.currency))
     // the 100x bug. 40 riel is not a haircut, and 4,500,000 dollars is not a perm.
     if (s.currency === 'KHR' && s.price_minor > 0 && s.price_minor < 500) {
-      w.push({ field: at, issue: `${s.price_minor} KHR is implausibly low, dollars may have been read as riel` })
+      w.push({ field: at, issue: `${amount} ទាបពេក ប្រហែលជាដុល្លារត្រូវបានយល់ច្រឡំជារៀល` })
     }
     if (s.currency === 'USD' && s.price_minor > 100_000) {
-      w.push({ field: at, issue: `${s.price_minor} cents is implausibly high, riel may have been read as dollars` })
+      w.push({ field: at, issue: `${amount} ខ្ពស់ពេក ប្រហែលជារៀលត្រូវបានយល់ច្រឡំជាដុល្លារ` })
     }
     if (s.currency !== shop.default_currency) {
-      w.push({ field: at, issue: `priced in ${s.currency} but the shop default is ${shop.default_currency}` })
+      w.push({
+        field: at,
+        issue: `កំណត់តម្លៃជា ${currencyLabel(asCurrencyCode(s.currency))} ប៉ុន្តែរូបិយប័ណ្ណលំនាំដើមរបស់ហាងគឺ ${currencyLabel(asCurrencyCode(shop.default_currency))}`,
+      })
     }
     if (s.duration_min > 24 * 60 && s.unit === 'session') {
-      w.push({ field: at, issue: `${s.duration_min} minutes is over a day but the unit is "session"` })
+      w.push({ field: at, issue: `រយៈពេល ${durationKm(s.duration_min)} លើសពីមួយថ្ងៃ ប៉ុន្តែសេវានេះជាកក់ម្តងៗ (session)` })
     }
   }
   for (const [i, h] of shop.hours.entries()) {
     if (h.open >= h.close) {
-      w.push({ field: `hours[${i}]`, issue: `opens ${h.open} and closes ${h.close}` })
+      w.push({ field: `hours[${i}]`, issue: `ម៉ោងបើក ${toKhmerDigits(h.open)} ក្រោយម៉ោងបិទ ${toKhmerDigits(h.close)}` })
     }
   }
   const days = shop.hours.map((h) => h.dow)
   if (new Set(days).size !== days.length) {
-    w.push({ field: 'hours', issue: 'the same weekday appears more than once' })
+    w.push({ field: 'hours', issue: 'ថ្ងៃដដែលកើតឡើងច្រើនជាងម្តងក្នុងបញ្ជីម៉ោងបើក' })
   }
   return w
 }
