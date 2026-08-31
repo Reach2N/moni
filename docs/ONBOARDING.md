@@ -230,6 +230,35 @@ Review the captures for:
 - Khmer labels are readable with `line-height: 1.75` and no tracking.
 - The marketing captures are unchanged, which is the evidence the fork held.
 
+## Current implementation state
+
+`/app/onboarding` renders the four-row setup spine through
+`src/components/agent/setup-tasks.tsx`, a prop-driven fork of Beautiful UI's Task
+Rows, fed by `loadSetupProgress()` over the pure rules in
+`src/lib/queries/setup-progress.ts`. `ShopSetup` keeps its original state machine
+and now presents Prompt Bar, the forked Thinking trace, and its own purpose-built
+review table at its four states.
+
+Diff Table was evaluated for the review step and rejected: the fetched source had
+no `<input>` element, only row-level include or exclude of a scripted employee
+diff, and its documented fallback, Records Table, was checkbox-only input in a CRM
+grid. Neither can edit a price or a duration. The review step instead keeps Moni's
+existing editable table, with each parse warning from `sanityCheck` attached to
+the row it concerns and marked with a lucide `TriangleAlert`, plus a summary block
+for warnings that name no row. `sanityCheck` now lives in `src/lib/ai/sanity.ts`,
+extracted out of `src/lib/ai/parse.ts` so the browser can recompute warnings live
+as the owner edits a service, without pulling the AI SDK or `src/lib/ai/models.ts`
+into a client bundle. `parse.ts` re-exports it for the server-side callers.
+
+The save is gated behind `AgentApprovalCard`
+(`src/components/agent/approval-card.tsx`), rendered below the review table.
+`POST /api/setup` fires only from the card's confirm handler, never from a plain
+button and never on parse. That is the one call site in the component, verified
+with `grep -rn "api/setup" src/components src/app`.
+
+The marketing primitives are unmodified. Provenance for every component is in
+`CREDITS.md`.
+
 ## Related documents
 
 - `AGENTS.md`: authority, current surface, and non-negotiable rules.

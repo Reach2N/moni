@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Check, CircleAlert, LoaderCircle, Save, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Check, CircleAlert, TriangleAlert } from 'lucide-react'
 import { VoiceNote } from './voice-note.tsx'
 import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { AgentThinking, type ThinkingStep } from '@/components/agent/agent-thinking.tsx'
+import { AgentApprovalCard } from '@/components/agent/approval-card.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
@@ -275,10 +276,24 @@ export function ShopSetup({
               </div>
             </div>
           ) : (
-            <Button type="button" onClick={() => void save()} disabled={busy} className="km min-h-11 w-full rounded-none">
-              {state === 'saving' ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <Save data-icon="inline-start" aria-hidden />}
-              {state === 'saving' ? 'កំពុងរក្សាទុកការរៀបចំហាង' : 'រក្សាទុកក្នុងហាង'}
-            </Button>
+            <AgentApprovalCard
+              title="រក្សាទុកព័ត៌មានហាង"
+              description="Moni នឹងឆ្លើយអតិថិជនតាមតម្លៃ និងម៉ោងខាងលើ។"
+              command="POST /api/setup"
+              details={[
+                { label: 'សេវា', value: `${toKhmerDigits(parsed?.shop.services.length ?? 0)}` },
+                { label: 'រូបិយប័ណ្ណ', value: parsed?.shop.default_currency ?? '' },
+              ]}
+              confirmLabel={state === 'saving' ? 'កំពុងរក្សាទុក' : 'រក្សាទុក'}
+              cancelLabel="កែម្តងទៀត"
+              onConfirm={() => void save()}
+              onCancel={() => {
+                setParsed(null)
+                setError('')
+                setState('describe')
+              }}
+              disabled={busy}
+            />
           )}
         </>
       ) : (
