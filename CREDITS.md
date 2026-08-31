@@ -201,3 +201,18 @@ The KHQR wordmark remains the existing local payment asset at
 `public/images/payment/khqr-wordmark.webp`. The requested ABA image could not be downloaded
 from its host, which returned HTTP 403 to the local fetch, so it is not represented as a
 fake or placeholder asset.
+
+## Beautiful UI: Task Rows (second adaptation)
+
+- Project: [Beautiful UI](https://www.beautifului.dev/)
+- Pattern: [Task Rows](https://www.beautifului.dev/#task-rows)
+- License: MIT (the site publishes the component set under MIT)
+- Local adaptations, both from one upstream source:
+  - `src/components/primitives/TaskRows.tsx`, marketing, scripted, unmodified
+  - `src/components/agent/setup-tasks.tsx`, owner app, prop-driven
+
+The app adaptation keeps Task Rows' row grammar, badge states, expand animation,
+and class names. It deletes the scripted `TICKS` timeline and the demo data, and
+takes every row state from `src/lib/queries/setup-progress.ts` instead. The
+marketing copy is deliberately not shared: the homepage has a screenshot
+acceptance target that an onboarding change must not be able to break.
