@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Check, CircleAlert, LoaderCircle, Save, WandSparkles } from 'lucide-react'
+import { ArrowLeft, Check, CircleAlert, LoaderCircle, Save } from 'lucide-react'
 import { VoiceNote } from './voice-note.tsx'
+import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { AgentThinking, type ThinkingStep } from '@/components/agent/agent-thinking.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
@@ -255,27 +256,19 @@ export function ShopSetup({
             <label htmlFor="shop-description" className="km text-sm font-semibold text-ink">ពិពណ៌នាហាងជាភាសាធម្មតា</label>
             <p className="km mt-1 text-sm text-rule">ប្រាប់សេវា តម្លៃ ម៉ោងបើក និងចំនួនបុគ្គលិក ឬបន្ទប់។ និយាយក៏បាន វាយក៏បាន។</p>
           </div>
-          <VoiceNote
-            disabled={busy}
-            onTranscript={(text) =>
-              setDescription((current) => (current.trim() ? `${current.trim()} ${text}` : text))
-            }
-          />
-          <Textarea
-            id="shop-description"
-            name="shop-description"
-            autoComplete="off"
+          <AgentPromptBar
             value={description}
-            onChange={(event) => setDescription(event.target.value)}
+            onChange={setDescription}
+            onSubmit={parse}
+            placeholder="ប្រាប់ Moni ពីហាងរបស់អ្នក៖ សេវា តម្លៃ ម៉ោងបើក"
+            submitLabel="រៀបចំឱ្យខ្ញុំ"
+            ariaLabel="ពិពណ៌នាហាង"
+            rows={6}
             disabled={busy}
-            rows={7}
-            placeholder="កាត់សក់ 15000៛ 30 នាទី។ បើកពីម៉ោង 8 ព្រឹក ដល់ 7 យប់…"
-            className="km min-h-44 resize-none rounded-none border-rule/70 bg-paper text-base shadow-none placeholder:text-rule md:text-base"
+            submitDisabled={busy}
+            leading={<VoiceNote onTranscript={(text) => setDescription(text)} />}
+            textareaClassName="km"
           />
-          <Button type="button" onClick={() => void parse()} disabled={busy} className="km min-h-11 w-full rounded-none">
-            {state === 'parsing' ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <WandSparkles data-icon="inline-start" aria-hidden />}
-            {state === 'parsing' ? 'Moni កំពុងរៀបចំសេវា និងម៉ោងបើក' : description.trim().length < 8 ? 'បំពេញឧទាហរណ៍' : 'រៀបចំឱ្យខ្ញុំពិនិត្យ'}
-          </Button>
           {state === 'parsing' && (
             <AgentThinking
               steps={parseSteps}
