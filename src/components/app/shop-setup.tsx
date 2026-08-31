@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ArrowLeft, Check, CircleAlert, LoaderCircle, Save, WandSparkles } from 'lucide-react'
 import { VoiceNote } from './voice-note.tsx'
+import { AgentThinking, type ThinkingStep } from '@/components/agent/agent-thinking.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
@@ -27,6 +28,7 @@ export function ShopSetup({
   const [parsed, setParsed] = useState<ParseResponse | null>(null)
   const [state, setState] = useState<SetupState>('describe')
   const [error, setError] = useState('')
+  const [parseSteps, setParseSteps] = useState<ThinkingStep[]>([])
 
   function updateService(
     index: number,
@@ -55,7 +57,13 @@ export function ShopSetup({
     setParsed(null)
     setState('parsing')
     setError('')
+    setParseSteps([
+      { label: 'អានពិពណ៌នា', done: false },
+      { label: 'រកសេវា និងតម្លៃ', done: false },
+      { label: 'រៀបម៉ោងបើកទ្វារ', done: false },
+    ])
     try {
+      setParseSteps((s) => s.map((step, i) => (i === 0 ? { ...step, done: true } : step)))
       const response = await fetch('/api/parse', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -63,6 +71,7 @@ export function ShopSetup({
       })
       const body = await response.json()
       if (!response.ok || body.error) throw new Error(body.error ?? 'parse failed')
+      setParseSteps((s) => s.map((step) => ({ ...step, done: true })))
       setParsed(body as ParseResponse)
       setState('review')
     } catch {
@@ -262,6 +271,14 @@ export function ShopSetup({
             {state === 'parsing' ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <WandSparkles data-icon="inline-start" aria-hidden />}
             {state === 'parsing' ? 'Moni កំពុងរៀបចំសេវា និងម៉ោងបើក' : description.trim().length < 8 ? 'បំពេញឧទាហរណ៍' : 'រៀបចំឱ្យខ្ញុំពិនិត្យ'}
           </Button>
+          {state === 'parsing' && (
+            <AgentThinking
+              steps={parseSteps}
+              working
+              activeLabel="កំពុងអាន"
+              doneLabel="អានរួចរាល់"
+            />
+          )}
         </>
       )}
 

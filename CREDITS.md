@@ -216,3 +216,17 @@ and class names. It deletes the scripted `TICKS` timeline and the demo data, and
 takes every row state from `src/lib/queries/setup-progress.ts` instead. The
 marketing copy is deliberately not shared: the homepage has a screenshot
 acceptance target that an onboarding change must not be able to break.
+
+## Beautiful UI: Thinking (second adaptation)
+
+- Project: [Beautiful UI](https://www.beautifului.dev/)
+- Pattern: [Thinking](https://www.beautifului.dev/#thinking)
+- License: MIT (the site publishes the component set under MIT)
+- Local adaptations, both from one upstream source:
+  - `src/components/primitives/ThinkingState.tsx`, marketing, scripted, unmodified
+  - `src/components/agent/agent-thinking.tsx`, owner app, prop-driven, Steps variant only
+
+The app adaptation keeps the header shimmer, the expandable trace, the connecting
+line and its measured height, and the class names. It deletes the scripted
+`STAGES` timeline and the Search, Reasoning, and Coding variants, and takes its
+steps from the real `/api/parse` lifecycle.
