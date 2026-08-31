@@ -1211,7 +1211,16 @@ In `shop-setup.tsx`'s `describe` branch, replace the raw `Textarea` and its subm
   rows={6}
   disabled={busy}
   submitDisabled={busy}
-  leading={<VoiceNote onTranscript={(text) => setDescription(text)} />}
+  leading={
+    /* Appended, never replaced: a shop description often takes more than one
+       take, and an owner who records a second note must not lose the first. */
+    <VoiceNote
+      disabled={busy}
+      onTranscript={(text) =>
+        setDescription((current) => (current.trim() ? `${current.trim()} ${text}` : text))
+      }
+    />
+  }
   textareaClassName="km"
 />
 ```
