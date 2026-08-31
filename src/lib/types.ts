@@ -158,6 +158,15 @@ export type BookingStatus = (typeof BOOKING_STATUSES)[number]
 /** Statuses that occupy the slot. Mirrors the DB exclusion constraint exactly. */
 export const BLOCKING_STATUSES: readonly BookingStatus[] = ['pending', 'confirmed', 'completed']
 
+/**
+ * What the free-tier meter counts as a booking that got real, and therefore
+ * what the setup checklist counts as a customer served. `v_month_usage` in
+ * db/schema.sql counts exactly these, so this constant and that view change
+ * together or the product meters one thing and congratulates the owner for
+ * another.
+ */
+export const BILLABLE_BOOKING_STATUSES: readonly BookingStatus[] = ['confirmed', 'completed']
+
 export const PAYMENT_STATUSES = ['pending', 'paid', 'expired', 'failed', 'refunded', 'cancelled'] as const
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
 

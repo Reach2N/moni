@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHmac } from 'node:crypto'
 import { PGlite } from '@electric-sql/pglite'
-import { formatMoney } from '../src/lib/types.ts'
+import { formatMoney, BILLABLE_BOOKING_STATUSES } from '../src/lib/types.ts'
 import { amountsMatch, idempotencyKey, shouldFallback, QR_TTL_SECONDS } from '../src/lib/payments.ts'
 import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
@@ -1010,10 +1010,13 @@ console.log('\nthe setup spine: has this shop ever served a customer')
 
 // The spine's question is "ever", the meter's is "this month". The WINDOW may
 // differ; the counted set may not. These assertions are what stops the two
-// drifting apart into a billing bug.
+// drifting apart into a billing bug. Built from BILLABLE_BOOKING_STATUSES,
+// not hardcoded, so a change to that constant without a matching change here
+// makes this test the one that turns red.
+const billable = BILLABLE_BOOKING_STATUSES.map((s) => `'${s}'`).join(',')
 const everTxn = `
   select (exists (select 1 from bookings
-                   where business_id = $1 and status in ('confirmed','completed'))
+                   where business_id = $1 and status in (${billable}))
        or exists (select 1 from payments
                    where business_id = $1 and status = 'paid' and booking_id is null)) as ok`
 
@@ -1046,7 +1049,7 @@ eq('a CONFIRMED booking is a transaction', await spineSays(B_NEW), true)
 // and the counted set matches the meter's, which is the assertion that matters
 const meterSet = await one(db, `
   select count(*) c from bookings
-   where business_id = '${B_NEW}' and status in ('confirmed','completed')`)
+   where business_id = '${B_NEW}' and status in (${billable})`)
 eq('and the meter counts exactly the same booking', Number(meterSet.c), 1)
 
 // ── result ────────────────────────────────────────────────────────────────

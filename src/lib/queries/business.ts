@@ -1,6 +1,7 @@
 import 'server-only'
 import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
+import { BILLABLE_BOOKING_STATUSES } from '../types.ts'
 
 /**
  * The business columns every owner-facing surface needs. One list, because a
@@ -86,7 +87,7 @@ export async function hasFirstTransaction(businessId: string): Promise<boolean> 
     .from('bookings')
     .select('id', { count: 'exact', head: true })
     .eq('business_id', businessId)
-    .in('status', ['confirmed', 'completed'])
+    .in('status', [...BILLABLE_BOOKING_STATUSES])
   throwIfDbError('count billable bookings', bookings.error)
   if ((bookings.count ?? 0) > 0) return true
 
