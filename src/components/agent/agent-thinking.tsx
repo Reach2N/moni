@@ -56,7 +56,7 @@ export function AgentThinking({
         <span role="status" className="contents">
           {working ? (
             <span
-              className="km bg-clip-text text-[13px] font-medium text-transparent"
+              className="km bg-clip-text text-[13px] font-medium whitespace-nowrap text-transparent"
               style={{
                 backgroundImage:
                   'linear-gradient(90deg, var(--ink-3) 35%, var(--ink) 50%, var(--ink-3) 65%)',
@@ -68,7 +68,7 @@ export function AgentThinking({
             </span>
           ) : (
             <span
-              className="km text-[13px] font-medium text-ink-2"
+              className="km text-[13px] font-medium whitespace-nowrap text-ink-2"
               style={{ animation: 'fade-in 350ms ease-out both' }}
             >
               {doneLabel}
@@ -120,7 +120,7 @@ export function AgentThinking({
                       style={{ animation: 'spin 700ms linear infinite' }}
                     />
                   )}
-                  <span className="km min-w-0 text-[12.5px] font-medium text-ink">{step.label}</span>
+                  <span className="km min-w-0 truncate text-[12.5px] font-medium text-ink">{step.label}</span>
                 </div>
               ))}
             </div>

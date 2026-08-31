@@ -229,4 +229,7 @@ acceptance target that an onboarding change must not be able to break.
 The app adaptation keeps the header shimmer, the expandable trace, the connecting
 line and its measured height, and the class names. It deletes the scripted
 `STAGES` timeline and the Search, Reasoning, and Coding variants, and takes its
-steps from the real `/api/parse` lifecycle.
+steps from the real `/api/parse` lifecycle. It also drops the source's
+`max-w-95` on the outer wrapper: that fixed width suits the marketing card, but
+this fork renders in a full-width form column, so it fills that column instead.
+Every other class is kept.
