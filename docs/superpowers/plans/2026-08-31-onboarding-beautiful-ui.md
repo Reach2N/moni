@@ -299,7 +299,11 @@ function channelState(channels: SetupProgressInput['channels']): {
   const connected = channels.find((c) => c.status === 'connected')
   if (connected) return { state: 'done', error: null, amount: 'ភ្ជាប់រួច' }
 
-  const broken = channels.find((c) => c.status !== 'connected')
+  // Only 'error' is a failure. 'connecting' and 'disconnected' are both states
+  // an owner chose or is passing through, and a red mark on either is a false
+  // alarm: it must mean something broke, never that a step is unfinished. The
+  // status column is free text, so anything unrecognised is pending, not broken.
+  const broken = channels.find((c) => c.status === 'error')
   if (broken) return { state: 'failed', error: broken.lastError, amount: 'ដាច់' }
 
   return { state: 'pending', error: null, amount: 'មិនទាន់ភ្ជាប់' }
