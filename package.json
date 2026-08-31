@@ -10,7 +10,8 @@
     "db:test": "node --experimental-strip-types db/test.mjs",
     "test:mvp": "node --experimental-strip-types scripts/mvp-acceptance.mjs",
     "shoot": "node scripts/shoot.mjs",
-    "test:signals": "node --experimental-strip-types scripts/signals-test.mjs"
+    "test:signals": "node --experimental-strip-types scripts/signals-test.mjs",
+    "test:setup": "node --experimental-strip-types scripts/setup-progress-test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.5",
