@@ -87,6 +87,27 @@ check('a connected channel wins over a broken one on another channel', () => {
   assert.equal(steps.channel.state, 'done')
 })
 
+check('a channel still connecting is pending, not failed', () => {
+  const steps = byKey(deriveSetupProgress(input({
+    channels: [{ channel: 'telegram', status: 'connecting', lastError: null }],
+  })))
+  assert.equal(steps.channel.state, 'pending')
+})
+
+check('a deliberately disconnected channel is pending, not failed', () => {
+  const steps = byKey(deriveSetupProgress(input({
+    channels: [{ channel: 'telegram', status: 'disconnected', lastError: null }],
+  })))
+  assert.equal(steps.channel.state, 'pending')
+})
+
+check('an unrecognised status is pending, because red must mean broken', () => {
+  const steps = byKey(deriveSetupProgress(input({
+    channels: [{ channel: 'telegram', status: 'some_new_status', lastError: null }],
+  })))
+  assert.equal(steps.channel.state, 'pending')
+})
+
 check('every row carries a destination, because a row that leads nowhere is worse than no row', () => {
   for (const step of deriveSetupProgress(input())) {
     assert.ok(step.href.startsWith('/app'), `${step.key} has no destination`)
