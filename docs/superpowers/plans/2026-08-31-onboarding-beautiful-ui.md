@@ -41,9 +41,11 @@ Every task's requirements implicitly include this section.
 - Consumes: nothing.
 - Produces: permission for every later task to modify source.
 
-- [ ] **Step 1: Confirm with the user that implementation is authorized**
+- [ ] **Step 1: Authorization, already granted**
 
-Do not guess at this. The exact sentence in `CLAUDE.md` is:
+The controller confirmed this with the user before dispatch: they chose subagent-driven
+execution and directed the checkpoint commit `9ee4bed`. Do not ask again. Proceed to Step 2.
+The exact sentence to replace in `CLAUDE.md` is:
 
 > For the current repository request, work is documentation-only. Do not modify frontend/source
 > files, install packages, or make frontend changes. The homepage contract is being prepared for
@@ -415,7 +417,6 @@ const spineSays = async (biz) =>
 
 eq('the seeded salon has already served someone', await spineSays(B_SALON), true)
 
-await db.exec(`create temporary table spine_probe as select 1`)
 await db.exec(`
   insert into businesses (id, slug, name, business_type, category, locale, default_currency)
   values ('b0000000-0000-4000-8000-000000000099', 'brand-new', 'Brand New',
@@ -696,10 +697,12 @@ Expected: both clean.
 - [ ] **Step 4: Prove the marketing primitive is untouched**
 
 ```bash
-git diff --stat -- src/components/primitives/TaskRows.tsx
+shasum -c .superpowers/sdd/2026-08-31-onboarding-beautiful-ui/frozen-baseline.sha256
 ```
 
-Expected: **no output at all.** Any output here is a plan violation. Revert it.
+Expected: every line ends `OK`. These files are UNTRACKED, so `git diff` reports nothing
+about them no matter what you do: the checksum baseline is the only real guard. A `FAILED`
+line on `TaskRows.tsx` means the fork edited the marketing copy. Revert that file.
 
 - [ ] **Step 5: Record the fork in CREDITS.md**
 
@@ -1135,10 +1138,11 @@ Import both: `import { AgentThinking, type ThinkingStep } from '@/components/age
 ```bash
 npx tsc --noEmit
 npm run lint
-git diff --stat -- src/components/primitives/ThinkingState.tsx
+shasum -c .superpowers/sdd/2026-08-31-onboarding-beautiful-ui/frozen-baseline.sha256
 ```
 
-Expected: first two clean, third prints **nothing**.
+Expected: first two clean, every checksum line ends `OK`. As in Task 3, these files are
+untracked, so the checksum baseline is the only guard that means anything.
 
 - [ ] **Step 5: Record the second fork in CREDITS.md**
 
@@ -1381,10 +1385,12 @@ Confirm before calling this done:
 - [ ] **Step 5: Prove both marketing primitives survived the whole plan**
 
 ```bash
-git diff --stat main -- src/components/primitives/TaskRows.tsx src/components/primitives/ThinkingState.tsx src/components/marketing/
+shasum -c .superpowers/sdd/2026-08-31-onboarding-beautiful-ui/frozen-baseline.sha256
 ```
 
-Expected: **no output.** If anything appears here, the fork failed and the homepage is at risk. Fix it before merging.
+Expected: all 19 lines end `OK`. This covers both scripted primitives, the Beautiful UI
+foundation, and every file in `src/components/marketing/`. A single `FAILED` line means a
+frozen file moved and the homepage is at risk. Fix it before merging.
 
 - [ ] **Step 6: Record the implementation state in the contract**
 
