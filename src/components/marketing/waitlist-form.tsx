@@ -83,7 +83,7 @@ export function WaitlistForm({ copy, locale, appUrl }: { copy: Copy; locale: Loc
 
         <a
           href={appUrl}
-          className="mt-7 inline-flex min-h-11 items-center gap-2 bg-label px-5 text-sm font-semibold text-surface transition-opacity hover:opacity-85 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-green"
+        className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-full bg-label px-5 text-sm font-semibold text-surface transition-opacity hover:opacity-85 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-green"
         >
           {c.appLink}
           <ExternalLink className="size-4" aria-hidden />
@@ -138,7 +138,7 @@ export function WaitlistForm({ copy, locale, appUrl }: { copy: Copy; locale: Loc
       <button
         type="submit"
         disabled={state === 'sending'}
-        className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 bg-green px-5 text-base font-semibold text-on-green transition-transform active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-green disabled:opacity-70"
+        className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-green px-5 text-base font-semibold text-on-green transition-transform active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-green disabled:opacity-70"
       >
         {state === 'sending' && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {state === 'sending' ? c.submitting : c.submit}

@@ -1,15 +1,13 @@
 /**
  * The shop's own surfaces.
  *
- * The landing page's illustrations are the objects a Cambodian shop already
- * has: the price list taped to the wall, the receipt handed across the counter,
- * the KHQR sticker by the till. Nothing here is a floating browser window with
- * traffic lights, a gradient mesh, or a glowing card. Those belong to software
- * marketing; these belong to the shop, which is whose side Moni is on.
+ * These are quiet product records: a price list, a booking receipt, and the
+ * official KHQR mark. Nothing here is a floating browser window with traffic
+ * lights, a gradient mesh, or a glowing card.
  *
- * All three share one substrate: white ground, a single hairline, CONTINUOUS
- * corners and ruled horizontal separators. Riel amounts and Khmer numerals do
- * the decorating, so no ornament has to be invented.
+ * All three share one substrate: white ground, a single hairline, continuous
+ * corners and restrained separators. Riel amounts and Khmer numerals carry the
+ * product detail without decorative UI.
  *
  * The corners are 14px, not 0. An earlier pass drew these square for a printed
  * look and that contradicted PLAN.md section 3, which specifies Apple-native
@@ -17,6 +15,7 @@
  */
 
 import type { ReactNode } from 'react'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 
 /** The paper. Everything else is printed on this. */
@@ -161,46 +160,16 @@ export function ReceiptLine({
   )
 }
 
-/**
- * The KHQR sticker by the till.
- *
- * The module grid is a fixed decorative pattern, NOT an encoded payload: a
- * marketing page that prints something scannable is printing a payment
- * instruction, and this one is a picture of the rail, not the rail. It carries
- * the three finder squares so it reads instantly as a QR and nothing else.
- */
-const MODULES = [
-  '1111111011011111111',
-  '1000001000101000001',
-  '1011101011101011101',
-  '1011101000101011101',
-  '1011101101101011101',
-  '1000001010001000001',
-  '1111111010101111111',
-  '0000000011000000000',
-  '1101101001011010110',
-  '0010110110100101101',
-  '1100011010110110010',
-  '0000000101101001011',
-  '1111111010011011010',
-  '1000001001101001101',
-  '1011101110010110011',
-  '1011101011011010101',
-  '1011101100101101100',
-  '1000001010110010110',
-  '1111111011001011011',
-]
-
 export function KhqrMark({ label, amount }: { label: string; amount?: string }) {
   return (
     <div className="flex items-center gap-4">
-      <svg viewBox="0 0 19 19" className="size-16 shrink-0" aria-hidden shapeRendering="crispEdges">
-        {MODULES.map((row, y) =>
-          row.split('').map((cell, x) =>
-            cell === '1' ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="currentColor" /> : null,
-          ),
-        )}
-      </svg>
+      <Image
+        src="/images/payment/khqr-wordmark.webp"
+        alt={label}
+        width={120}
+        height={50}
+        className="h-10 w-[96px] shrink-0 rounded-[8px] object-contain"
+      />
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-label-2">{label}</p>
         {amount ? <p className="tnum mt-1 text-lg font-semibold text-label">{amount}</p> : null}

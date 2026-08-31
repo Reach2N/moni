@@ -30,7 +30,13 @@ export function HeaderScrollState() {
     // so isActive is simply "scrolled past 24px and not yet at the very end".
     const trigger = ScrollTrigger.create({
       start: 24,
-      end: () => ScrollTrigger.maxScroll(window),
+      /* +1 because isActive is false AT the end, not past it. Ending exactly at
+         maxScroll meant the last reachable scroll position sat outside the
+         range, so the header's border, tint and blur all switched off the
+         instant the visitor reached the bottom of the page and came back the
+         moment they scrolled up a pixel. Measured 30 August: scrolled=true at
+         6878, scrolled=false at 6880, which is maxScroll. */
+      end: () => ScrollTrigger.maxScroll(window) + 1,
       onToggle: (self) => apply(self.isActive),
     })
 

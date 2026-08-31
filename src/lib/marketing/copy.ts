@@ -35,6 +35,7 @@ type Platform = { name: string; note: string }
 
 export type Copy = {
   nav: {
+    notice: string
     apply: string
     other: string
     otherHref: Locale
@@ -43,8 +44,7 @@ export type Copy = {
     faq: string
   }
   hero: {
-    eyebrow: string
-    headline: string
+    headline: [string, string]
     sub: string
     cta: string
     secondary: string
@@ -78,6 +78,7 @@ export type Copy = {
     traceLabel: string
     trace: [string, string, string, string]
     replyNote: string
+    runAction: string
   }
   capabilities: {
     eyebrow: string
@@ -151,6 +152,7 @@ export type Copy = {
 
 const km: Copy = {
   nav: {
+    notice: 'សម្រាប់ម្ចាស់ហាងតូចនៅកម្ពុជា',
     apply: 'ដាក់ពាក្យ',
     other: 'English',
     otherHref: 'en',
@@ -159,9 +161,8 @@ const km: Copy = {
     faq: 'សំណួរ',
   },
   hero: {
-    eyebrow: 'សម្រាប់ម្ចាស់ហាងតូចនៅកម្ពុជា',
-    headline: 'ហាងរបស់អ្នកឆ្លើយអតិថិជន ពេលដៃអ្នករវល់',
-    sub: 'ប្រាប់ Moni ពីហាងរបស់អ្នកជាភាសាធម្មតា ដោយវាយ ឬនិយាយ។ វាឆ្លើយសារ ពិនិត្យម៉ោងទំនេរ និងកក់ជំនួសអ្នក។',
+    headline: ['រវល់មើលហាង?', 'Moni ឆ្លើយឲ្យអ្នក។'],
+    sub: 'តម្លៃ ការកក់ ការទូទាត់ និងសារ ចូលមកពេលដៃអ្នកកំពុងធ្វើការ។ Moni ទទួលសារ ឆ្លើយតាមទិន្នន័យហាង និងជួយបញ្ចប់ការងារឲ្យអ្នក។',
     cta: 'ដាក់ពាក្យជាហាងស្ថាបនិក',
     secondary: 'មើលរបៀបដំណើរការ',
     reassure: 'យើងរៀបចំហាងដំបូងដោយផ្ទាល់។ ឥតគិតថ្លៃពេលយើងកំពុងសាងសង់។',
@@ -197,7 +198,8 @@ const km: Copy = {
       'កក់ម៉ោងទុកជូន',
       'ផ្ញើ KHQR ១៥,០០០៛',
     ],
-    replyNote: 'រាល់ចម្លើយមកពីទិន្នន័យរបស់អ្នក មិនមែនពីការស្មានទេ។',
+    replyNote: 'ចម្លើយនេះយកចេញពីបញ្ជីសេវាកម្ម និងម៉ោងបើករបស់ហាងអ្នក។',
+    runAction: 'ដំណើរការការបង្ហាញ',
   },
   capabilities: {
     eyebrow: 'អ្វីដែល Moni ធ្វើបាន',
@@ -220,12 +222,12 @@ const km: Copy = {
     customerMessage: 'សួស្តី ខ្ញុំចង់កក់កាត់សក់ថ្ងៃស្អែក ម៉ោង ១០ ព្រឹក',
     assistantLabel: 'Moni',
     assistantMessage: 'បាន។ ម៉ោង ១០ ព្រឹកនៅទំនេរ។ តម្លៃ ១៥០០០៛។ ខ្ញុំកក់ឲ្យទេ?',
-    bookingLabel: 'ការកក់បានបញ្ជាក់',
-    bookingValue: 'កាត់សក់ · ១០:០០ ព្រឹក',
-    bookingStatus: 'បានកត់ត្រា',
-    ownerNote: 'ម្ចាស់ហាងឃើញភ្លាមៗ',
-    handoff: 'មិនច្បាស់? ប្រគល់ឲ្យម្ចាស់ហាង',
-    handoffBody: 'Moni មិនស្មានតម្លៃ ឬម៉ោងទំនេរទេ។ វាឈប់ ហើយទុកឲ្យអ្នកសម្រេច។',
+    bookingLabel: 'សំណើកក់',
+    bookingValue: 'កាត់សក់ ថ្ងៃស្អែក ម៉ោង ១០ ព្រឹក',
+    bookingStatus: 'រួចរាល់សម្រាប់អ្នកបញ្ជាក់',
+    ownerNote: 'សំណើចូលមករកអ្នកភ្លាមៗ',
+    handoff: 'ពេល Moni មិនប្រាកដ អ្នកជាអ្នកសម្រេច',
+    handoffBody: 'Moni មិនទាយតម្លៃ ឬម៉ោងទំនេរទេ។ វាបង្ហាញអ្វីដែលដឹង ហើយផ្ញើអ្វីដែលមិនច្បាស់មកអ្នកពិនិត្យ។',
   },
   breadth: {
     eyebrow: 'ហាងមួយ មិនមែនប្រភេទតែមួយ',
@@ -258,8 +260,8 @@ const km: Copy = {
   },
   pricing: {
     eyebrow: 'តម្លៃដែលងាយយល់',
-    title: 'ចាប់ផ្តើមដោយឥតគិតថ្លៃ',
-    headline: 'បង់តែពេលហាងអ្នករកបាន',
+    title: 'សាកល្បងជាមួយហាងអ្នក',
+    headline: 'ឥតគិតថ្លៃ ខណៈយើងរៀបចំជាមួយអ្នក',
     body: 'មិនមានថ្លៃប្រចាំខែសម្រាប់ការចាប់ផ្តើមទេ។ យើងនឹងប្រាប់តម្លៃជាមុន នៅពេលការគិតថ្លៃចាប់ផ្តើម។',
     points: ['ប្រតិបត្តិការ ១០០ ដំបូងក្នុងមួយខែ ឥតគិតថ្លៃ', 'គ្មានកាតឥណទានពេលដាក់ពាក្យ', 'ទិន្នន័យហាងជារបស់អ្នក និងអាចនាំចេញបាន'],
     figure: 100,
@@ -298,11 +300,10 @@ const km: Copy = {
 }
 
 const en: Copy = {
-  nav: { apply: 'Apply', other: 'ភាសាខ្មែរ', otherHref: 'km', how: 'How it works', proof: 'See the proof', faq: 'Questions' },
+  nav: { notice: 'For small shops in Cambodia', apply: 'Apply', other: 'ភាសាខ្មែរ', otherHref: 'km', how: 'How it works', proof: 'See the proof', faq: 'Questions' },
   hero: {
-    eyebrow: 'For small shops in Cambodia',
-    headline: 'Your shop answers customers while your hands are busy',
-    sub: 'Tell Moni about your shop in plain language, by typing or speaking. It answers messages, checks real availability, and books for you.',
+    headline: ['Busy running the shop?', 'Moni answers for you.'],
+    sub: 'Prices, bookings, payments, and messages arrive while your hands are busy. Moni answers from your shop data and helps finish the work for you.',
     cta: 'Apply as a founding shop',
     secondary: 'See how it works',
     reassure: 'We set up the first shops by hand. Free while we build.',
@@ -338,7 +339,8 @@ const en: Copy = {
       'Held the slot',
       'Sent a KHQR for 15,000៛',
     ],
-    replyNote: 'Every answer comes from your data, never from a guess.',
+    replyNote: 'This answer comes from your service list and opening hours.',
+    runAction: 'Run the example',
   },
   capabilities: {
     eyebrow: 'What Moni can do',
@@ -361,12 +363,12 @@ const en: Copy = {
     customerMessage: 'Hi, can I book a haircut tomorrow at 10am?',
     assistantLabel: 'Moni',
     assistantMessage: 'Yes. 10am is available. The price is 15,000៛. Shall I book it?',
-    bookingLabel: 'Booking confirmed',
-    bookingValue: 'Haircut · 10:00am',
-    bookingStatus: 'Recorded',
-    ownerNote: 'The owner sees it instantly',
-    handoff: 'Not sure? Hand it back to the owner',
-    handoffBody: 'Moni does not guess a price or promise a slot from memory. It stops and lets you decide.',
+    bookingLabel: 'Booking request',
+    bookingValue: 'Haircut, tomorrow at 10:00am',
+    bookingStatus: 'Ready for your confirmation',
+    ownerNote: 'You see the request right away',
+    handoff: 'When Moni is unsure, you decide',
+    handoffBody: 'Moni never guesses a price or opening hour. It shows what it knows and sends anything uncertain back for you to check.',
   },
   breadth: {
     eyebrow: 'A shop is not one shape',
@@ -399,8 +401,8 @@ const en: Copy = {
   },
   pricing: {
     eyebrow: 'A price you can understand',
-    title: 'Free to get started',
-    headline: 'You pay when your shop gets paid',
+    title: 'Try it with your shop',
+    headline: 'Free while we set it up with you',
     body: 'There is no monthly fee while we set up the founding shops. We will tell you the rate before charging begins.',
     points: ['The first 100 transactions each month are free', 'No card needed to apply', 'Your shop data is yours and exportable'],
     figure: 100,

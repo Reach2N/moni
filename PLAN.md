@@ -96,7 +96,7 @@ Rules:
 - Green is confirmation and money. It is never decoration. A screen with more than
   a few green elements is wrong.
 - Typography: system stack first (`-apple-system, BlinkMacSystemFont, "SF Pro Text",
-  Inter, sans-serif`), Khmer through the vendored Busra or Kantumruy Pro with
+  Inter, sans-serif`), with vendored Busra as the Khmer fallback and
   `line-height: 1.75` (the Khmer clipping rules in CLAUDE.md still apply in full).
 - Chrome (nav, sheets, bars) uses translucency: `backdrop-blur` over the content,
   hairline separators, never solid borders heavier than 1px.
@@ -112,7 +112,9 @@ Rules:
   `refresh()` and a real scroll position, so a capture can drive it. Plugin registration
   lives only in `src/lib/motion/gsap.ts`, the same way only `src/lib/ai/models.ts` may name
   a model. GSAP 3.15 is free for commercial use including the formerly Club-only plugins.
-- Icons from lucide-react only. Never emoji.
+- Icons use Lucide for interface controls, official simple-icons marks for external channels,
+  and an authored SVG only where no complete library mark exists. Never emoji or invented
+  brand marks.
 - Light only for the homepage. Do not add `prefers-color-scheme: dark` branches to the
   marketing layout or homepage components.
 
@@ -193,9 +195,11 @@ Marketing psychology: scarcity and belonging, not hype. The page is light-only.
   shop and watches it become a price list (`/api/parse`), is the first thing a
   gated member sees. Their description saves against their business from the
   start, so nothing typed is ever lost.
-- Sections below the fold: how it works in three steps, the two-channel promise
-  (Telegram now, Messenger next), per-transaction pricing (free to start, pay only
-  when you get paid), four FAQs, footer with privacy and terms.
+- Sections below the fold: how it works in three steps, a full channel-breadth showcase
+  using the official Telegram, Messenger, Facebook, Instagram, and Grab marks, per-transaction
+  pricing (free to start, pay only when you get paid), four FAQs, footer with privacy and terms.
+  All five marks render at equal weight. Copy and onboarding state which connections are
+  available to a shop; the visual set must not be read as five verified live integrations.
 - Components: use Beautiful UI first for every homepage interaction, especially agentic
   surfaces, and install or copy the strongest complete source component for the showcase.
   Choose by visual clarity, interaction quality,
@@ -207,10 +211,15 @@ Marketing psychology: scarcity and belonging, not hype. The page is light-only.
   in `CREDITS.md`. Do not invent, redraw, or substantially rewrite a component with Tailwind.
   If no library component fits, stop and report the gap. Homepage source components stay in
   marketing during this phase; do not copy them into the legacy `/app` surface.
+- Agent proof: the public page visibly shows one complete customer turn and the agent work
+  trace that grounds it. Use the exact source selections in `docs/HOMEPAGE.md` and
+  `CREDITS.md`; do not substitute generic demo data, a public owner composer, or a page-level
+  library foundation that changes the white marketing ground.
 - Acceptance: deployed (vercel.app until moni.cam is bought); email lands in
   `waitlist` and gets a confirmation; the product is NOT reachable from the public
   site; `npm run shoot` screenshots reviewed at desktop and mobile widths; no
-  layout shift on the hero.
+  layout shift on the hero; the light marketing root remains white with no hidden settled
+  content under reduced motion.
 
 ### Phase 2: Clerk auth, the waitlist gate, and real tenancy
 

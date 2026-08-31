@@ -1,13 +1,36 @@
 @import "tailwindcss";
+@import "@fontsource/kantumruy-pro/khmer-400.css";
+@import "@fontsource/kantumruy-pro/khmer-600.css";
+@import "@fontsource/kantumruy-pro/khmer-700.css";
+
+/* Beautiful UI's foundation, installed verbatim from
+   https://www.beautifului.dev/r/foundation.json and imported unmodified.
+   It carries the @theme that generates the utilities its components are
+   written against (text-ink-2, bg-hover-2, rounded-control), the
+   primitive-card-* rules, and the keyframes. UI-COMPONENTS.md forbids
+   rewriting a library source, so nothing in that file is edited; every
+   collision with Moni's palette is corrected BELOW instead, where a later
+   declaration of the same key wins.
+
+   What it collides on, and why each is reclaimed further down:
+     --font-sans      it points at an undefined --font-inter, which would drop
+                      Busra from the stack and break Khmer rendering outright
+     --radius-card    10px, against the 14px that docs/HOMEPAGE.md mandates
+     --shadow-card    a ring plus a shadow; our surfaces draw their own border
+     --color-surface  \
+     --color-green     |  same names, different meanings. These stay mapped to
+     --color-red       |  Beautiful UI's runtime vars, and the runtime vars are
+     --color-ink      /   fed Moni's values per subtree at the bottom of this file
+     --accent         blue. Ours is systemGreen, re-declared after this import. */
+@import "./beautifui/foundation.css";
 
 /* ── fonts ──────────────────────────────────────────────────────────────────
    Busra: SIL, OFL, real Khmer engineering based on Khmer Mondulkiri, so coeng
    subscripts stack correctly rather than approximately. Licence ships at
    /fonts/OFL-Busra.txt as the OFL requires.
 
-   Kantumruy Pro was removed after the finish review: next/font names the family
-   itself, --font-sans never matched that name, so five weights downloaded and none
-   rendered. Busra carries Khmer and Latin as one family.
+   Kantumruy Pro is loaded for the public homepage through its Fontsource Khmer
+   subsets. The legacy dashboard keeps Busra and does not inherit that scope.
 
    Futura 100 Khmer is the brand face. It is licensed for web use ONLY through
    an Adobe Fonts web project, and its EULA forbids converting it to a web font
@@ -37,7 +60,6 @@
      on text meaning, so green is only ever a struck seal, a fill, or ink on the
      dark panel. sealText exists for the rare case green must carry small text. */
   --color-paper:     #F8FAFC;
-  --color-ink:       #0F172A;
   --color-rule:      #475569;
   --color-seal:      #059669;
   --color-seal-text: #04845D;
@@ -154,16 +176,15 @@
    time and the prefers-color-scheme override above never reaches the utility,
    so dark mode silently does nothing. */
 @theme inline {
-  --color-surface:    var(--background);
   --color-surface-2:  var(--background-secondary);
   --color-label:      var(--label);
   --color-label-2:    var(--label-secondary);
   --color-label-3:    var(--label-tertiary);
   --color-separator:  var(--separator);
-  --color-green:      var(--accent);
   --color-on-green:   var(--on-accent);
-  --color-red:        var(--destructive);
   --color-material:   var(--material);
+  --animate-accordion-down: accordion-down 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-accordion-up: accordion-up 180ms cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* Radii and shadows stay OUT of @theme. Tailwind's theme namespaces are
@@ -183,26 +204,97 @@
    black, white, one green, light and dark from day one. Do not reintroduce
    colour here; change the palette at :root where both schemes are defined. */
 .moni-hig {
-  color-scheme: light dark;
+  /* docs/HOMEPAGE.md: "The homepage is a quiet, light Apple-native showcase
+     surface. It never follows prefers-color-scheme: dark in this phase."
+     So the light values are pinned here rather than inherited, and a visitor on
+     a dark operating system still gets the designed page. The :root dark block
+     above is left in place for the eventual dashboard rebuild; it simply does
+     not reach this subtree. */
+  color-scheme: light;
 
-  /* PLAN.md section 3: "system stack first (-apple-system, BlinkMacSystemFont,
-     SF Pro Text, Inter, sans-serif), Khmer through the vendored Busra".
+  --background:           #FFFFFF;
+  --background-secondary: #F5F5F7;
+  --label:                #1D1D1F;
+  --label-secondary:      rgba(60, 60, 67, 0.60);
+  --label-tertiary:       rgba(60, 60, 67, 0.30);
+  --separator:            rgba(60, 60, 67, 0.29);
+  --accent:               #34C759;
+  --on-accent:            #0B2E16;
+  --destructive:          #FF3B30;
 
-     This is scoped to the public surface rather than changed in --font-sans,
-     because --font-sans is also the dashboard's face and the Invitation world
-     deliberately sets everything in Busra. Without this the marketing page
-     rendered its Latin in Busra too, whose Latin is a SERIF, so an interface
-     meant to read as Apple-native was setting its headlines in a bookish
-     roman. Futura 100 Khmer still leads when NEXT_PUBLIC_TYPEKIT_ID is set:
-     it is the licensed brand face and covers both scripts.
+  /* Beautiful UI's components resolve these names from their foundation
+     stylesheet. Keep the source component intact, but scope its hooks to the
+     homepage so its cool canvas, stripe, and dark branch cannot leak through. */
+  --surface:              var(--background);
+  --page:                 var(--background);
+  --canvas:               var(--background-secondary);
+  --inset:                var(--background-secondary);
+  --field:                var(--background-secondary);
+  --hover:                var(--background-secondary);
+  --hover-2:              color-mix(in srgb, var(--label) 8%, var(--background));
+  --ink:                  var(--label);
+  --ink-2:                var(--label-secondary);
+  --ink-3:                var(--label-tertiary);
+  --line:                 var(--separator);
+  --line-strong:          color-mix(in srgb, var(--label) 38%, transparent);
+  --line-soft:            color-mix(in srgb, var(--label) 12%, transparent);
+  --stripe:               transparent;
+  --stripe-bg:            var(--background);
+  --accent-ink:           var(--on-accent);
+  --accent-tint:          color-mix(in srgb, var(--accent) 12%, transparent);
+  --green:                var(--accent);
+  --green-tint:           color-mix(in srgb, var(--accent) 12%, transparent);
+  --red:                  var(--destructive);
+  --red-tint:             color-mix(in srgb, var(--destructive) 12%, transparent);
 
-     Font fallback is per glyph, not per string, so Khmer characters are absent
-     from SF and resolve to Busra on the next family in the list. That is why
-     one stack can serve both scripts without a :lang() rule. */
-  font-family: 'futura-100-khmer', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+  /* Homepage type: system stack for Latin, Kantumruy Pro for Khmer. Scoped here
+     because --font-sans is also the dashboard's face, and the Invitation world
+     is deliberately set in Busra throughout. Font fallback is per glyph, so
+     Khmer is absent from SF and resolves to Kantumruy Pro further down the list. */
+  /* Only the Khmer subset of Kantumruy is imported. Keeping it first selects it
+     for Khmer glyphs while Latin falls through to the native system stack. */
+  font-family: 'Kantumruy Pro', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
     'Inter', system-ui, 'Busra', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── the bridge: Moni's palette drives Beautiful UI's theme hooks ──────────
+   Beautiful UI's components are written against its own token names, and its
+   foundation maps them through @theme (--color-ink-2: var(--ink-2), and so on).
+   Rather than edit a single line of a library component, the runtime vars those
+   utilities resolve to are fed Moni's values here. `text-ink-2` in an installed
+   component and `text-label-2` in ours now render the same colour.
+
+   This is the "documented theme hooks" route UI-COMPONENTS.md requires, and it
+   is why nothing under src/components/primitives/ has been touched. */
+:root {
+  --surface:      var(--background);
+  --page:         var(--background);
+  --canvas:       var(--background-secondary);
+  --inset:        var(--background-secondary);
+  --field:        var(--background-secondary);
+  --hover:        var(--background-secondary);
+  --hover-2:      color-mix(in srgb, var(--label) 8%, var(--background));
+
+  --ink:          var(--label);
+  --ink-2:        var(--label-secondary);
+  --ink-3:        var(--label-tertiary);
+
+  --line:         var(--separator);
+  --line-strong:  color-mix(in srgb, var(--label) 38%, transparent);
+  --line-soft:    color-mix(in srgb, var(--label) 12%, transparent);
+
+  /* --accent is already ours: the name is shared, and our declaration wins by
+     order. Green is the accent here, so both names resolve to systemGreen. */
+  --accent-ink:   var(--on-accent);
+  --accent-tint:  color-mix(in srgb, var(--accent) 12%, transparent);
+  --green:        var(--accent);
+  --green-tint:   color-mix(in srgb, var(--accent) 12%, transparent);
+  --red:          var(--destructive);
+  --red-tint:     color-mix(in srgb, var(--destructive) 12%, transparent);
+}
+
+
 
 
 /* Unlayered on purpose. Tailwind emits utilities inside @layer utilities and
@@ -245,6 +337,20 @@
   --ui-thumb:     var(--label-tertiary);
 }
 .moni-invitation {
+  /* The dashboard answers the same Beautiful UI hooks with Invitation values,
+     so a component reused there reads plate ink on note paper rather than the
+     homepage's palette. Delete with the rest of the Invitation in Phase 5. */
+  --surface:      #FFFFFF;
+  --page:         var(--color-paper);
+  --canvas:       var(--color-paper);
+  --ink:          #0F172A;
+  --ink-2:        var(--color-rule);
+  --ink-3:        var(--color-on-ink-dim);
+  --line:         var(--color-hairline);
+  --line-strong:  var(--color-rule);
+  --accent:       var(--color-seal);
+  --green:        var(--color-seal);
+
   --ui-accent:    var(--color-seal);
   --ui-ground:    var(--color-paper);
   --ui-hairline:  var(--color-hairline);
@@ -272,6 +378,16 @@ html, body {
   max-width: 100vw;
 }
 
+/* Beautiful UI's foundation owns a fixed stripe on `body`. The marketing
+   root is the homepage's actual canvas, so remove that page-level treatment
+   whenever this route is present. The legacy owner surface has no `.moni-hig`
+   child and keeps its own ground. */
+body:has(.moni-hig) {
+  background-color: #FFFFFF;
+  background-image: none;
+  color: #1D1D1F;
+}
+
 /* Amounts and times are quantities, so they align as columns of digits rather
    than reflowing as prose. This is the discipline the nixie counter donated. */
 .tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
@@ -280,5 +396,54 @@ html, body {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
+/* Radix Accordion exposes the measured content height through this variable.
+   The installed shadcn wrapper already points at these animation names; the
+   keyframes are the missing bridge that turns its open/close state into a
+   measured height transition instead of a snap. */
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+
 /* Composer demo caret. Steps, not a fade: a text cursor does not dissolve. */
 @keyframes moni-caret { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+
+/* ── scroll entrances, rewritten 30 August 2026 ─────────────────────────────
+   Every entrance on the public site used to write its own start values from
+   JavaScript, and JavaScript cannot run until hydration. Measured against the
+   production build: the hero painted complete at 25ms and was snapped back to
+   opacity 0 at 638ms, and fifteen further blocks blinked out and faded back in
+   on a single pass down the page. An entrance that hides something the visitor
+   has already started reading is not an entrance, it is a flicker.
+
+   The start state therefore ships in CSS, gated on data-motion, which the
+   marketing layout's inline script sets on <html> before the body paints:
+
+     no JavaScript    the attribute is never set, so nothing is ever hidden.
+                      That is exactly the guarantee reveal.tsx was written to
+                      keep, and it is kept here rather than in tween options.
+     reduced motion   this query does not match, so nothing is hidden, which
+                      agrees with useScrollScene's reduced branch doing nothing.
+     JavaScript on    hidden from the first painted frame, so there is no
+                      visible state to lose. GSAP then writes inline styles,
+                      which outrank these rules.
+
+   Unlayered on purpose, the same cascade-layer trick as the :lang(km) rules:
+   Tailwind emits its utilities inside @layer utilities, so an unlayered rule
+   wins without !important.
+
+     fade     the marked block starts invisible.
+     stagger  its DIRECT CHILDREN start invisible, because children are what
+              Reveal tweens once a stagger is asked for.
+     mask     the headline slides out of an overflow-hidden box, so it keeps
+              its opacity and starts below the mask instead. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-motion='on'] [data-enter='fade'] { opacity: 0; }
+  [data-motion='on'] [data-enter='stagger'] > * { opacity: 0; }
+  [data-motion='on'] [data-enter='mask'] { transform: translateY(104%); }
+}

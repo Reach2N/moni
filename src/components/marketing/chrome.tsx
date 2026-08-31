@@ -1,27 +1,42 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import type { Copy, Locale } from '@/lib/marketing/copy'
 import { HeaderScrollState } from '@/components/marketing/header-scroll-state.tsx'
+import { HeaderNotchNav } from '@/components/marketing/header-notch-nav.tsx'
 
-/**
- * The wordmark: a square plate with the seal struck in it.
+/** The shipped Moni mark, cropped into the compact header lockup.
  *
- * Squared off from the earlier rounded-rect-and-circle. A pill-cornered badge
- * with a dot in it is the generic app-icon shape; the shop's paper has corners,
- * and the green square reads as a stamp rather than a status light.
- */
-function Wordmark() {
+ *  `tone="morph"` is the header's copy: ink while the header is the full white
+ *  bar, and light once it has drawn in to the dark glass island. It reads the
+ *  island's own `data-compact` rather than taking a prop, because this element
+ *  is rendered on the server and passed in as a slot, so it cannot be told.
+ *  The footer's copy is plain ink and takes neither.
+ *
+ *  `compact` drops the word below `sm` and keeps the mark, which is how the
+ *  island fits a phone alongside a destination and Apply. */
+function Wordmark({ tone = 'ink', compact = false }: { tone?: 'ink' | 'morph'; compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <svg viewBox="0 0 24 24" className="size-5" aria-hidden fill="none">
-        <rect x="2.5" y="2.5" width="19" height="19" rx="1" className="fill-label" />
-        <rect x="9" y="9" width="6" height="6" className="fill-green" />
-      </svg>
-      <span className="text-[17px] font-semibold tracking-tight text-label">Moni</span>
+      <Image
+        src="/logos/logo-mark-transparent.png"
+        alt=""
+        width={32}
+        height={20}
+        className="h-5 w-8 shrink-0 object-contain"
+        aria-hidden
+        priority
+      />
+      <span
+        className={`text-[17px] font-semibold tracking-tight transition-colors duration-300 ${
+          tone === 'morph' ? 'text-label group-data-[compact=true]/notch:text-zinc-50' : 'text-label'
+        } ${compact ? 'hidden sm:inline' : ''}`}
+      >
+        Moni
+      </span>
     </span>
   )
 }
 
-const otherHref = (locale: Locale) => (locale === 'km' ? '/?lang=en' : '/')
 const homeHref = (locale: Locale) => (locale === 'km' ? '/' : '/?lang=en')
 const sectionHref = (locale: Locale, section: string) => `${homeHref(locale)}#${section}`
 
@@ -35,46 +50,51 @@ const sectionHref = (locale: Locale, section: string) => `${homeHref(locale)}#${
  * branch on. If a section ever needs light chrome over a dark ground again, that
  * is what .moni-invert is for, and it needs no prop.
  *
- * The header starts transparent over the hero and gains its ground and hairline
- * once the page scrolls: that state is a data attribute set by HeaderScrollState.
+ * The header's own ground and hairline still arrive on scroll, from the data
+ * attribute HeaderScrollState sets. That is the bar BEHIND the notch, and once
+ * scrolled it now paints NOTHING. It used to be `bg-surface/80` with its own
+ * blur, which was a second sheet of frosted white between the page and the
+ * island: the content was already gone by the time it reached the glass, so
+ * the island's transparency showed white and bought nothing. The island is the
+ * only chrome in the compact state, and the page runs live underneath it.
+ *
+ * The bar still paints at the TOP of the page, where the notch is the
+ * full-width white header and there is nothing to see through.
+ *
+ * The header is one element. It used to be two rows: a notice strip that
+ * compacted into an empty decorative notch on scroll, and beneath it a mark, a
+ * `hidden lg:flex` row of links no phone ever saw, a language toggle and Apply.
+ * All of it now lives in the single notch, which is the full-width white header
+ * at the top of the page and draws in to the compact glass island on scroll.
+ * `copy.nav.notice` is deliberately no longer rendered: a notch carrying the
+ * mark, three destinations, the language toggle and Apply has no room for a
+ * tagline as well, and the hero says the same thing directly below it.
  */
 export function SiteHeader({ copy, locale }: { copy: Copy; locale: Locale }) {
   return (
     <header
       data-site-header
-      className="sticky top-0 z-40 border-b border-transparent transition-colors duration-300 data-[scrolled=true]:border-separator data-[scrolled=true]:bg-surface/80 data-[scrolled=true]:backdrop-blur-xl"
+      /* No hairline, and past the threshold no ground either: the island's own
+         glass is what separates the navigation from the page, and a white
+         sheet behind it would just be the covering-up this was meant to
+         stop. */
+      className="sticky top-0 z-40 bg-surface transition-colors duration-300 data-[scrolled=true]:bg-transparent"
     >
       <HeaderScrollState />
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
-        <Link href={homeHref(locale)} aria-label="Moni">
-          <Wordmark />
-        </Link>
-        <nav className="hidden items-center gap-5 text-sm text-label-2 md:flex" aria-label="Primary">
-          <Link href={sectionHref(locale, 'how')} className="transition-colors hover:text-label">
-            {copy.nav.how}
-          </Link>
-          <Link href={sectionHref(locale, 'proof')} className="transition-colors hover:text-label">
-            {copy.nav.proof}
-          </Link>
-          <Link href={sectionHref(locale, 'faq')} className="transition-colors hover:text-label">
-            {copy.nav.faq}
-          </Link>
-        </nav>
-        <nav className="ml-auto flex items-center gap-1.5" aria-label="Site actions">
-          <Link
-            href={otherHref(locale)}
-            hrefLang={copy.nav.otherHref}
-            className="px-3 py-2 text-sm text-label-2 transition-colors hover:text-label"
-          >
-            {copy.nav.other}
-          </Link>
-          <a
-            href={sectionHref(locale, 'apply')}
-            className="bg-label px-4 py-2 text-sm font-medium text-surface transition-opacity hover:opacity-85 active:scale-[0.99]"
-          >
-            {copy.nav.apply}
-          </a>
-        </nav>
+      <div className="relative h-14">
+        <HeaderNotchNav
+          nav={copy.nav}
+          locale={locale}
+          logo={<Wordmark tone="morph" compact />}
+          action={
+            <a
+              href={sectionHref(locale, 'apply')}
+              className="rounded-full bg-label px-3.5 py-2 text-[13px] font-semibold text-surface transition-[background-color,color,opacity] duration-300 hover:opacity-85 active:scale-[0.99] group-data-[compact=true]/notch:bg-zinc-50 group-data-[compact=true]/notch:text-zinc-950 sm:px-4 sm:text-sm"
+            >
+              {copy.nav.apply}
+            </a>
+          }
+        />
       </div>
     </header>
   )
@@ -89,10 +109,9 @@ export function SiteFooter({ copy, locale }: { copy: Copy; locale: Locale }) {
           <Wordmark />
           <span className="text-sm text-label-2">{copy.footer.rights}</span>
         </div>
+        {/* No Apply link here. The header's is sticky, so it is on screen at the
+            footer too, and this one pointed at the same #apply anchor. */}
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-label-2" aria-label="Footer">
-          <Link href={sectionHref(locale, 'apply')} className="hover:text-label">
-            {copy.nav.apply}
-          </Link>
           <Link href={`/privacy${q}`} className="hover:text-label">
             {copy.footer.privacy}
           </Link>

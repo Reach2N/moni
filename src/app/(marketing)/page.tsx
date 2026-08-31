@@ -3,17 +3,16 @@ import { BookingProof } from '@/components/marketing/booking-proof.tsx'
 import { SiteFooter, SiteHeader } from '@/components/marketing/chrome.tsx'
 import { Hero } from '@/components/marketing/hero.tsx'
 import { HowSequence } from '@/components/marketing/how-sequence.tsx'
-import { AgentConversation } from '@/components/marketing/agent-conversation.tsx'
 import { Capabilities } from '@/components/marketing/capabilities.tsx'
 import { ChannelList } from '@/components/marketing/channel-list.tsx'
 import { MessageLog } from '@/components/marketing/message-log.tsx'
 import { PricingFigure } from '@/components/marketing/pricing-figure.tsx'
 import { WaitlistForm } from '@/components/marketing/waitlist-form.tsx'
 import { Sheet, SheetHead } from '@/components/marketing/artifacts.tsx'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion.tsx'
 import {
   IconCheck,
   IconGoods,
-  IconPlus,
   IconRoom,
   IconShopfront,
 } from '@/components/marketing/icons.tsx'
@@ -56,24 +55,6 @@ export default async function MarketingHome({
             between them. White is the ground the whole way down. */}
         <Hero copy={copy} />
 
-        {/* The page's whole claim, shown before it is argued: a customer writes,
-            Moni answers from the shop's data, and the work it did is listed
-            beside the reply. */}
-        <section className="border-b border-separator pb-20 sm:pb-28" aria-labelledby="agent-heading">
-          <div className="mx-auto max-w-5xl px-5 pb-10 sm:px-8 sm:pb-12">
-            <Reveal className="max-w-2xl">
-              <p className={EYEBROW}>{copy.agent.eyebrow}</p>
-              <h2 id="agent-heading" className={HEADING}>
-                {copy.agent.title}
-              </h2>
-              <p className="mt-5 text-lg text-pretty text-label-2">{copy.agent.body}</p>
-            </Reveal>
-          </div>
-          <div className="px-5 sm:px-8">
-            <AgentConversation copy={copy} />
-          </div>
-        </section>
-
         <section className="border-b border-separator" aria-labelledby="capabilities-heading">
           <div className={SECTION}>
             <Reveal className="max-w-2xl">
@@ -89,9 +70,9 @@ export default async function MarketingHome({
           </div>
         </section>
 
-        <HowSequence copy={copy} locale={locale} />
+        <HowSequence copy={copy} />
 
-        <section id="proof" className="scroll-mt-16 border-b border-separator bg-surface-2" aria-labelledby="proof-heading">
+        <section id="proof" className="scroll-mt-20 border-b border-separator bg-surface-2" aria-labelledby="proof-heading">
           <div className={SECTION}>
             <Reveal className="max-w-2xl">
               <p className={EYEBROW}>{copy.proof.eyebrow}</p>
@@ -109,7 +90,7 @@ export default async function MarketingHome({
         {/* Breadth and channels were two anonymous, anchorless sections with the
             same shape. One band answers both questions a shop owner actually
             asks: does it fit my kind of shop, and where do my messages arrive. */}
-        <section id="channels" className="scroll-mt-16 border-b border-separator" aria-labelledby="breadth-heading">
+        <section id="channels" className="scroll-mt-20 border-b border-separator" aria-labelledby="breadth-heading">
           <div className={SECTION}>
             <Reveal className="max-w-2xl">
               <p className={EYEBROW}>{copy.breadth.eyebrow}</p>
@@ -177,28 +158,29 @@ export default async function MarketingHome({
           </div>
         </section>
 
-        <section id="faq" className="scroll-mt-16 border-b border-separator" aria-labelledby="faq-heading">
+        <section id="faq" className="scroll-mt-20 border-b border-separator" aria-labelledby="faq-heading">
           <div className="mx-auto max-w-3xl px-5 py-20 sm:px-8 sm:py-28">
             <Reveal>
               <h2 id="faq-heading" className="text-3xl font-semibold tracking-[-0.035em] text-balance text-label sm:text-5xl">
                 {copy.faq.title}
               </h2>
             </Reveal>
-            <div className="mt-10 divide-y divide-separator border-y border-separator">
-              {copy.faq.items.map((item) => (
-                <details key={item.q} className="group py-5">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-semibold text-label [&::-webkit-details-marker]:hidden">
-                    <span className="min-w-0">{item.q}</span>
-                    <IconPlus className="size-4 shrink-0 text-label-2" />
-                  </summary>
-                  <p className="mt-3 max-w-2xl text-[15px] text-pretty text-label-2">{item.a}</p>
-                </details>
+            <Accordion type="single" collapsible className="mt-10 border-y border-separator">
+              {copy.faq.items.map((item, index) => (
+                <AccordionItem key={item.q} value={`faq-${index}`}>
+                  <AccordionTrigger className="py-5 text-left text-lg font-semibold text-label hover:no-underline">
+                    <span className="min-w-0 text-balance">{item.q}</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="max-w-2xl text-[15px] text-pretty text-label-2">
+                    {item.a}
+                  </AccordionContent>
+                </AccordionItem>
               ))}
-            </div>
+            </Accordion>
           </div>
         </section>
 
-        <section id="apply" className="scroll-mt-16 bg-surface-2" aria-labelledby="apply-heading">
+        <section id="apply" className="scroll-mt-20 bg-surface-2" aria-labelledby="apply-heading">
           <div className={`${SECTION} grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20`}>
             <Reveal>
               <p className={EYEBROW}>{copy.waitlist.eyebrow}</p>
@@ -206,7 +188,6 @@ export default async function MarketingHome({
                 {copy.waitlist.title}
               </h2>
               <p className="mt-5 text-lg text-pretty text-label-2">{copy.waitlist.body}</p>
-              <p className="mt-5 text-sm text-label-3">{copy.hero.reassure}</p>
             </Reveal>
             <Reveal y={18} delay={0.06} className="rounded-[var(--radius-card)] border border-separator bg-surface p-5 shadow-[var(--shadow-card)] sm:p-8">
               <WaitlistForm copy={copy} locale={locale} appUrl={APP_URL} />
