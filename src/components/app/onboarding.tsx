@@ -4,6 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Check, Send } from 'lucide-react'
+import { SetupTasks } from '@/components/agent/setup-tasks.tsx'
+import { setupComplete, type SetupStep } from '@/lib/queries/setup-progress.ts'
 import { ChatPanel } from './chat-panel.tsx'
 import { ShopSetup } from './shop-setup.tsx'
 
@@ -20,10 +22,12 @@ export function Onboarding({
   shopName,
   initialInstructions,
   hasCatalogue,
+  steps,
 }: {
   shopName: string
   initialInstructions: string | null
   hasCatalogue: boolean
+  steps: readonly SetupStep[]
 }) {
   const router = useRouter()
   const [saved, setSaved] = useState(false)
@@ -32,6 +36,11 @@ export function Onboarding({
     <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
       {saved ? (
         <>
+          {!setupComplete(steps) && (
+            <div className="mb-6">
+              <SetupTasks steps={steps} retryLabel="សាកម្តងទៀត" detailLabel="មើលកំហុស" />
+            </div>
+          )}
           <div className="flex items-start gap-3">
             <Check className="mt-1 size-6 shrink-0 text-seal-text" strokeWidth={1.75} aria-hidden />
             <div>
@@ -85,6 +94,11 @@ export function Onboarding({
         </>
       ) : (
         <>
+          {!setupComplete(steps) && (
+            <div className="mb-6">
+              <SetupTasks steps={steps} retryLabel="សាកម្តងទៀត" detailLabel="មើលកំហុស" />
+            </div>
+          )}
           <h1 className="km text-xl font-semibold text-ink">
             {hasCatalogue ? 'កែពិពណ៌នាហាង' : `សូមស្វាគមន៍ ${shopName}`}
           </h1>
@@ -92,12 +106,6 @@ export function Onboarding({
             ប្រាប់ Moni ពីហាងរបស់អ្នកម្តង ដោយនិយាយ ឬវាយបញ្ចូល។ Moni រៀបចំសេវា តម្លៃ ម៉ោងបើក
             និងចំនួនបុគ្គលិកឱ្យអ្នកពិនិត្យ។
           </p>
-
-          <ol className="km mt-4 flex flex-wrap gap-x-4 gap-y-1 border-y border-hairline py-2 text-xs text-rule">
-            <li>១. ពិពណ៌នា</li>
-            <li>២. ពិនិត្យ និងរក្សាទុក</li>
-            <li>៣. សាកជាអតិថិជន</li>
-          </ol>
 
           <div className="mt-4 -mx-4 sm:mx-0">
             <ShopSetup

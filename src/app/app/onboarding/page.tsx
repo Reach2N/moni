@@ -11,14 +11,17 @@ export const metadata = { title: 'រៀបចំហាង' }
 export default async function OnboardingPage() {
   // Same reason as the dashboard: keep database configuration out of the
   // build-time module graph so a clean clone still builds the public site.
-  const [{ requireMember }, { getBusinessById, hasCatalogue }] = await Promise.all([
-    import('@/lib/auth/member.ts'),
-    import('@/lib/queries/business.ts'),
-  ])
+  const [{ requireMember }, { getBusinessById, hasCatalogue }, { loadSetupProgress }] =
+    await Promise.all([
+      import('@/lib/auth/member.ts'),
+      import('@/lib/queries/business.ts'),
+      import('@/lib/queries/setup.ts'),
+    ])
   const member = await requireMember()
-  const [business, catalogued] = await Promise.all([
+  const [business, catalogued, steps] = await Promise.all([
     getBusinessById(member.businessId),
     hasCatalogue(member.businessId),
+    loadSetupProgress(member.businessId),
   ])
 
   return (
@@ -26,6 +29,7 @@ export default async function OnboardingPage() {
       shopName={business.name}
       initialInstructions={business.ai_instructions}
       hasCatalogue={catalogued}
+      steps={steps}
     />
   )
 }
