@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 import type { ParseResponse } from '@/lib/parse-types.ts'
+import { sanityCheck } from '@/lib/ai/sanity.ts'
 import { moneyKm, toKhmerDigits } from './dashboard-format.ts'
 
 const SAMPLE =
@@ -16,7 +17,7 @@ const SAMPLE =
 
 type SetupState = 'describe' | 'parsing' | 'review' | 'saving' | 'saved' | 'error'
 
-/** Service warnings name their row as `services[2] "Haircut"`, per sanityCheck in lib/ai/parse.ts. */
+/** Service warnings name their row as `services[2] "Haircut"`, per sanityCheck in lib/ai/sanity.ts. */
 function warningsByService(warnings: readonly { field: string; issue: string }[]) {
   const byIndex = new Map<number, string[]>()
   const other: string[] = []
@@ -146,7 +147,11 @@ export function ShopSetup({
   }
 
   const busy = state === 'parsing' || state === 'saving'
-  const { byIndex: serviceWarnings, other: otherWarnings } = warningsByService(parsed?.warnings ?? [])
+  // Recomputed on every edit, not read from the parse response: a warning that
+  // survives the correction it asked for teaches the owner to ignore warnings,
+  // and this screen exists to earn their trust in the parse.
+  const liveWarnings = parsed ? sanityCheck(parsed.shop) : []
+  const { byIndex: serviceWarnings, other: otherWarnings } = warningsByService(liveWarnings)
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8" aria-live="polite" aria-busy={busy}>
