@@ -1006,6 +1006,49 @@ const meter = await one(db, `
    where table_name = 'v_month_usage' and column_name = 'ai_spend_micro_usd'`)
 eq('the month view exposes model spend, so the ceiling has something to read', Number(meter.c), 1)
 
+console.log('\nthe setup spine: has this shop ever served a customer')
+
+// The spine's question is "ever", the meter's is "this month". The WINDOW may
+// differ; the counted set may not. These assertions are what stops the two
+// drifting apart into a billing bug.
+const everTxn = `
+  select (exists (select 1 from bookings
+                   where business_id = $1 and status in ('confirmed','completed'))
+       or exists (select 1 from payments
+                   where business_id = $1 and status = 'paid' and booking_id is null)) as ok`
+
+const spineSays = async (biz) =>
+  (await one(db, everTxn.replaceAll('$1', `'${biz}'`))).ok === true
+
+eq('the seeded salon has already served someone', await spineSays(B_SALON), true)
+
+await db.exec(`
+  insert into businesses (id, slug, name, business_type, category, locale, default_currency)
+  values ('b0000000-0000-4000-8000-000000000099', 'brand-new', 'Brand New',
+          'salon', 'beauty', 'km', 'KHR')
+  on conflict (id) do nothing`)
+const B_NEW = 'b0000000-0000-4000-8000-000000000099'
+
+eq('a brand new shop has served nobody', await spineSays(B_NEW), false)
+
+await db.exec(`
+  insert into bookings (business_id, service_id, resource_id, customer_id, starts_at, ends_at,
+                        status, unit, price_minor, currency, channel, created_by)
+  values ('${B_NEW}','${S_CUT}','${R_SOKHA}','${C_SOPHEA}',
+          ${at(30, '09:00')}, ${at(30, '09:30')},
+          'pending','session',15000,'KHR','web','ai')`)
+eq('a PENDING booking is not a transaction (it may never happen)', await spineSays(B_NEW), false)
+
+await db.exec(`update bookings set status = 'confirmed'
+                where business_id = '${B_NEW}' and status = 'pending'`)
+eq('a CONFIRMED booking is a transaction', await spineSays(B_NEW), true)
+
+// and the counted set matches the meter's, which is the assertion that matters
+const meterSet = await one(db, `
+  select count(*) c from bookings
+   where business_id = '${B_NEW}' and status in ('confirmed','completed')`)
+eq('and the meter counts exactly the same booking', Number(meterSet.c), 1)
+
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
 process.exit(fail === 0 ? 0 : 1)

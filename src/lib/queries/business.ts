@@ -67,3 +67,35 @@ export async function getChannelConnections(businessId: string): Promise<Channel
     lastError: row.last_error,
   }))
 }
+
+/**
+ * Has this shop ever served a real customer?
+ *
+ * The counted set is the one `v_month_usage` meters (db/schema.sql): a booking
+ * that got real, plus a standalone paid sale with no booking behind it, so a
+ * booking that is also paid counts once. The WINDOW is deliberately different:
+ * the meter asks about this month, the setup spine asks whether it has ever
+ * happened at all. Change the set here only by changing the view too, or the
+ * product will meter one thing and congratulate the owner for another.
+ *
+ * Two head counts rather than one join: either is a yes, so the second is
+ * skipped whenever the first answers.
+ */
+export async function hasFirstTransaction(businessId: string): Promise<boolean> {
+  const bookings = await db
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .in('status', ['confirmed', 'completed'])
+  throwIfDbError('count billable bookings', bookings.error)
+  if ((bookings.count ?? 0) > 0) return true
+
+  const sales = await db
+    .from('payments')
+    .select('id', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .eq('status', 'paid')
+    .is('booking_id', null)
+  throwIfDbError('count standalone sales', sales.error)
+  return (sales.count ?? 0) > 0
+}
