@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Check, CircleAlert, LoaderCircle, Save } from 'lucide-react'
+import { ArrowLeft, Check, CircleAlert, LoaderCircle, Save, TriangleAlert } from 'lucide-react'
 import { VoiceNote } from './voice-note.tsx'
 import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { AgentThinking, type ThinkingStep } from '@/components/agent/agent-thinking.tsx'
@@ -15,6 +15,22 @@ const SAMPLE =
   'កាត់សក់ 15000៛ 30 នាទី។ លាបសក់ 45000៛ ១ម៉ោងកន្លះ។ សក់អ៊ុត 60000៛ ២ម៉ោង។ លាងសក់ 8000៛។ Open 8am to 7pm, Monday to Saturday. Closed Sunday. Two staff.'
 
 type SetupState = 'describe' | 'parsing' | 'review' | 'saving' | 'saved' | 'error'
+
+/** Service warnings name their row as `services[2] "Haircut"`, per sanityCheck in lib/ai/parse.ts. */
+function warningsByService(warnings: readonly { field: string; issue: string }[]) {
+  const byIndex = new Map<number, string[]>()
+  const other: string[] = []
+  for (const warning of warnings) {
+    const match = /^services\[(\d+)\]/.exec(warning.field)
+    if (!match) {
+      other.push(warning.issue)
+      continue
+    }
+    const index = Number(match[1])
+    byIndex.set(index, [...(byIndex.get(index) ?? []), warning.issue])
+  }
+  return { byIndex, other }
+}
 
 export function ShopSetup({
   onSaved,
@@ -130,6 +146,7 @@ export function ShopSetup({
   }
 
   const busy = state === 'parsing' || state === 'saving'
+  const { byIndex: serviceWarnings, other: otherWarnings } = warningsByService(parsed?.warnings ?? [])
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-8" aria-live="polite" aria-busy={busy}>
@@ -200,16 +217,25 @@ export function ShopSetup({
                   <p className="km tnum mt-2 text-xs text-rule">
                     {moneyKm(service.price_minor, service.currency === 'USD' ? 'USD' : 'KHR')} · {toKhmerDigits(service.duration_min)} នាទី
                   </p>
+                  {(serviceWarnings.get(index) ?? []).map((issue, warningIndex) => (
+                    <p
+                      key={`${index}-${warningIndex}`}
+                      className="mt-2 flex items-start gap-1.5 border-t border-hairline pt-2 text-xs text-ink"
+                    >
+                      <TriangleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                      {issue}
+                    </p>
+                  ))}
                 </li>
               ))}
             </ul>
           </div>
 
-          {parsed && parsed.warnings.length > 0 ? (
+          {otherWarnings.length > 0 ? (
             <div className="border border-rule/70 px-3 py-2">
               <p className="km text-sm font-semibold text-ink">មានព័ត៌មានត្រូវពិនិត្យ</p>
-              {parsed.warnings.map((warning) => (
-                <p key={`${warning.field}-${warning.issue}`} className="mt-1 text-xs text-rule">{warning.issue}</p>
+              {otherWarnings.map((issue, warningIndex) => (
+                <p key={warningIndex} className="mt-1 text-xs text-rule">{issue}</p>
               ))}
             </div>
           ) : null}

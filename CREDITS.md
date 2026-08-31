@@ -233,3 +233,31 @@ steps from the real `/api/parse` lifecycle. It also drops the source's
 `max-w-95` on the outer wrapper: that fixed width suits the marketing card, but
 this fork renders in a full-width form column, so it fills that column instead.
 Every other class is kept.
+
+## Beautiful UI: Diff Table, fetched and rejected
+
+- Project: [Beautiful UI](https://www.beautifului.dev/)
+- Pattern: [Diff Table](https://www.beautifului.dev/#diff-table)
+- License: MIT (the site publishes the component set under MIT)
+- Outcome: rejected, not adapted
+
+Fetched with `npx shadcn@latest add https://www.beautifului.dev/r/diff-table.json --yes`
+for the parse-review step, where an owner checks and corrects the services Moni parsed
+from their description. The install returned real code, not a link stub, but the
+component does not fit. Its `DiffRow` type is `{ key, id, dept, email, removed }`, a
+scripted employee directory diff, and the only interaction is clicking a whole row to
+include or exclude it from an add and remove set. There is no `<input>` anywhere in the
+file: no cell can be typed into. This screen needs an owner to correct a name, a price,
+and a duration per row, which is cell editing, not row inclusion.
+
+The plan's documented fallback, `src/components/primitives/RecordsTable.tsx`, was checked
+next and rejected too. It is a 1054 line CRM grid built around company names, websites,
+and relationship strength, and its only `<input>` is a checkbox. Bending either component
+to three service fields would be the "substantially rewrite a library component" the
+sourcing rule forbids as firmly as inventing one.
+
+The review step therefore keeps Moni's existing purpose built services table in
+`src/components/app/shop-setup.tsx`, whose inputs already have proper labels. The fix
+delivered instead attaches each parse warning to the row it concerns, so a row Moni was
+unsure about is visually distinct at the point the owner is looking at it, rather than
+listed separately below the table.
