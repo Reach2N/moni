@@ -11,9 +11,11 @@ product scope and build order, `ARCHITECTURE.md` for architectural decisions, an
 `docs/HOMEPAGE.md` for the active homepage UI contract. The former feature, UI, product,
 and Invitation design documents are archived under `docs/archive/`.
 
-For the current repository request, work is documentation-only. Do not modify frontend/source
-files, install packages, or make frontend changes. The homepage contract is being prepared for
-a later implementation pass.
+The active implementation pass is owner onboarding, per `docs/ONBOARDING.md` and
+`docs/superpowers/plans/2026-08-31-onboarding-beautiful-ui.md`. Homepage files stay
+frozen: `src/components/marketing/**`, `src/app/(marketing)/**`, and the two scripted
+primitives `src/components/primitives/TaskRows.tsx` and
+`src/components/primitives/ThinkingState.tsx` are not modified by this pass.
 
 ## Hard rules
 

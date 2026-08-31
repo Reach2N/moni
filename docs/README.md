@@ -2,8 +2,8 @@
 
 This directory separates active implementation instructions from historical research.
 
-The current request changes documentation only. Frontend/source files and dependencies stay
-untouched until a later, explicitly authorized implementation pass.
+Owner onboarding is under active implementation per `ONBOARDING.md`. Homepage files and the
+scripted marketing primitives stay frozen during that pass.
 
 ## Active documents
 
