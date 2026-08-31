@@ -50,11 +50,14 @@ const CheckIcon = (
 export function SetupTasks({
   steps,
   retryLabel,
+  detailLabel,
   className,
 }: {
   steps: readonly SetupStep[]
   /** Khmer, for example 'សាកម្តងទៀត'. Passed in so no copy is hardcoded here. */
   retryLabel: string
+  /** Khmer, names the disclosure action for screen readers, for example 'មើលកំហុស'. */
+  detailLabel: string
   className?: string
 }) {
   const [manualOpen, setManualOpen] = useState<Record<string, boolean>>({})
@@ -104,7 +107,8 @@ export function SetupTasks({
                 <button
                   type="button"
                   aria-expanded={open}
-                  aria-label={step.label}
+                  aria-label={`${detailLabel}: ${step.label}`}
+                  aria-controls={`setup-detail-${step.key}`}
                   onClick={() => setManualOpen((current) => ({ ...current, [step.key]: !open }))}
                   className="-ml-1 flex size-7 shrink-0 items-center justify-center rounded-full text-ink-3"
                 >
@@ -121,6 +125,7 @@ export function SetupTasks({
 
             {expandable && (
               <div
+                id={`setup-detail-${step.key}`}
                 className="grid transition-[grid-template-rows,opacity] duration-300"
                 style={{
                   gridTemplateRows: open ? '1fr' : '0fr',
