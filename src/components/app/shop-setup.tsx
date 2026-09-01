@@ -18,6 +18,13 @@ const SAMPLE =
 
 type SetupState = 'describe' | 'parsing' | 'review' | 'saving' | 'saved' | 'error'
 
+/** A parse failure the OWNER can do something about, carrying the route's words. */
+class ParseFailure extends Error {
+  constructor(message: string, readonly actionable: boolean) {
+    super(message)
+  }
+}
+
 /** Service warnings name their row as `services[2] "Haircut"`, per sanityCheck in lib/ai/sanity.ts. */
 function warningsByService(warnings: readonly { field: string; issue: string }[]) {
   const byIndex = new Map<number, string[]>()
@@ -102,12 +109,23 @@ export function ShopSetup({
       // this screen actually knows, so it is the first thing it claims.
       setParseSteps((s) => s.map((step, i) => (i === 0 ? { ...step, done: true } : step)))
       const body = await response.json()
-      if (!response.ok || body.error) throw new Error(body.error ?? 'parse failed')
+      if (!response.ok || body.error) {
+        // A 4xx is the caller's problem and the route says what is wrong, so
+        // show that instead of a generic line. Anything else is ours: the
+        // owner cannot act on a model error, only on the reassurance that
+        // nothing was changed.
+        throw new ParseFailure(body.error ?? 'parse failed', response.status < 500)
+      }
       setParseSteps((s) => s.map((step) => ({ ...step, done: true })))
       setParsed(body as ParseResponse)
       setState('review')
-    } catch {
-      setError('Moni មិនអាចអានព័ត៌មានហាងបាន។ ទិន្នន័យហាងមិនបានប្តូរទេ។')
+    } catch (failure) {
+      const actionable = failure instanceof ParseFailure && failure.actionable
+      setError(
+        actionable
+          ? (failure as ParseFailure).message
+          : 'Moni មិនអាចអានព័ត៌មានហាងបាន។ ទិន្នន័យហាងមិនបានប្តូរទេ។',
+      )
       setState('error')
     }
   }

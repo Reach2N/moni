@@ -170,7 +170,8 @@ export function modelFor(task: Task): LanguageModel {
  * A schema validation failure means the prompt is wrong, so the next model fails
  * identically. That propagates immediately rather than burning every provider.
  *
- * A QUOTA failure is per project, not per model. Gemini's free tier counts every
+ * A QUOTA failure from Gemini's free tier is per MODEL: the error names the
+ * model and its limit. Corrected 1 September 2026, it previously counted every
  * Gemini model against one bucket, so falling from 3.7-flash to 3.5-flash on a 429
  * fails the same way a millisecond later. On a quota error we therefore skip every
  * remaining candidate from the SAME provider and jump to a different one (the
@@ -179,7 +180,16 @@ export function modelFor(task: Task): LanguageModel {
  * we honour the server's own retryDelay once, because the free tier window is per
  * minute and waiting is usually cheaper than failing the user's request.
  */
-const isQuota = (m: string) => /429|quota|exhausted|RESOURCE_EXHAUSTED|rate limit/i.test(m)
+/**
+ * Capacity pressure, which is about the model right now rather than the
+ * account. Checked before quota because a provider can answer 429 for both,
+ * and an overloaded model is not an exhausted allowance.
+ */
+const isCapacity = (m: string) =>
+  /overloaded|high demand|unavailable|503|502|500|timeout|ETIMEDOUT|ECONN|fetch failed/i.test(m)
+
+const isQuota = (m: string) =>
+  !isCapacity(m) && /429|quota|exhausted|RESOURCE_EXHAUSTED|rate limit/i.test(m)
 /**
  * An ENTITLEMENT refusal is permanent for that one route and irrelevant to the
  * rest of the chain, which is exactly when a direct provider should take over.
@@ -192,10 +202,7 @@ const isQuota = (m: string) => /429|quota|exhausted|RESOURCE_EXHAUSTED|rate limi
 const isEntitlement = (m: string) =>
   /free tier|do not have access|not available on your plan|insufficient credit|payment required|\b40[23]\b/i.test(m)
 
-const isRetryable = (m: string) =>
-  isQuota(m) ||
-  isEntitlement(m) ||
-  /overloaded|high demand|unavailable|503|502|500|timeout|ETIMEDOUT|ECONN|fetch failed/i.test(m)
+const isRetryable = (m: string) => isQuota(m) || isEntitlement(m) || isCapacity(m)
 
 /** Gemini reports "Please retry in 41.6s"; honour it rather than guessing. */
 function retryAfterMs(msg: string): number | null {
@@ -225,6 +232,18 @@ export async function withFallback<T>(
       if (!isRetryable(msg)) throw err
       last = err
 
+      // Gemini's free tier meters PER MODEL, not per project. Its error names
+      // the bucket outright: "Quota exceeded for metric:
+      // generate_content_free_tier_requests, limit: 20, model: gemini-3.7-flash".
+      // Treating that as a project-wide exhaustion marks every Google model
+      // spent and skips a sibling holding its own separate allowance, which on
+      // 1 September 2026 was the 3.5-flash that answered on the next line.
+      // Only an exhaustion that names no model is taken as provider wide.
+      const namesModel = /\bmodel:\s*\S+/i.test(msg)
+      if (isQuota(msg) && namesModel) {
+        console.warn(`[ai] ${ref} is out of its own quota, trying the next model`)
+        continue
+      }
       if (isQuota(msg)) {
         exhaustedProviders.add(provider)
         const another = candidates.slice(i + 1).find((c) => !exhaustedProviders.has(providerOf(c.ref)))

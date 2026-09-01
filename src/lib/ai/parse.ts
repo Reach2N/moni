@@ -7,7 +7,7 @@
  */
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { BOOKING_UNITS, BUSINESS_TYPES, CURRENCIES } from '@/lib/types.ts'
+import { BOOKING_UNITS, BUSINESS_TYPES, CURRENCIES } from '../types.ts'
 import { costMicroUsd, withFallback } from './models.ts'
 import { sanityCheck, type ParseWarning } from './sanity.ts'
 

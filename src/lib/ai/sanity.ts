@@ -42,6 +42,14 @@ export function sanityCheck(shop: ParsedShop): ParseWarning[] {
   for (const [i, s] of shop.services.entries()) {
     const at = `services[${i}] "${s.name}"`
     const amount = moneyKm(s.price_minor, asCurrencyCode(s.currency))
+    // A price of zero means the owner never said one, because the model is told
+    // not to invent prices. It must never reach the catalogue unnoticed: the
+    // agent quotes services.price_minor verbatim, so a zero saved here is Moni
+    // telling a customer the coffee is free. This is the single most expensive
+    // thing this file can catch.
+    if (s.price_minor === 0) {
+      w.push({ field: at, issue: 'មិនទាន់មានតម្លៃ។ សូមបញ្ចូលតម្លៃមុនពេលរក្សាទុក' })
+    }
     // the 100x bug. 40 riel is not a haircut, and 4,500,000 dollars is not a perm.
     if (s.currency === 'KHR' && s.price_minor > 0 && s.price_minor < 500) {
       w.push({ field: at, issue: `${amount} ទាបពេក ប្រហែលជាដុល្លារត្រូវបានយល់ច្រឡំជារៀល` })
