@@ -96,6 +96,13 @@ export async function transcribeVoiceNote(audio: Uint8Array, mediaType: string |
         },
       ],
       temperature: 0,
+      // One retry, not the SDK's default three. withFallback already has
+      // somewhere better to go, so retrying a struggling model in place just
+      // delays the model that would have answered: an overloaded 3.7-flash
+      // spent 45 seconds backing off before the chain was allowed to move on,
+      // and a shop owner holding a phone waiting for a voice note does not have
+      // 45 seconds. Retry once for a blip, then hand over.
+      maxRetries: 1,
     }),
   )
 

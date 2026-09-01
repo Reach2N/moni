@@ -41,7 +41,12 @@ const TYPEKIT_ID = process.env.NEXT_PUBLIC_TYPEKIT_ID?.trim()
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="km" className="h-full antialiased">
+    // suppressHydrationWarning covers ONE level: the html element's own
+    // attributes. The marketing layout sets data-motion on documentElement in a
+    // pre-paint inline script, so the served markup and the hydrated DOM differ
+    // by that attribute by design. Without this, React 19 reports it as a
+    // mismatch on every marketing page load. It does not mask anything deeper.
+    <html lang="km" className="h-full antialiased" suppressHydrationWarning>
       {TYPEKIT_ID ? (
         <head>
           <link rel="stylesheet" href={`https://use.typekit.net/${TYPEKIT_ID}.css`} />

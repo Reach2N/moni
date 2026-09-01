@@ -79,8 +79,13 @@ insert into bookings (id, business_id, service_id, resource_id, customer_id, sta
   'pending','session',1500,'USD',500,'instagram','ai','MN9X5C'),
  ('90000000-0000-4000-8000-000000000004','b0000000-0000-4000-8000-000000000001',
   '50000000-0000-4000-8000-000000000004','a0000000-0000-4000-8000-000000000002','d0000000-0000-4000-8000-000000000003',
-  ((current_date - 2) + time '16:00') at time zone 'Asia/Phnom_Penh',
-  ((current_date - 2) + time '16:20') at time zone 'Asia/Phnom_Penh',
+  -- Clamped to the start of the month, not simply two days back. The month
+  -- views filter on `starts_at >= date_trunc('month', now())`, so on the 1st or
+  -- 2nd a booking two days old lands in the PREVIOUS month and the no-show
+  -- vanishes from this month's stats. That failed db/test.mjs on 1 September
+  -- 2026 and would fail on the 1st and 2nd of every month.
+  ((greatest(current_date - 2, date_trunc('month', current_date)::date)) + time '16:00') at time zone 'Asia/Phnom_Penh',
+  ((greatest(current_date - 2, date_trunc('month', current_date)::date)) + time '16:20') at time zone 'Asia/Phnom_Penh',
   'no_show','session',200,'USD',null,'telegram','ai','MN2B8D')
 on conflict (id) do nothing;
 

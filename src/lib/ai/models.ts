@@ -19,7 +19,7 @@
  * keeps local dev working with no gateway key at all), then Anthropic. The
  * first provider with a configured key that does not throw wins.
  */
-import { google } from '@ai-sdk/google'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { anthropic } from '@ai-sdk/anthropic'
 import type { LanguageModel } from 'ai'
 
@@ -110,6 +110,26 @@ function hasKeyFor(provider: string): boolean {
   return false
 }
 
+/**
+ * The Google provider, built with whichever key name is actually set.
+ *
+ * The bare `google` export reads GOOGLE_GENERATIVE_AI_API_KEY and ONLY that
+ * name, while `hasKeyFor` below accepts either it or GEMINI_API_KEY. That
+ * mismatch let the chain pass its own gate and then call the API with no
+ * credential at all, which the provider reports as "Method doesn't allow
+ * unregistered callers": an error that names neither the key nor the variable.
+ * `.env.example` promises either name works, so make that true here rather than
+ * quietly meaning one of them.
+ */
+let googleClient: ReturnType<typeof createGoogleGenerativeAI> | undefined
+function googleProvider() {
+  googleClient ??= createGoogleGenerativeAI({
+    apiKey:
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim(),
+  })
+  return googleClient
+}
+
 function build(ref: ModelRef): LanguageModel {
   // No colon: hand the slug straight to the AI SDK, which routes it through the
   // gateway. Passing a string IS the supported integration; wrapping it in a
@@ -119,7 +139,7 @@ function build(ref: ModelRef): LanguageModel {
 
   const provider = ref.slice(0, ref.indexOf(':'))
   const id = ref.slice(ref.indexOf(':') + 1)
-  if (provider === 'google') return google(id)
+  if (provider === 'google') return googleProvider()(id)
   if (provider === 'anthropic') return anthropic(id)
   throw new Error(`unknown provider in "${ref}"`)
 }
@@ -160,8 +180,22 @@ export function modelFor(task: Task): LanguageModel {
  * minute and waiting is usually cheaper than failing the user's request.
  */
 const isQuota = (m: string) => /429|quota|exhausted|RESOURCE_EXHAUSTED|rate limit/i.test(m)
+/**
+ * An ENTITLEMENT refusal is permanent for that one route and irrelevant to the
+ * rest of the chain, which is exactly when a direct provider should take over.
+ * The Vercel gateway's free tier serves a subset of the catalogue and refuses
+ * the rest with prose carrying none of the words below, so before this pattern
+ * existed a refusal threw on the first candidate and the direct Gemini links
+ * were never tried. Kept OUT of isQuota deliberately: quota marks the whole
+ * provider exhausted, and here only the gateway is refusing.
+ */
+const isEntitlement = (m: string) =>
+  /free tier|do not have access|not available on your plan|insufficient credit|payment required|\b40[23]\b/i.test(m)
+
 const isRetryable = (m: string) =>
-  isQuota(m) || /overloaded|high demand|unavailable|503|502|500|timeout|ETIMEDOUT|ECONN|fetch failed/i.test(m)
+  isQuota(m) ||
+  isEntitlement(m) ||
+  /overloaded|high demand|unavailable|503|502|500|timeout|ETIMEDOUT|ECONN|fetch failed/i.test(m)
 
 /** Gemini reports "Please retry in 41.6s"; honour it rather than guessing. */
 function retryAfterMs(msg: string): number | null {

@@ -28,9 +28,14 @@ export type AgentApprovalCardProps = {
   details?: readonly AgentApprovalDetail[]
   statusLabel?: string
   confirmLabel: string
-  cancelLabel: string
+  /**
+   * Optional. Omit BOTH of these when the surface already has its own way back:
+   * a cancel that lands on the state the owner is already in is a dead click,
+   * which reads as a broken app.
+   */
+  cancelLabel?: string
   onConfirm: () => void
-  onCancel: () => void
+  onCancel?: () => void
   disabled?: boolean
   className?: string
 }
@@ -91,15 +96,17 @@ export function AgentApprovalCard({
       </div>
 
       <footer className="flex flex-col-reverse gap-2 px-3 py-3 sm:flex-row sm:justify-end sm:px-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={disabled}
-          className="km min-h-11 rounded-none border-rule/70 bg-paper text-ink shadow-none"
-        >
-          {cancelLabel}
-        </Button>
+        {onCancel && cancelLabel ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={disabled}
+            className="km min-h-11 rounded-none border-rule/70 bg-paper text-ink shadow-none"
+          >
+            {cancelLabel}
+          </Button>
+        ) : null}
         <Button
           type="button"
           onClick={onConfirm}

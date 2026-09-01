@@ -302,15 +302,11 @@ export function ShopSetup({
               confirmLabel={state === 'saving' ? 'កំពុងរក្សាទុក' : 'រក្សាទុក'}
               // Not the back button above: that one discards the parse and returns
               // to the description box. This one sits below the review table the
-              // owner is still looking at, so cancel here means "not yet, let me
-              // keep editing", not "throw away my corrections". It stays on this
-              // step and only clears a stale save error, if there was one.
-              cancelLabel="មិនទាន់"
+              // owner is still looking at, so there is no cancel here at all: it
+              // would land on the state they are already in, which is a dead
+              // click. The "កែពិពណ៌នា" back button above is the one way back,
+              // and it says plainly that it discards the parse.
               onConfirm={() => void save()}
-              onCancel={() => {
-                setError('')
-                setState('review')
-              }}
               disabled={busy}
             />
           )}
