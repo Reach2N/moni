@@ -32,7 +32,7 @@ function ToolSheetHeader({ title, description }: { title: string; description: s
   )
 }
 
-export function SecondaryTools() {
+export function SecondaryTools({ shopName = null }: { shopName?: string | null }) {
   const router = useRouter()
   const [setupOpen, setSetupOpen] = useState(false)
 
@@ -68,7 +68,7 @@ export function SecondaryTools() {
         <SheetContent side="right" showCloseButton={false} className="w-full max-w-none gap-0 overscroll-contain bg-paper p-0 shadow-none transition-none sm:max-w-xl">
           <ToolSheetHeader title="រៀបចំហាង" description="ពិពណ៌នាហាងម្តង ហើយ Moni រៀបចំសេវា តម្លៃ ម៉ោង និងកន្លែងឱ្យ។" />
           <div className="min-h-0 flex-1 overflow-y-auto pt-4">
-            <ShopSetup onSaved={refresh} />
+            <ShopSetup onSaved={refresh} initialShopName={shopName} />
           </div>
         </SheetContent>
       </Sheet>

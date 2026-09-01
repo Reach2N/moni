@@ -359,6 +359,30 @@
   --ui-hairline:  var(--color-hairline);
   --ui-thumb:     var(--color-rule);
 }
+/* The onboarding screen, and only that screen, renders on the Apple palette
+   while the rest of /app is still the Invitation (PLAN.md Phase 5 owns the rest).
+   It carries `.moni-hig` for the palette itself, and this class on top.
+
+   Why a second class rather than folding these into `.moni-hig`: the Invitation's
+   fixed inks are theme COLOURS (--color-rule, --color-hairline, --color-seal),
+   not the runtime vars `.moni-hig` swaps, and the agent components shared with the
+   dashboard reach for them by name. Re-pointing them here repaints
+   approval-card, prompt-bar, agent-thinking and setup-tasks inside this subtree
+   without editing one line of a library component, which is the rule in
+   CLAUDE.md. Putting them on `.moni-hig` itself would reach the frozen homepage
+   too, and this class cannot.
+
+   Delete it in Phase 5 along with the Invitation. */
+.moni-app-hig {
+  --color-paper:      var(--background);
+  --color-rule:       var(--label-secondary);
+  --color-hairline:   var(--separator);
+  --color-seal:       var(--accent);
+  --color-seal-text:  var(--accent);
+  --color-on-ink:     var(--background);
+  --color-on-ink-dim: var(--label-tertiary);
+}
+
 ::selection            { background: var(--ui-accent); color: var(--ui-ground); }
 :root                  { caret-color: var(--ui-accent); accent-color: var(--ui-accent); }
 :focus-visible         { outline: 2px solid var(--ui-accent); outline-offset: 2px; border-radius: 1px; }

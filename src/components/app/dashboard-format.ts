@@ -1,10 +1,10 @@
 /**
  * Presentation helpers for the owner surface.
  *
- * The numeral and money formatters used to be defined here AND in `lib/demo.ts`,
- * two copies of the same Intl traps. They now live in `lib/format/khmer.ts` and
- * are re-exported so component imports stay short and there is one place where
- * the rules can be got wrong.
+ * The numeral and money formatters used to be defined here AND in a demo fixture
+ * module, two copies of the same Intl traps. They now live in
+ * `lib/format/khmer.ts` and are re-exported so component imports stay short and
+ * there is one place where the rules can be got wrong.
  */
 export {
   durationKm,

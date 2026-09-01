@@ -1,6 +1,6 @@
 /**
  * Every quantity the owner reads passes through here, so the numeral system is
- * never mixed. This module is the single source: `lib/demo.ts` and
+ * never mixed. This module is the single source: a demo fixture module and
  * `components/app/dashboard-format.ts` each carried their own copy of
  * `toKhmerDigits` and `moneyKm`, which is three chances for the two mechanisms to
  * drift apart on the same screen.

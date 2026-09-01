@@ -33,10 +33,23 @@ export const ASK_CATEGORIES = [
     km: 'ដំណើរការ',
     en: 'Operate',
     examples: [
-      'MN7Q1A បានមកហើយ',
-      'ទទួលលុយសុទ្ធ ៣០០០០៛ ពី MN7Q1A',
-      'MN9X5C មិនបានមក',
+      'ថ្ងៃនេះមានការកក់ប៉ុន្មាន?',
       'ផ្តល់បញ្ជីអតិថិជន',
     ],
   },
 ] as const
+
+/**
+ * The two operate chips used to read `MN7Q1A បានមកហើយ` and `MN9X5C មិនបានមក`.
+ * Those are not illustrations, they are the literal booking codes from
+ * `db/seed.sql`, so an owner who tapped one sent a code that does not exist in
+ * their own shop to the real /api/ask and was told so. A starting point that
+ * cannot work is worse than an empty box.
+ *
+ * So the code comes from the owner's own day. With no booking yet there is no
+ * code to name, and the two reads below answer correctly against an empty shop.
+ */
+export function operateExamples(bookingCode: string | null): readonly [string, string] {
+  if (!bookingCode) return [ASK_CATEGORIES[2].examples[0], ASK_CATEGORIES[2].examples[1]]
+  return [`${bookingCode} បានមកហើយ`, `${bookingCode} មិនបានមក`]
+}

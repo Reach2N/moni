@@ -35,9 +35,21 @@ const ParsedHours = z.object({
 })
 
 export const ParsedShop = z.object({
+  name: z
+    .string()
+    .nullable()
+    .describe('the shop name if the owner stated one, otherwise null. Never the owner\'s own name'),
   business_type: z.enum(TYPE_IDS).describe('closest match from the list'),
   default_currency: z.enum(CURRENCY_CODES),
-  services: z.array(ParsedService).min(1),
+  // Deliberately no .min(1). An owner who opens with an intent ("I want to
+  // start a coffee shop") has named no service, and the system prompt forbids
+  // inventing one, so a floor here makes the two rules contradict: the model
+  // obeys the prompt, zod rejects the object, and the AI SDK raises
+  // NoObjectGeneratedError, which is not retryable and reaches the owner as a
+  // 502 that says try again and never succeeds. An empty catalogue is a valid
+  // FIRST answer; `SetupRequestSchema` still enforces min(1) on the way into
+  // the database, so nothing incomplete can be saved.
+  services: z.array(ParsedService),
   hours: z.array(ParsedHours).describe('omit a day entirely if the shop is closed that day'),
   resource_count: z
     .number()
@@ -72,6 +84,14 @@ Hours:
 - 24 hour "HH:MM". "8am to 7pm" is 08:00 to 19:00.
 - Leave a closed day out of the array entirely rather than setting equal times.
 - If no hours are given at all, return an empty array. Do not invent them.
+
+What to do when the owner has not said much yet:
+- An owner may only state an intent, such as "I want to open a coffee shop". That is a valid input, not an error.
+- Return an EMPTY services array when no service was named. An empty array is the correct answer. Never fill it to look complete.
+- Return an empty hours array the same way when no opening times were given.
+- Set name only if the owner named the shop. An owner's personal name is not a shop name, so leave it null.
+- default_currency is KHR unless the owner clearly prices in dollars.
+- business_type is still your best guess from whatever was said.
 
 Never use an em dash in any text you output. Use a comma or a full stop.
 Do not invent services, prices or opening hours that were not stated or clearly implied.`

@@ -49,20 +49,26 @@ export function CompactPlate({
   shortMeta,
 }: {
   name: string
-  meta: string
+  /** Optional: with no meta the plate draws no divider and the name takes the width. */
+  meta?: string
   /** What survives when the plate runs out of room. The name never yields. */
-  shortMeta: string
+  shortMeta?: string
 }) {
   return (
     <Frame className="flex h-10 min-w-0 items-center gap-3 px-3">
       <h1 className="km min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.015em] text-ink">{name}</h1>
-      <span aria-hidden className="h-4 shrink-0 border-l border-hairline" />
-      {/* The meta was shrink-0, which made the demo label outrank the shop's own
-          name: at 390px "Sokha Beauty" was cut to "Sokha B..." so a fixture
-          marker could print in full. The marker is required (PRODUCT.md) but it
-          is not what she opened the app to read, so it shortens first. */}
-      <p className="km tnum hidden shrink-0 text-xs text-rule sm:block">{meta}</p>
-      <p className="km tnum shrink-0 text-xs text-rule sm:hidden">{shortMeta}</p>
+      {/* The meta was shrink-0, which made the old demo label outrank the shop's
+          own name: at 390px "Sokha Beauty" was cut to "Sokha B..." so a fixture
+          marker could print in full. It is not what she opened the app to read,
+          so it shortens first, and when there is nothing true to put here the
+          divider goes with it rather than fencing off an empty space. */}
+      {meta ? (
+        <>
+          <span aria-hidden className="h-4 shrink-0 border-l border-hairline" />
+          <p className="km tnum hidden shrink-0 text-xs text-rule sm:block">{meta}</p>
+          <p className="km tnum shrink-0 text-xs text-rule sm:hidden">{shortMeta ?? meta}</p>
+        </>
+      ) : null}
     </Frame>
   )
 }

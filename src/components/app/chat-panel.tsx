@@ -26,9 +26,10 @@ const CUSTOMER_STEP: Record<string, string> = {
  * "Try it as a customer". `/api/chat` is the public customer endpoint and picks
  * its shop server side, so no tenant is named here.
  *
- * Honest limitation until Phase 3 retargets that route: it still answers as the
- * fixed demo shop, not as the signed-in member's. The owner sees the assistant's
- * behaviour, not their own catalogue.
+ * It answers as the signed-in member's own shop: `chatBusiness()` in
+ * `src/app/api/chat/route.ts` resolves the member through `memberGate()` and only
+ * falls back to the public demo shop for a signed-out visitor. This comment said
+ * the opposite for a while after Phase 3 retargeted the route.
  */
 export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
   const [turns, setTurns] = useState<Turn[]>([])

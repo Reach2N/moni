@@ -144,18 +144,68 @@ function build(ref: ModelRef): LanguageModel {
   throw new Error(`unknown provider in "${ref}"`)
 }
 
+/**
+ * Refs known to be dead, and the moment each becomes worth trying again.
+ *
+ * Without this the chain re-pays for the same two refusals on every single
+ * request. Measured on 2 September 2026: the gateway refuses
+ * google/gemini-3.7-flash outright ("Free tier users do not have access to this
+ * model") and direct google:gemini-3.7-flash is out of its per-model free-tier
+ * quota, so a parse spent roughly eight seconds walking two dead candidates
+ * before reaching the 3.5-flash that answers. Neither refusal is discoverable in
+ * advance: the gateway's model list carries no tier field, so a model the account
+ * cannot run looks identical to one it can until you call it.
+ *
+ * The two timeouts are different on purpose, and match the distinctions
+ * `isEntitlement` and `isQuota` already draw below. An entitlement refusal is a
+ * billing fact and will not change inside one process, so it is marked forever. A
+ * quota is a window, and Gemini's free tier meters per minute, so it is marked for
+ * the server's own retryDelay when it names one and a minute when it does not.
+ * Capacity pressure is never marked: an overloaded model is fine a second later,
+ * and remembering it would route away from the best model for nothing.
+ *
+ * This map is per process. It helps a warm serverless instance and costs a cold
+ * one nothing, which is the right trade: the cost it avoids is per request, not
+ * per deploy.
+ */
+const unavailableUntil = new Map<string, number>()
+
+/** Marks `ref` dead until `until` (Infinity for permanent), keeping the later deadline. */
+function markUnavailable(ref: string, until: number): void {
+  const current = unavailableUntil.get(ref) ?? 0
+  if (until > current) unavailableUntil.set(ref, until)
+}
+
+function isMarkedDead(ref: string): boolean {
+  const until = unavailableUntil.get(ref)
+  if (until === undefined) return false
+  if (until <= Date.now()) {
+    unavailableUntil.delete(ref)
+    return false
+  }
+  return true
+}
+
+/** For the test harness, and for anything that wants a clean slate. */
+export function resetModelAvailability(): void {
+  unavailableUntil.clear()
+}
+
 /** Every configured candidate for a job, in preference order. */
 export function modelsFor(task: Task): Array<{ ref: ModelRef; model: LanguageModel }> {
-  const out = refsFor(task)
-    .filter((ref) => hasKeyFor(providerOf(ref)))
-    .map((ref) => ({ ref, model: build(ref) }))
-  if (out.length === 0) {
+  const configured = refsFor(task).filter((ref) => hasKeyFor(providerOf(ref)))
+  if (configured.length === 0) {
     throw new Error(
       `no API key configured for any model assigned to "${task}". ` +
         `Set AI_GATEWAY_API_KEY, GEMINI_API_KEY or ANTHROPIC_API_KEY in .env.local`,
     )
   }
-  return out
+  // A mark is an optimisation, never a gate. If every candidate is marked the
+  // full list comes back unfiltered, so a stale entry can slow the product down
+  // but can never take it off the air.
+  const live = configured.filter((ref) => !isMarkedDead(ref))
+  const chosen = live.length > 0 ? live : configured
+  return chosen.map((ref) => ({ ref, model: build(ref) }))
 }
 
 export function modelFor(task: Task): LanguageModel {
@@ -239,13 +289,23 @@ export async function withFallback<T>(
       // spent and skips a sibling holding its own separate allowance, which on
       // 1 September 2026 was the 3.5-flash that answered on the next line.
       // Only an exhaustion that names no model is taken as provider wide.
+      // A quota is a window, so the mark expires with it. The server names its
+      // own delay often enough to be worth honouring; a minute is the free
+      // tier's window when it does not.
+      const quotaWindow = () => Date.now() + (retryAfterMs(msg) ?? 60_000)
+
       const namesModel = /\bmodel:\s*\S+/i.test(msg)
       if (isQuota(msg) && namesModel) {
+        markUnavailable(ref, quotaWindow())
         console.warn(`[ai] ${ref} is out of its own quota, trying the next model`)
         continue
       }
       if (isQuota(msg)) {
         exhaustedProviders.add(provider)
+        const until = quotaWindow()
+        for (const c of candidates) {
+          if (providerOf(c.ref as ModelRef) === provider) markUnavailable(c.ref, until)
+        }
         const another = candidates.slice(i + 1).find((c) => !exhaustedProviders.has(providerOf(c.ref)))
         if (another) {
           console.warn(`[ai] ${provider} is over quota, switching provider`)
@@ -263,6 +323,14 @@ export async function withFallback<T>(
           }
         }
         break
+      }
+      // Checked after quota on purpose: a 429 that also says "free tier" is a
+      // window, not a billing fact, and marking it permanent would route away
+      // from the best model for the life of the process.
+      if (isEntitlement(msg)) {
+        markUnavailable(ref, Infinity)
+        console.warn(`[ai] ${ref} is not available on this plan, dropping it for this process`)
+        continue
       }
       console.warn(`[ai] ${ref} failed, trying next: ${msg.slice(0, 160)}`)
     }

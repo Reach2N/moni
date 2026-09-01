@@ -1,6 +1,6 @@
 'use client'
 
-import { startTransition, useState } from 'react'
+import { startTransition, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useReducedMotion } from 'motion/react'
 import {
@@ -16,7 +16,7 @@ import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsx'
-import { ASK_CATEGORIES } from '@/lib/agent/categories.ts'
+import { ASK_CATEGORIES, operateExamples } from '@/lib/agent/categories.ts'
 import { RECEIPT_EVENT, type MoniReceiptEvent } from '@/lib/moni-events.ts'
 import { toKhmerDigits } from './dashboard-format.ts'
 import { Panel, PanelHeader } from './panel.tsx'
@@ -42,10 +42,17 @@ const CATEGORY_LOADING: Record<CategoryId, string> = {
   operate: 'Moni កំពុងធ្វើការងារនេះក្នុងហាង…',
 }
 
-const CATEGORY_EXAMPLES: Record<CategoryId, readonly string[]> = {
-  organize: [ASK_CATEGORIES[0].examples[1], ASK_CATEGORIES[0].examples[3]],
-  plan: [ASK_CATEGORIES[1].examples[0], ASK_CATEGORIES[1].examples[2]],
-  operate: [ASK_CATEGORIES[2].examples[0], ASK_CATEGORIES[2].examples[1]],
+/**
+ * Two starting points per tab. The operate pair is built from a booking code
+ * belonging to THIS shop, because the pair it replaced was built from the seed
+ * fixtures: see `operateExamples` in lib/agent/categories.ts.
+ */
+function categoryExamples(bookingCode: string | null): Record<CategoryId, readonly string[]> {
+  return {
+    organize: [ASK_CATEGORIES[0].examples[1], ASK_CATEGORIES[0].examples[3]],
+    plan: [ASK_CATEGORIES[1].examples[0], ASK_CATEGORIES[1].examples[2]],
+    operate: operateExamples(bookingCode),
+  }
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -195,7 +202,7 @@ function wait(duration: number) {
  * Clerk session, so this component no longer names one: a component that can
  * name a tenant is a component that can be made to name the wrong one.
  */
-export function AskMoni() {
+export function AskMoni({ sampleCode = null }: { sampleCode?: string | null }) {
   const router = useRouter()
   const reduceMotion = useReducedMotion()
   const [category, setCategory] = useState<CategoryId>('plan')
@@ -208,8 +215,9 @@ export function AskMoni() {
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null)
 
   const busy = state === 'working' || state === 'steps'
+  const examples = useMemo(() => categoryExamples(sampleCode), [sampleCode])
   const empty = text.trim().length === 0
-  const firstExample = CATEGORY_EXAMPLES[category][0] ?? ''
+  const firstExample = examples[category][0] ?? ''
   const traceSteps: OwnerToolTraceStep[] = steps.map((step, index) => ({
     id: `${index}-${step.title}`,
     label: step.title,
@@ -311,7 +319,7 @@ export function AskMoni() {
         {ASK_CATEGORIES.map((item) => (
           <TabsContent key={item.id} value={item.id} className="m-0">
             <div className="grid grid-cols-2">
-              {CATEGORY_EXAMPLES[item.id].map((example, index) => (
+              {examples[item.id].map((example, index) => (
                 <button
                   key={example}
                   type="button"

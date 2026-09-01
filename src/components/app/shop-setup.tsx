@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Check, CircleAlert, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Check, CircleAlert, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { VoiceNote } from './voice-note.tsx'
 import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { AgentThinking, type ThinkingStep } from '@/components/agent/agent-thinking.tsx'
@@ -44,23 +44,82 @@ function warningsByService(warnings: readonly { field: string; issue: string }[]
 export function ShopSetup({
   onSaved,
   initialInstructions = null,
+  initialShopName = null,
 }: {
   onSaved: () => void
   /** What the owner has already taught the assistant, so a re-save does not lose it. */
   initialInstructions?: string | null
+  /**
+   * The name the shop is stored under today. A member's business is claimed with
+   * the local part of their email (`src/lib/queries/member.ts`), so until this
+   * screen writes one the shop is named after the owner's inbox. `/api/setup`
+   * has always accepted `business.name`; nothing was ever sending it.
+   */
+  initialShopName?: string | null
 }) {
   const [description, setDescription] = useState('')
   const [instructions, setInstructions] = useState(initialInstructions ?? '')
+  const [shopName, setShopName] = useState(initialShopName ?? '')
   const [parsed, setParsed] = useState<ParseResponse | null>(null)
   const [state, setState] = useState<SetupState>('describe')
   const [error, setError] = useState('')
   const [parseSteps, setParseSteps] = useState<ThinkingStep[]>([])
-  // Whether the box currently holds the sample text `parse` filled in for an
-  // owner who typed too little to submit. The old submit button used to have a
-  // third label state that announced this; now that the button always reads the
-  // same, this line is the only thing that says a sample landed rather than the
-  // owner's own words.
+  // Whether the box currently holds the sample text rather than the owner's own
+  // words. It only ever gets there by a deliberate tap now, and this is the line
+  // that says so, because a description the owner did not write is one save away
+  // from becoming their real catalogue.
   const [sampleFilled, setSampleFilled] = useState(false)
+  // Said when a submit arrives with too little to work on. It used to be answered
+  // by writing SAMPLE into the box, which meant two presses of the same button
+  // saved a fictional salon as the owner's real catalogue.
+  const [tooShort, setTooShort] = useState(false)
+
+  /**
+   * The review table is now the place a missing catalogue gets filled in, not
+   * just corrected. A parse that found no service (an owner who opened with
+   * "I want to start a coffee shop") lands here with an empty list, and this is
+   * the one action that moves them forward.
+   */
+  function addService() {
+    setParsed((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        shop: {
+          ...current.shop,
+          services: [
+            ...current.shop.services,
+            {
+              name: '',
+              name_en: null,
+              // Zero, never a guess. sanityCheck flags a zero price and the save
+              // is blocked until the owner replaces it, which is the whole point:
+              // a made-up price is how Moni ends up telling a customer the coffee
+              // is free.
+              price_minor: 0,
+              currency: current.shop.default_currency,
+              duration_min: 30,
+              buffer_min: 0,
+              unit: 'session',
+            },
+          ],
+        },
+      }
+    })
+  }
+
+  function removeService(index: number) {
+    setParsed((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        shop: {
+          ...current.shop,
+          services: current.shop.services.filter((_, i) => i !== index),
+        },
+      }
+    })
+  }
 
   function updateService(
     index: number,
@@ -83,11 +142,10 @@ export function ShopSetup({
 
   async function parse() {
     if (description.trim().length < 8) {
-      setDescription(SAMPLE)
-      setSampleFilled(true)
+      setTooShort(true)
       return
     }
-    setSampleFilled(false)
+    setTooShort(false)
     setParsed(null)
     setState('parsing')
     setError('')
@@ -117,7 +175,12 @@ export function ShopSetup({
         throw new ParseFailure(body.error ?? 'parse failed', response.status < 500)
       }
       setParseSteps((s) => s.map((step) => ({ ...step, done: true })))
-      setParsed(body as ParseResponse)
+      const result = body as ParseResponse
+      // Only when the owner actually named the shop, and only over a box they
+      // have not filled themselves. The model is told an owner's personal name is
+      // not a shop name, so what arrives here is either a real name or null.
+      if (result.shop.name && !shopName.trim()) setShopName(result.shop.name)
+      setParsed(result)
       setState('review')
     } catch (failure) {
       const actionable = failure instanceof ParseFailure && failure.actionable
@@ -134,9 +197,17 @@ export function ShopSetup({
     if (!parsed) return
     setState('saving')
     setError('')
+    const trimmedName = shopName.trim()
     const payload = {
       raw_description: description,
       model: parsed.model,
+      // Absent leaves the stored name alone. The block is only sent when the
+      // owner has actually given a name and it differs from what is stored, so a
+      // re-save from the dashboard sheet never rewrites the shop's name with a
+      // stale copy of it.
+      ...(trimmedName && trimmedName !== (initialShopName ?? '').trim()
+        ? { business: { name: trimmedName } }
+        : {}),
       // Absent and null are different answers to the setup contract: absent
       // leaves what is stored, null clears it. An owner who empties the box
       // means to clear it.
@@ -174,6 +245,28 @@ export function ShopSetup({
   }
 
   const busy = state === 'parsing' || state === 'saving'
+  /**
+   * What still has to be true before this can be saved, in the owner's words.
+   *
+   * These are not style preferences: `SetupRequestSchema` rejects an empty
+   * catalogue and a blank service name outright, and a zero price is the one
+   * mistake sanityCheck calls the most expensive thing it can catch, because the
+   * agent quotes `services.price_minor` verbatim to a customer. A disabled button
+   * with no reason beside it is its own defect, so the reasons are rendered.
+   */
+  const reviewServices = parsed?.shop.services ?? []
+  const blockers: string[] = []
+  if (reviewServices.length === 0) {
+    blockers.push('បន្ថែមសេវាយ៉ាងតិចមួយ មុនពេលរក្សាទុក')
+  } else {
+    if (reviewServices.some((service) => !service.name.trim())) {
+      blockers.push('សេវាខ្លះមិនទាន់មានឈ្មោះ')
+    }
+    if (reviewServices.some((service) => service.price_minor === 0)) {
+      blockers.push('សេវាខ្លះមិនទាន់មានតម្លៃ')
+    }
+  }
+  const canSave = blockers.length === 0
   // Recomputed on every edit, not read from the parse response: a warning that
   // survives the correction it asked for teaches the owner to ignore warnings,
   // and this screen exists to earn their trust in the parse.
@@ -214,12 +307,38 @@ export function ShopSetup({
               <h3 className="km text-sm font-semibold text-ink">ពិនិត្យមុនរក្សាទុក</h3>
               <p className="km text-xs text-rule">កែឈ្មោះ តម្លៃ ឬរយៈពេល។ Moni នឹងប្រើតែទិន្នន័យដែលអ្នករក្សាទុក។</p>
             </header>
+            <div className="border-b border-hairline px-3 py-3">
+              <label className="km block text-xs font-semibold text-rule" htmlFor="shop-name">
+                ឈ្មោះហាង
+              </label>
+              <Input
+                id="shop-name"
+                value={shopName}
+                maxLength={120}
+                disabled={busy || state === 'saved'}
+                onChange={(event) => setShopName(event.target.value)}
+                placeholder="ឈ្មោះដែលអតិថិជនស្គាល់ហាងរបស់អ្នក"
+                className="km mt-1 min-h-11 rounded-none border-rule/70 bg-paper text-base shadow-none placeholder:text-rule md:text-base"
+              />
+            </div>
             <ul>
               {parsed?.shop.services.map((service, index) => (
                 <li key={`service-${index}`} className="border-t border-hairline px-3 py-3 first:border-t-0">
-                  <label className="km block text-xs font-semibold text-rule" htmlFor={`service-name-${index}`}>
-                    ឈ្មោះសេវា
-                  </label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="km block text-xs font-semibold text-rule" htmlFor={`service-name-${index}`}>
+                      ឈ្មោះសេវា
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => removeService(index)}
+                      disabled={busy || state === 'saved'}
+                      className="km h-8 min-h-8 rounded-none px-1 text-xs text-rule"
+                    >
+                      <Trash2 data-icon="inline-start" aria-hidden />
+                      លុប
+                    </Button>
+                  </div>
                   <Input
                     id={`service-name-${index}`}
                     value={service.name}
@@ -267,7 +386,24 @@ export function ShopSetup({
                   ))}
                 </li>
               ))}
+              {reviewServices.length === 0 && (
+                <li className="km px-3 py-4 text-sm text-rule">
+                  Moni មិនឃើញសេវាណាមួយក្នុងពិពណ៌នារបស់អ្នកទេ។ បន្ថែមមួយខាងក្រោម ឬត្រឡប់ទៅកែពិពណ៌នា។
+                </li>
+              )}
             </ul>
+            <div className="border-t border-hairline px-3 py-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={addService}
+                disabled={busy || state === 'saved'}
+                className="km min-h-11 rounded-none px-0"
+              >
+                <Plus data-icon="inline-start" aria-hidden />
+                បន្ថែមសេវា
+              </Button>
+            </div>
           </div>
 
           {otherWarnings.length > 0 ? (
@@ -309,24 +445,34 @@ export function ShopSetup({
               </div>
             </div>
           ) : (
-            <AgentApprovalCard
-              title="រក្សាទុកព័ត៌មានហាង"
-              description="Moni នឹងឆ្លើយអតិថិជនតាមតម្លៃ និងម៉ោងខាងលើ។"
-              command="រក្សាទុកសេវា និងម៉ោងទៅក្នុងហាង"
-              details={[
-                { label: 'សេវា', value: `${toKhmerDigits(parsed?.shop.services.length ?? 0)}` },
-                { label: 'រូបិយប័ណ្ណ', value: parsed?.shop.default_currency ?? '' },
-              ]}
-              confirmLabel={state === 'saving' ? 'កំពុងរក្សាទុក' : 'រក្សាទុក'}
-              // Not the back button above: that one discards the parse and returns
-              // to the description box. This one sits below the review table the
-              // owner is still looking at, so there is no cancel here at all: it
-              // would land on the state they are already in, which is a dead
-              // click. The "កែពិពណ៌នា" back button above is the one way back,
-              // and it says plainly that it discards the parse.
-              onConfirm={() => void save()}
-              disabled={busy}
-            />
+            <>
+              {blockers.length > 0 && (
+                <div role="status" className="border border-rule/70 px-3 py-2">
+                  <p className="km text-sm font-semibold text-ink">មិនទាន់អាចរក្សាទុកបានទេ</p>
+                  {blockers.map((blocker) => (
+                    <p key={blocker} className="km mt-1 text-xs text-rule">{blocker}</p>
+                  ))}
+                </div>
+              )}
+              <AgentApprovalCard
+                title="រក្សាទុកព័ត៌មានហាង"
+                description="Moni នឹងឆ្លើយអតិថិជនតាមតម្លៃ និងម៉ោងខាងលើ។"
+                command="រក្សាទុកសេវា និងម៉ោងទៅក្នុងហាង"
+                details={[
+                  { label: 'សេវា', value: `${toKhmerDigits(parsed?.shop.services.length ?? 0)}` },
+                  { label: 'រូបិយប័ណ្ណ', value: parsed?.shop.default_currency ?? '' },
+                ]}
+                confirmLabel={state === 'saving' ? 'កំពុងរក្សាទុក' : 'រក្សាទុក'}
+                // Not the back button above: that one discards the parse and returns
+                // to the description box. This one sits below the review table the
+                // owner is still looking at, so there is no cancel here at all: it
+                // would land on the state they are already in, which is a dead
+                // click. The "កែពិពណ៌នា" back button above is the one way back,
+                // and it says plainly that it discards the parse.
+                onConfirm={() => void save()}
+                disabled={busy || !canSave}
+              />
+            </>
           )}
         </>
       ) : (
@@ -366,11 +512,35 @@ export function ShopSetup({
             }
             textareaClassName="km"
           />
-          {sampleFilled && (
-            <p className="km text-xs text-rule">
-              Moni បានបំពេញឧទាហរណ៍មួយ ព្រោះពិពណ៌នាខ្លីពេក។ អ្នកអាចកែឧទាហរណ៍នេះ រួចចុច &quot;រៀបចំឱ្យខ្ញុំ&quot; ម្តងទៀត។
+          {tooShort && (
+            <p role="status" className="km text-xs text-ink">
+              ពិពណ៌នាខ្លីពេក។ ប្រាប់សេវាមួយ និងតម្លៃរបស់វា ជាការចាប់ផ្តើម។
             </p>
           )}
+          {/* The sample used to write itself into the box on a short submit, so
+              pressing the same button twice saved a fictional salon as this
+              owner's real catalogue. It is genuinely useful copy, so it stays,
+              behind a deliberate tap that says what it is. */}
+          <div>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setDescription(SAMPLE)
+                setSampleFilled(true)
+                setTooShort(false)
+              }}
+              disabled={busy}
+              className="km min-h-11 rounded-none px-0 text-xs text-rule"
+            >
+              បំពេញឧទាហរណ៍ហាងកាត់សក់
+            </Button>
+            {sampleFilled && (
+              <p className="km text-xs text-rule">
+                នេះជាឧទាហរណ៍ មិនមែនហាងរបស់អ្នកទេ។ កែវាឱ្យត្រូវនឹងហាងរបស់អ្នក មុនចុច &quot;រៀបចំឱ្យខ្ញុំ&quot;។
+              </p>
+            )}
+          </div>
           {state === 'parsing' && (
             <AgentThinking
               steps={parseSteps}

@@ -39,6 +39,17 @@ const asCurrencyCode = (currency: string): CurrencyCode => (currency === 'USD' ?
  */
 export function sanityCheck(shop: ParsedShop): ParseWarning[] {
   const w: ParseWarning[] = []
+  // An owner who opened with an intent rather than a description gets here with
+  // nothing in the catalogue. That is no longer a parse failure (see the comment
+  // on ParsedShop.services), so it has to become a thing the review screen ASKS
+  // for. This warning and the empty-hours one below are the whole difference
+  // between "Moni could not read your shop" and "Moni needs two more facts".
+  if (shop.services.length === 0) {
+    w.push({ field: 'services', issue: 'មិនទាន់មានសេវា។ ប្រាប់ខ្ញុំពីសេវា និងតម្លៃ មុនពេលរក្សាទុក' })
+  }
+  if (shop.hours.length === 0) {
+    w.push({ field: 'hours', issue: 'មិនទាន់មានម៉ោងបើក។ Moni នឹងមិនប្រាប់អតិថិជនពីម៉ោងទេ' })
+  }
   for (const [i, s] of shop.services.entries()) {
     const at = `services[${i}] "${s.name}"`
     const amount = moneyKm(s.price_minor, asCurrencyCode(s.currency))

@@ -17,6 +17,13 @@ import { ShopSetup } from './shop-setup.tsx'
  * implementation. The dashboard sheet and this screen are the same job at
  * different moments, and two copies of the parse flow is exactly how the earlier
  * iteration drifted.
+ *
+ * This is the one /app screen on the Apple palette. It is the first thing a
+ * founding shop sees after the site that sold them, and until PLAN.md Phase 5
+ * rebuilds the dashboard the two would not match. `.moni-hig` carries the palette
+ * and the type, `.moni-app-hig` re-points the Invitation's fixed inks so the
+ * shared agent components come with it: see the comment on that class in
+ * globals.css. Both go away in Phase 5, when the whole surface is one world.
  */
 export function Onboarding({
   shopName,
@@ -33,14 +40,14 @@ export function Onboarding({
   const [saved, setSaved] = useState(false)
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+    <div className="moni-hig moni-app-hig min-h-dvh bg-surface text-label">
+      <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
       {saved ? (
         <>
-          {!setupComplete(steps) && (
-            <div className="mb-6">
-              <SetupTasks steps={steps} retryLabel="សាកម្តងទៀត" detailLabel="មើលកំហុស" />
-            </div>
-          )}
+          {/* No spine on this branch. `steps` is a server prop snapshotted before
+              the save, so rendering it here shows the owner "មិនទាន់" against the
+              two rows they just completed, for as long as router.refresh() takes.
+              The Telegram card below already names what is next. */}
           <div className="flex items-start gap-3">
             <Check className="mt-1 size-6 shrink-0 text-seal-text" strokeWidth={1.75} aria-hidden />
             <div>
@@ -110,6 +117,7 @@ export function Onboarding({
           <div className="mt-4 -mx-4 sm:mx-0">
             <ShopSetup
               initialInstructions={initialInstructions}
+              initialShopName={shopName}
               onSaved={() => {
                 setSaved(true)
                 router.refresh()
@@ -118,6 +126,7 @@ export function Onboarding({
           </div>
         </>
       )}
-    </main>
+      </main>
+    </div>
   )
 }

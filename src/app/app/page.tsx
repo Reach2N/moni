@@ -65,7 +65,7 @@ export default async function OwnerCommandCentre() {
               </div>
 
               <div className="order-2 xl:order-none xl:col-start-1 xl:row-start-1">
-                <AskMoni />
+                <AskMoni sampleCode={snapshot.today.bookings[0]?.code ?? null} />
               </div>
 
               <div className="order-3 xl:order-none xl:col-start-1 xl:row-start-2">
@@ -77,9 +77,6 @@ export default async function OwnerCommandCentre() {
               </div>
             </div>
 
-            <p className="km pt-5 text-center text-xs text-rule">
-              ទិន្នន័យសាកល្បងសម្រាប់ហាងប្រឌិត មិនមែនអាជីវកម្មពិតទេ
-            </p>
           </div>
         </main>
       </div>
