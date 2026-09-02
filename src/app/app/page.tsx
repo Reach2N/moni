@@ -20,12 +20,13 @@ export default async function OwnerCommandCentre() {
   // Keep database configuration out of the build-time module graph. This route
   // is dynamic and needs credentials only when an owner opens the dashboard;
   // importing the query modules above made `next build` fail on a clean clone.
-  const [{ requireMember }, { getDashboardSnapshot }, { shopSignals }, { loadSetupProgress }] =
+  const [{ requireMember }, { getDashboardSnapshot }, { shopSignals }, { loadSetupProgress }, { countCatalogue }] =
     await Promise.all([
       import('@/lib/auth/member.ts'),
       import('@/lib/queries/dashboard.ts'),
       import('@/lib/queries/signals.ts'),
       import('@/lib/queries/setup.ts'),
+      import('@/lib/queries/catalogue.ts'),
     ])
   // The gated layout already resolved this member; `memberGate` is request
   // cached, so asking again costs nothing and keeps the tenant id out of props.
@@ -34,7 +35,11 @@ export default async function OwnerCommandCentre() {
   // A shop with no catalogue has no day to plan and no takings to show, so the
   // dashboard would be a page of zeroes. Send a new member to the composer
   // instead: PLAN.md Phase 3 makes it the first screen they see.
-  if (snapshot.services.length === 0) redirect('/app/onboarding')
+  //
+  // It counted SERVICES until 2 September 2026, which sent a cafe with a full
+  // menu back to onboarding on every single visit, forever. A menu is a
+  // catalogue.
+  if ((await countCatalogue(member.businessId)) === 0) redirect('/app/onboarding')
   const signals = shopSignals(snapshot)
   const urgent = signals.filter((signal) => signal.tone === 'act').length
   const steps = await loadSetupProgress(member.businessId)

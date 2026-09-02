@@ -25,19 +25,24 @@ export async function getBusinessById(businessId: string) {
 }
 
 /**
- * Does this shop have anything to sell yet?
+ * Does this shop have anything to sell yet, of either kind?
  *
  * The answer decides whether a member lands on the dashboard or on onboarding,
  * so it is a count and not a full read: an empty shop's dashboard is a page of
  * zeroes that answers none of the owner's three opening questions.
+ *
+ * It counted active `services` until 2 September 2026, which meant a cafe with
+ * a full menu and no appointments answered false: the dashboard bounced it back
+ * to onboarding on every visit and the setup spine never completed. It counts
+ * `v_catalog`, so a menu is a catalogue and so is a price list.
  */
 export async function hasCatalogue(businessId: string): Promise<boolean> {
   const result = await db
-    .from('services')
+    .from('v_catalog')
     .select('id', { count: 'exact', head: true })
     .eq('business_id', businessId)
     .eq('active', true)
-  throwIfDbError('count active services', result.error)
+  throwIfDbError('count catalogue', result.error)
   return (result.count ?? 0) > 0
 }
 

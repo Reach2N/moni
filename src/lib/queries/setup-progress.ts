@@ -37,7 +37,8 @@ export type SetupStep = {
 export type SetupProgressInput = {
   hasDescription: boolean
   hasCatalogue: boolean
-  serviceCount: number
+  /** Active rows in `v_catalog`: services and products together, because a cafe has no services. */
+  catalogueCount: number
   /** `businesses.khqr_account_id` is set: the shop can be paid into its own account. */
   hasPaymentAccount: boolean
   channels: readonly { channel: string; status: string; lastError: string | null }[]
@@ -77,12 +78,15 @@ export function deriveSetupProgress(input: SetupProgressInput): SetupStep[] {
       href: '/app/onboarding',
     },
     {
+      // "អ្វីដែលលក់", not "សេវា". A cafe has no services and never will, and a
+      // row telling a coffee shop it has no services is a row it can never
+      // complete.
       key: 'catalogue',
-      label: 'បញ្ជីសេវា',
-      amount: input.hasCatalogue ? `${toKhmerDigits(input.serviceCount)} សេវា` : 'គ្មានសេវា',
+      label: 'បញ្ជីអ្វីដែលលក់',
+      amount: input.hasCatalogue ? `${toKhmerDigits(input.catalogueCount)} មុខ` : 'គ្មានទេ',
       state: input.hasCatalogue ? 'done' : 'pending',
       error: null,
-      href: '/app/onboarding',
+      href: '/app/products',
     },
     {
       // Before the channel on purpose. A shop that answers on Telegram but

@@ -11,10 +11,10 @@ import { deriveSetupProgress, type SetupStep } from './setup-progress.ts'
  * policies, so a query that forgets its tenant has nothing to catch it.
  */
 export async function loadSetupProgress(businessId: string): Promise<SetupStep[]> {
-  const [described, services, channels, served] = await Promise.all([
+  const [described, catalogue, channels, served] = await Promise.all([
     db.from('businesses').select('raw_description, khqr_account_id').eq('id', businessId).single(),
     db
-      .from('services')
+      .from('v_catalog')
       .select('id', { count: 'exact', head: true })
       .eq('business_id', businessId)
       .eq('active', true),
@@ -22,13 +22,13 @@ export async function loadSetupProgress(businessId: string): Promise<SetupStep[]
     hasFirstTransaction(businessId),
   ])
   throwIfDbError('load shop description', described.error)
-  throwIfDbError('count active services', services.error)
+  throwIfDbError('count catalogue', catalogue.error)
 
-  const serviceCount = services.count ?? 0
+  const catalogueCount = catalogue.count ?? 0
   return deriveSetupProgress({
     hasDescription: Boolean(described.data?.raw_description),
-    hasCatalogue: serviceCount > 0,
-    serviceCount,
+    hasCatalogue: catalogueCount > 0,
+    catalogueCount,
     hasPaymentAccount: Boolean(described.data?.khqr_account_id),
     channels,
     hasFirstTransaction: served,

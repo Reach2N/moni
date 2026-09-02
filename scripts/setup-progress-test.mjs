@@ -25,7 +25,7 @@ function input(overrides = {}) {
   return {
     hasDescription: false,
     hasCatalogue: false,
-    serviceCount: 0,
+    catalogueCount: 0,
     hasPaymentAccount: false,
     channels: [],
     hasFirstTransaction: false,
@@ -60,10 +60,27 @@ check('a described shop marks only the first row done', () => {
   assert.equal(steps.catalogue.state, 'pending')
 })
 
-check('the catalogue row counts services in its amount', () => {
-  const steps = byKey(deriveSetupProgress(input({ hasCatalogue: true, serviceCount: 5 })))
+check('the catalogue row counts what the shop sells, in its amount', () => {
+  const steps = byKey(deriveSetupProgress(input({ hasCatalogue: true, catalogueCount: 5 })))
   assert.equal(steps.catalogue.state, 'done')
-  assert.ok(steps.catalogue.amount.includes('៥'), 'service count renders in Khmer digits')
+  assert.ok(steps.catalogue.amount.includes('៥'), 'the count renders in Khmer digits')
+})
+
+check('a cafe with only products has a catalogue, which is the bug this fixes', () => {
+  const steps = byKey(deriveSetupProgress(input({ hasCatalogue: true, catalogueCount: 6 })))
+  assert.equal(steps.catalogue.state, 'done')
+  assert.ok(steps.catalogue.amount.includes('៦'), 'the count renders in Khmer digits')
+})
+
+check('the catalogue row never promises services, because a cafe has none', () => {
+  const steps = byKey(deriveSetupProgress(input()))
+  assert.ok(!steps.catalogue.label.includes('សេវា'), 'the label still says services')
+  assert.ok(!steps.catalogue.amount.includes('សេវា'), 'the amount still says services')
+})
+
+check('the catalogue row sends the owner to the catalogue screen', () => {
+  const steps = byKey(deriveSetupProgress(input()))
+  assert.equal(steps.catalogue.href, '/app/products')
 })
 
 check('a connected telegram marks the channel row done', () => {
@@ -128,7 +145,7 @@ check('every row carries a destination, because a row that leads nowhere is wors
 })
 
 check('no em dash reaches any label', () => {
-  for (const step of deriveSetupProgress(input({ hasCatalogue: true, serviceCount: 3 }))) {
+  for (const step of deriveSetupProgress(input({ hasCatalogue: true, catalogueCount: 3 }))) {
     assert.ok(!step.label.includes('—'), `${step.key} label has an em dash`)
     assert.ok(!step.amount.includes('—'), `${step.key} amount has an em dash`)
   }
@@ -140,7 +157,7 @@ check('setup is complete only when all five are done', () => {
   const unpaid = deriveSetupProgress(input({
     hasDescription: true,
     hasCatalogue: true,
-    serviceCount: 2,
+    catalogueCount: 2,
     channels: [{ channel: 'telegram', status: 'connected', lastError: null }],
     hasFirstTransaction: true,
   }))
@@ -148,7 +165,7 @@ check('setup is complete only when all five are done', () => {
   const all = deriveSetupProgress(input({
     hasDescription: true,
     hasCatalogue: true,
-    serviceCount: 2,
+    catalogueCount: 2,
     hasPaymentAccount: true,
     channels: [{ channel: 'telegram', status: 'connected', lastError: null }],
     hasFirstTransaction: true,
