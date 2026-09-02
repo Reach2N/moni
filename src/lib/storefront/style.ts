@@ -105,6 +105,14 @@ const RHYTHM: Record<Vibe['density'], { scale: number; section: number; row: num
 
 const RATIO: Record<Vibe['voice'], number> = { plain: 1.2, crafted: 1.25, bright: 1.333 }
 
+/**
+ * Leading by density, before the floor is applied. An airy shop gets more air
+ * in its Khmer, a compact one sits on the floor. Every value here already
+ * clears `MIN_LEADING`, which is the point: the floor exists to catch a future
+ * value someone adds below it, not to describe the ones that are here today.
+ */
+const LEADING: Record<Vibe['density'], number> = { airy: 1.9, standard: 1.8, compact: 1.75 }
+
 function pick<T>(rand: () => number, pool: readonly T[]): T {
   return pool[Math.floor(rand() * pool.length)]!
 }
@@ -201,7 +209,7 @@ export function styleFor(seed: number, vibe: Vibe, _theme: ThemeId): StorefrontS
       '--sf-weight-heading': String(weight),
       '--sf-gap-section': `${rhythm.section}px`,
       '--sf-gap-row': `${rhythm.row}px`,
-      '--sf-leading': String(MIN_LEADING),
+      '--sf-leading': String(Math.max(MIN_LEADING, LEADING[vibe.density])),
     },
   }
 }

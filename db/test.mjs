@@ -39,7 +39,7 @@ import {
   statusFromEvent, verifyCutluyDelivery, withinReplayWindow,
 } from '../src/lib/payments/cutluy-webhook.ts'
 import { THEMES, WARMTHS, VOICES, DENSITIES, DEFAULT_VIBE, vibeOf } from '../src/lib/types.ts'
-import { candidateSeeds, contrastRatio, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
+import { candidateSeeds, contrastRatio, mulberry32, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
@@ -1279,9 +1279,33 @@ for (const warmth of WARMTHS) for (const voice of VOICES) for (const density of 
 }
 eq('the vibe space is twenty seven', VIBES.length, 27)
 
+// contrastRatio is what every assertion below trusts. Nothing above this line
+// checks it against a value this codebase did not itself compute, so without
+// these four fixtures the whole readability claim would rest on arithmetic
+// nobody verified: paletteFor's clamp loop exits on this same function, so a
+// sweep that only calls contrastRatio again is unfalsifiable. These four are
+// independently known, not derived here: WCAG's own worked pairs (black and
+// white are the two ends of the scale, a colour against itself is a fixed
+// point) plus #767676, the shade the accessibility community treats as the
+// canonical AA text boundary at exactly 4.54.
+const round2 = (n) => Math.round(n * 100) / 100
+eq('white on black is the maximum possible contrast', round2(contrastRatio({ h: 0, s: 0, l: 100 }, { h: 0, s: 0, l: 0 })), 21)
+eq('#767676 on white sits on the canonical AA boundary', round2(contrastRatio({ h: 0, s: 0, l: (118 / 255) * 100 }, { h: 0, s: 0, l: 100 })), 4.54)
+eq('pure blue on white is 8.59', round2(contrastRatio({ h: 240, s: 100, l: 50 }, { h: 0, s: 0, l: 100 })), 8.59)
+eq('a colour against itself is exactly 1', contrastRatio({ h: 200, s: 40, l: 55 }, { h: 200, s: 40, l: 55 }), 1)
+
 let worstButton = Infinity, worstAccent = Infinity, worstBody = Infinity, worstLeading = Infinity
+// A fixed arithmetic step (`i * k % modulus`) is a lattice, not a sample: every
+// seed lands a constant distance from the last, so a failure mode that only
+// shows up between the rungs would never be seen no matter how many rungs
+// there are. Math.random() would spread out, but a flaky harness is worse than
+// a slow one: a run that fails on Tuesday and passes on Wednesday teaches
+// nobody anything. mulberry32 gives the spread of a random sample and the
+// reproducibility of a fixed one, seeded once so a red run is the same red run
+// every time.
+const seedPicker = mulberry32(20260903)
 const SEEDS = []
-for (let i = 0; i < 400; i++) SEEDS.push(Math.floor((i * 5_381_923) % 2147483647))
+for (let i = 0; i < 400; i++) SEEDS.push(Math.floor(seedPicker() * 2147483647))
 for (const seed of SEEDS) {
   for (const vibe of VIBES) {
     const p = paletteFor(seed, vibe)
