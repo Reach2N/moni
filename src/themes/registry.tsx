@@ -23,6 +23,12 @@ import { ProductTile } from '@/components/storefront/product-tile.tsx'
  * `tileFor()` for a photoless row's pattern tile. It never computes a colour,
  * radius or spacing from that integer: it only wears the `--sf-*` values
  * already resolved above it.
+ *
+ * Headline and subhead sizes come from `--sf-text-*`, the four steps the `.sf`
+ * block builds out of the seeded base size and ratio. A fixed rem size here
+ * would answer to the ROOT font size and not to this shop's, which is how a
+ * compact shop and an airy shop both ended up with a 30px headline while the
+ * ratio that was supposed to separate them went unread.
  */
 
 function Hours({ data }: { data: StorefrontData }) {
@@ -118,8 +124,8 @@ function SalonStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: n
   return (
     <div className="mx-auto w-full max-w-2xl px-5 py-12">
       <p className="km text-sm tracking-wide text-label-2">{data.shop.province ?? 'កម្ពុជា'}</p>
-      <h1 className="km mt-1 text-3xl font-semibold">{data.content.headline}</h1>
-      <p className="km mt-3 text-lg text-label-2">{data.content.subhead}</p>
+      <h1 className="km mt-1 text-[length:var(--sf-text-3)] font-semibold">{data.content.headline}</h1>
+      <p className="km mt-3 text-[length:var(--sf-text-1)] text-label-2">{data.content.subhead}</p>
       <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
 
       <h2 className="km mt-12 text-sm font-semibold tracking-wide text-label-2">សេវា និងតម្លៃ</h2>
@@ -139,8 +145,8 @@ function StayStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: nu
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-12">
       <header className="border-b border-separator pb-8">
-        <h1 className="km text-4xl font-semibold tracking-tight">{data.content.headline}</h1>
-        <p className="km mt-3 max-w-xl text-lg text-label-2">{data.content.subhead}</p>
+        <h1 className="km text-[length:var(--sf-text-4)] font-semibold tracking-tight">{data.content.headline}</h1>
+        <p className="km mt-3 max-w-xl text-[length:var(--sf-text-1)] text-label-2">{data.content.subhead}</p>
         <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
       </header>
 
@@ -167,8 +173,8 @@ function StayStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: nu
 function WorkshopStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: number }) {
   return (
     <div className="mx-auto w-full max-w-2xl px-5 py-12">
-      <h1 className="km text-3xl font-semibold">{data.content.headline}</h1>
-      <p className="km mt-3 text-lg text-label-2">{data.content.subhead}</p>
+      <h1 className="km text-[length:var(--sf-text-3)] font-semibold">{data.content.headline}</h1>
+      <p className="km mt-3 text-[length:var(--sf-text-1)] text-label-2">{data.content.subhead}</p>
 
       <ol className="km mt-8 flex flex-col gap-3 border-y border-separator py-6">
         {data.content.highlights.map((line, index) => (
@@ -192,7 +198,7 @@ function WorkshopStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed
 function CounterStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: number }) {
   return (
     <div className="mx-auto w-full max-w-xl px-5 py-10">
-      <h1 className="km text-2xl font-semibold">{data.content.headline}</h1>
+      <h1 className="km text-[length:var(--sf-text-2)] font-semibold">{data.content.headline}</h1>
       <p className="km mt-2 text-[0.9375rem] text-label-2">{data.content.subhead}</p>
 
       <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">មុខម្ហូប និងតម្លៃ</h2>

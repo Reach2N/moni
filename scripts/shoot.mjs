@@ -140,6 +140,13 @@ await shoot('landing-desktop-still',1440,900,1,undefined,false,'/',1200,{scheme:
 const STOREFRONT_SLUG = process.env.MONI_CAPTURE_SLUG ?? 'sansethireach'
 await shoot('storefront-desktop', 1440,900,1,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,LIGHT,true)
 await shoot('storefront-mobile',   390,844,2,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,LIGHT,true)
+// Both of the captures above pass LIGHT, and that is exactly how a shop site
+// that rendered near-white Khmer on near-white paper for every dark-system
+// visitor got through a full review with screenshots attached. A seeded page
+// pins its own ground, so the scheme is the one axis a light-only capture can
+// never speak for. These two are the ones that would have caught it.
+await shoot('storefront-desktop-dark',1440,900,1,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,DARK,true)
+await shoot('storefront-mobile-dark',  390,844,2,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,DARK,true)
 
 // ── Phase 2: the dashboard. Light locked, so no scheme emulation.
 await shoot('mobile',390,844,2,undefined,false,'/app',500,{scheme:null})

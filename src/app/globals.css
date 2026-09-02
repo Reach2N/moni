@@ -522,6 +522,17 @@ body:has(.moni-hig) {
    Tailwind emits its utilities inside @layer utilities, so these win without
    an !important anywhere. */
 .sf {
+  /* A shop's site is a light page in every scheme. The ground moved here to a
+     seeded near-white and, for one release, the INK did not come with it: the
+     `prefers-color-scheme: dark` block near the top of this file still owns
+     `--label` unless something claims it, and it was flipping the body copy to
+     #F5F5F7. That is 1.04:1 on this ground. Every Khmer glyph on every
+     published shop's public site was invisible to a visitor whose system was
+     dark, which is roughly half of them. Binding the four inks is the fix;
+     `color-scheme` is the other half, so the browser draws its own form
+     controls and scrollbars light against a page that is light. */
+  color-scheme:   light;
+
   --accent:       var(--sf-accent);
   --on-accent:    var(--sf-on-accent);
   --green:        var(--sf-accent);
@@ -530,7 +541,49 @@ body:has(.moni-hig) {
   --background:   var(--sf-surface);
   --surface:      var(--sf-surface);
   --page:         var(--sf-surface);
+
+  /* The inks, composited against this shop's own surface in style.ts rather
+     than left as translucent blacks, so the ratio db/test.mjs asserts is the
+     ratio a browser paints. */
+  --label:            var(--sf-label);
+  --label-secondary:  var(--sf-label-2);
+  --label-tertiary:   var(--sf-label-3);
+  --separator:        var(--sf-separator);
+  --ink:              var(--sf-label);
+  --ink-2:            var(--sf-label-2);
+  --ink-3:            var(--sf-label-3);
+  --line:             var(--sf-separator);
+
+  /* The browser's own surfaces inside this subtree. `--ui-*` is declared at
+     :root, so it resolves against :root's scheme-aware palette unless it is
+     re-declared somewhere the storefront can see. */
+  --ui-accent:    var(--sf-accent);
+  --ui-ground:    var(--sf-surface);
+  --ui-hairline:  var(--sf-separator);
+  --ui-thumb:     var(--sf-label-3);
+
   font-size:      var(--sf-scale);
+
+  /* The type scale, which is what `--sf-ratio` is FOR. Tailwind's text sizes
+     are rem based, so they answer to the root font size and not to the one set
+     just above: a compact shop and an airy shop were rendering their headlines
+     at exactly the same 30px. Four steps, multiplied out rather than written
+     with pow(), which is newer than the browsers this has to reach. */
+  --sf-text-1:    calc(var(--sf-scale) * var(--sf-ratio));
+  --sf-text-2:    calc(var(--sf-text-1) * var(--sf-ratio));
+  --sf-text-3:    calc(var(--sf-text-2) * var(--sf-ratio));
+  --sf-text-4:    calc(var(--sf-text-3) * var(--sf-ratio));
+}
+
+/* The document scroller is `html`, which the storefront div cannot reach from
+   inside it, and the scrollbar colours are set on `*` further up, so they beat
+   `color-scheme` on their own. Without this a shop's site keeps a black
+   scrollbar track down the side of a white page for a dark-system visitor. */
+:root:has(.sf) {
+  color-scheme:   light;
+  --ui-ground:    #FFFFFF;
+  --ui-hairline:  rgba(60, 60, 67, 0.29);
+  --ui-thumb:     rgba(60, 60, 67, 0.30);
 }
 
 .sf h1, .sf h2, .sf h3 { font-weight: var(--sf-weight-heading); }

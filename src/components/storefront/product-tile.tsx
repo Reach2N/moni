@@ -15,7 +15,18 @@ import { patternGeometry } from '@/lib/media/tile.ts'
  * `tile.ts`, kept pure and separate so `db/test.mjs` can rotate the real
  * shapes and prove `ROTATIONS_FOR` true about the art, not about this file.
  */
-const TINTS = ['8%', '14%', '22%'] as const
+/**
+ * The three ink steps, as token names rather than as mix percentages.
+ *
+ * They used to be `color-mix(in srgb, var(--sf-accent) 8%, transparent)` and
+ * the ground a mix of its own. A browser older than Chrome 111 or Safari 16.2
+ * does not know `color-mix`, and an unknown function is not a soft landing: the
+ * whole declaration is dropped, so `color` fell back to what it inherited and
+ * every photoless row painted a heavy near-black pattern on no ground at all.
+ * `styleFor` composites all four against the shop's own surface and emits plain
+ * `hsl()`, so there is nothing here left to fail.
+ */
+const TINTS = ['var(--sf-tile-ink-1)', 'var(--sf-tile-ink-2)', 'var(--sf-tile-ink-3)'] as const
 
 function pathD(points: { x: number; y: number }[]): string {
   return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
@@ -32,13 +43,12 @@ function drawPrimitive(primitive: Primitive, key: number) {
 }
 
 export function ProductTile({ spec, className }: { spec: TileSpec; className?: string }) {
-  const paint = { color: `color-mix(in srgb, var(--sf-accent) ${TINTS[spec.tint]}, transparent)` }
   const primitives = patternGeometry(spec.pattern, spec.density)
   return (
     <span
       aria-hidden="true"
       className={className}
-      style={{ ...paint, background: `color-mix(in srgb, var(--sf-accent) 6%, var(--sf-surface))` }}
+      style={{ color: TINTS[spec.tint], background: 'var(--sf-tile-ground)' }}
     >
       <svg viewBox="0 0 56 56" width="56" height="56" style={{ transform: `rotate(${spec.rotation}deg)` }}>
         <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">

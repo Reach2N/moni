@@ -1312,7 +1312,22 @@ eq('#767676 on white sits on the canonical AA boundary', round2(contrastRatio({ 
 eq('pure blue on white is 8.59', round2(contrastRatio({ h: 240, s: 100, l: 50 }, { h: 0, s: 0, l: 100 })), 8.59)
 eq('a colour against itself is exactly 1', contrastRatio({ h: 200, s: 40, l: 55 }, { h: 200, s: 40, l: 55 }), 1)
 
+// Every ink this sweep measures has to be an ink the PAGE paints, or the sweep
+// is measuring its own record. That was the defect: `paletteFor` returned a
+// label colour, this file asserted 7:1 against it, and `styleFor` emitted no
+// token carrying it, so `:root`'s dark block went on owning `--label` and every
+// shop's site rendered near-white on near-white for a dark-system visitor at a
+// measured 1.04:1 while this assertion stayed green. So before any ratio is
+// asserted: every custom property styleFor emits must be read by something.
+const CONSUMERS = ['../src/app/globals.css', '../src/themes/registry.tsx',
+  '../src/components/storefront/product-tile.tsx', '../src/app/s/[slug]/page.tsx']
+  .map((f) => readFileSync(join(here, f), 'utf8')).join('\n')
+const emitted = Object.keys(styleFor(4242, DEFAULT_VIBE, 'counter').vars)
+const unread = emitted.filter((name) => !CONSUMERS.includes(`var(${name})`))
+eq(`all ${emitted.length} seeded tokens are read by a file that renders`, unread.join(',') || 'none', 'none')
+
 let worstButton = Infinity, worstAccent = Infinity, worstBody = Infinity, worstLeading = Infinity
+let worstSecondary = Infinity, worstSeparator = Infinity
 // A fixed arithmetic step (`i * k % modulus`) is a lattice, not a sample: every
 // seed lands a constant distance from the last, so a failure mode that only
 // shows up between the rungs would never be seen no matter how many rungs
@@ -1330,6 +1345,8 @@ for (const seed of SEEDS) {
     worstButton = Math.min(worstButton, contrastRatio(p.accent, p.onAccent))
     worstAccent = Math.min(worstAccent, contrastRatio(p.accent, p.surface))
     worstBody = Math.min(worstBody, contrastRatio(p.label, p.surface))
+    worstSecondary = Math.min(worstSecondary, contrastRatio(p.labelSecondary, p.surface))
+    worstSeparator = Math.min(worstSeparator, contrastRatio(p.separator, p.surface))
     for (const theme of THEMES) {
       const s = styleFor(seed, vibe, theme.id)
       worstLeading = Math.min(worstLeading, parseFloat(s.vars['--sf-leading']))
@@ -1339,6 +1356,16 @@ for (const seed of SEEDS) {
 eq(`a call to action is legible on every one of ${SEEDS.length * VIBES.length} palettes`, worstButton >= 4.5, true)
 eq('accent text on the page ground is legible', worstAccent >= 3, true)
 eq('body copy on the page ground is legible', worstBody >= 7, true)
+// 4.5:1 is WCAG AA for normal-size text, and the secondary ink is normal-size
+// text: every subhead, every day name in the opening hours, an item's English
+// name under its Khmer one. It is quieter than the body ink, not a different
+// class of thing, so it owes the same floor.
+eq('the secondary ink is normal-size text and owes the text floor', worstSecondary >= 4.5, true)
+// 3:1 is WCAG 1.4.11, the floor for a graphical object the content is read
+// through, which is what a row rule is on a phone-width menu: it is the thing
+// binding a dish to its price. Not the 4.5 above it, because nobody reads the
+// line itself.
+eq('a row rule is a graphical object and owes the non-text floor', worstSeparator >= 3, true)
 eq('and Khmer never drops below 1.75 leading', worstLeading >= 1.75, true)
 
 // Determinism is not a convenience. A shop whose site changed colour between
@@ -1353,6 +1380,29 @@ eq('a different seed gives a different style', JSON.stringify(a1) === JSON.strin
 const warmHue = paletteFor(4242, { warmth: 'warm', voice: 'plain', density: 'airy' }).accent.h
 const coolHue = paletteFor(4242, { warmth: 'cool', voice: 'plain', density: 'airy' }).accent.h
 eq('warm and cool land in different hue bands', Math.abs(warmHue - coolHue) > 100, true)
+
+// The default vibe is the one that has to carry the variation, and it was the
+// one that had almost none. Every storefront row written before this phase has
+// no vibe, and every generation that names none falls back here, so neutral and
+// plain will be a large share of all published shops: four of them looked like
+// four shades of the same green with the same square corner and the same rule.
+// These four assertions are the "visibly different" acceptance line made
+// falsifiable, over the same fixed sample as the contrast sweep above.
+const defaultLooks = SEEDS.map((seed) => ({ s: styleFor(seed, DEFAULT_VIBE, 'counter'), p: paletteFor(seed, DEFAULT_VIBE) }))
+const looks = new Set(defaultLooks.map(({ s }) => `${s.vars['--sf-radius']}|${s.rule}|${s.vars['--sf-weight-heading']}`))
+const defaultHues = defaultLooks.map(({ p }) => p.accent.h)
+eq('the default vibe draws from more than a handful of shapes', looks.size >= 12, true)
+eq('and its hue band is wide enough to tell two neighbours apart',
+  Math.round(Math.max(...defaultHues) - Math.min(...defaultHues)) >= 80, true)
+// The other half of the same claim: a band widened until it means nothing has
+// not been widened, it has been deleted. Neutral must still sit clear of both
+// its neighbours, and plain must still corner harder than crafted.
+const hueOf = (warmth) => SEEDS.map((seed) => paletteFor(seed, { warmth, voice: 'plain', density: 'airy' }).accent.h)
+const radiusOf = (voice) => SEEDS.map((seed) => parseInt(styleFor(seed, { warmth: 'neutral', voice, density: 'airy' }, 'counter').vars['--sf-radius'], 10))
+eq('neutral still sits clear of warm and of cool',
+  Math.max(...hueOf('warm')) < Math.min(...hueOf('neutral')) && Math.max(...hueOf('neutral')) < Math.min(...hueOf('cool')), true)
+eq('and a plain corner is still crisper than a crafted one',
+  Math.max(...radiusOf('plain')) < Math.min(...radiusOf('crafted')), true)
 
 // The picker offers four looks. It must never offer the one she already has,
 // or a reshuffle would silently do nothing.
