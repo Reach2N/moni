@@ -657,6 +657,56 @@ export const STOREFRONT_STATUSES = ['draft', 'published'] as const
 export type StorefrontStatus = (typeof STOREFRONT_STATUSES)[number]
 
 /**
+ * How a shop feels, in three closed enums the model fills from the owner's own
+ * words. Twenty-seven combinations.
+ *
+ * These are enums and not free text on purpose. The model is choosing an id
+ * here exactly as it already chooses `theme`, so a bad generation is a wrong
+ * adjective and never markup on a real shop's public site. The seed resolves
+ * everything these three do not say: see src/lib/storefront/style.ts.
+ */
+export const WARMTHS = ['warm', 'neutral', 'cool'] as const
+export const VOICES = ['plain', 'crafted', 'bright'] as const
+export const DENSITIES = ['airy', 'standard', 'compact'] as const
+
+export type Vibe = {
+  warmth: (typeof WARMTHS)[number]
+  voice: (typeof VOICES)[number]
+  density: (typeof DENSITIES)[number]
+}
+
+/**
+ * What a shop published before this phase existed gets.
+ *
+ * Neutral, plain and standard is the quietest point in the space, which is the
+ * right thing to hand a shop that never chose: it looks deliberate rather than
+ * random, and the owner can regenerate whenever she likes.
+ */
+export const DEFAULT_VIBE: Vibe = { warmth: 'neutral', voice: 'plain', density: 'standard' }
+
+/**
+ * Read a vibe out of stored content that may predate it, or be malformed.
+ *
+ * A live shop site must render. A published jsonb blob written last week has no
+ * `vibe` key at all, and treating that as an error would take a real shop's
+ * site down to serve a type.
+ */
+export function vibeOf(content: unknown): Vibe {
+  const candidate = (content as { vibe?: Partial<Vibe> } | null)?.vibe
+  if (!candidate) return DEFAULT_VIBE
+  const warmth = (WARMTHS as readonly string[]).includes(candidate.warmth ?? '')
+    ? (candidate.warmth as Vibe['warmth'])
+    : DEFAULT_VIBE.warmth
+  const voice = (VOICES as readonly string[]).includes(candidate.voice ?? '')
+    ? (candidate.voice as Vibe['voice'])
+    : DEFAULT_VIBE.voice
+  const density = (DENSITIES as readonly string[]).includes(candidate.density ?? '')
+    ? (candidate.density as Vibe['density'])
+    : DEFAULT_VIBE.density
+  return { warmth, voice, density }
+}
+
+/**
  * What the model is allowed to write for a shop's public site.
  *
  * Every field is a STRING or a list of strings. The model never emits markup,
@@ -666,6 +716,8 @@ export type StorefrontStatus = (typeof STOREFRONT_STATUSES)[number]
  */
 export type StorefrontContent = {
   theme: ThemeId
+  /** How the shop feels, from the owner's own words. Read through `vibeOf()`. Optional because this type also describes storefront jsonb written before this field existed. */
+  vibe?: Vibe
   headline: string
   subhead: string
   about: string
@@ -681,6 +733,8 @@ export type Storefront = {
   id: string
   business_id: string
   theme: ThemeId | string
+  /** The owner's chosen look. A column and not part of the content jsonb: it is her choice, not the model's, and it survives a regeneration. */
+  seed: number
   draft: StorefrontContent | null
   published: StorefrontContent | null
   published_at: string | null

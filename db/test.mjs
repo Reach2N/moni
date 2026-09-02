@@ -38,7 +38,7 @@ import {
   expectedSignature, isFulfillingEvent, parseSignatureHeader,
   statusFromEvent, verifyCutluyDelivery, withinReplayWindow,
 } from '../src/lib/payments/cutluy-webhook.ts'
-import { THEMES } from '../src/lib/types.ts'
+import { THEMES, WARMTHS, VOICES, DENSITIES, DEFAULT_VIBE, vibeOf } from '../src/lib/types.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
@@ -1241,6 +1241,31 @@ eq('and it still counts as reading the shop', unknown.grounded, true)
 eq('repeated calls are not collapsed, because two lookups is what happened',
   describeTurn([{ tool: 'list_slots' }, { tool: 'list_slots' }]).steps.length, 2)
 eq('no em dash reaches a trace line', groundedTurn.steps.some((s) => s.includes('—')), false)
+
+console.log('\na shop\'s look is a vibe plus a seed')
+// The vibe is three closed enums, so the model can get it wrong only in ways
+// the schema already refuses. Twenty-seven combinations is the whole space.
+eq('three warmths', WARMTHS.length, 3)
+eq('three voices', VOICES.length, 3)
+eq('three densities', DENSITIES.length, 3)
+// Every storefront published before this phase has no vibe in its jsonb. A
+// missing vibe must be a default, never a crash on a real shop's live site.
+eq('a content object with no vibe falls back', vibeOf({ headline: 'x' }).warmth, DEFAULT_VIBE.warmth)
+eq('and a stated vibe is used as stated', vibeOf({ vibe: { warmth: 'cool', voice: 'bright', density: 'compact' } }).voice, 'bright')
+// A vibe that is present but malformed is the same case as absent: the site
+// still has to render.
+eq('a malformed vibe falls back too', vibeOf({ vibe: { warmth: 'purple' } }).warmth, DEFAULT_VIBE.warmth)
+
+// db/seed.sql inserts no storefronts rows, so the seed column is proved here by
+// inserting one and checking what the column default does on its own, the same
+// way the cafe catalogue bug above builds its own row rather than reading seed data.
+const existingCafeStorefront = await one(db, `select seed from storefronts where id = '${B_CAFE}'`)
+if (!existingCafeStorefront) {
+  await db.query(`insert into storefronts (id, theme) values ('${B_CAFE}', 'counter')`)
+}
+const seeded = await one(db, `select seed from storefronts where id = '${B_CAFE}'`)
+eq('a new storefront row gets a seed without being given one', Number.isInteger(Number(seeded.seed)), true)
+eq('and it is inside the 31 bit range', Number(seeded.seed) >= 0 && Number(seeded.seed) <= 2147483647, true)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

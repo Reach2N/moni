@@ -447,6 +447,7 @@ create unique index if not exists waitlist_email_uniq on waitlist (lower(email))
 create table if not exists storefronts (
   id            uuid primary key references businesses(id) on delete cascade,
   theme         text not null default 'salon',
+  seed          integer not null default (floor(random() * 2147483647))::int,
   draft         jsonb,
   published     jsonb,
   published_at  timestamptz,
@@ -458,6 +459,7 @@ comment on table  storefronts is 'The shop''s own public site at {slug}.moni.cam
 comment on column storefronts.draft is 'What the agent last generated: a validated StorefrontContent object, never markup. A bad generation is a bad string, never a white screen on a real shop''s site.';
 comment on column storefronts.published is 'What the public actually sees. Only the owner moves draft to published, so nothing the model wrote reaches a customer unread.';
 comment on column storefronts.generated_by is 'Model ref that wrote the draft, for the same reason businesses.parse_model exists: when a generation is wrong you need to know which model wrote it.';
+comment on column storefronts.seed is 'The integer a shop''s whole look is a function of. A column default rather than app generated, so it is set once per row and stable by construction. Changing it is the owner''s act on /app/site, never the model''s.';
 
 create table if not exists webhook_events (
   id                bigserial primary key,
