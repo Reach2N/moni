@@ -40,7 +40,7 @@ import {
 } from '../src/lib/payments/cutluy-webhook.ts'
 import { THEMES, WARMTHS, VOICES, DENSITIES, DEFAULT_VIBE, vibeOf } from '../src/lib/types.ts'
 import { candidateSeeds, contrastRatio, isSeed, mulberry32, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
-import { TILE_PATTERNS, ROTATIONS_FOR, tileFor, patternGeometry } from '../src/lib/media/tile.ts'
+import { TILE_PATTERNS, ROTATIONS_FOR, tileFor, patternGeometry, shouldDrawTile } from '../src/lib/media/tile.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
@@ -1221,6 +1221,22 @@ eq('and every one of them is a product', cafeSite.rows.every((r) => r.kind === '
 // A menu must read correctly for a shop that uploaded nothing, so a null photo
 // is a normal row and never a broken image.
 eq('a product with no photo is still a row', cafeSite.rows.every((r) => 'photo_path' in r), true)
+
+console.log('\na haircut never had a photo, so it never gets a tile either')
+// db/seed.sql's two demo businesses, the salon and the guesthouse, are both
+// services only. That makes a services-only shop the ORDINARY case, not an
+// edge case, and every earlier check here only ever exercised the product-only
+// cafe: `Items` in src/themes/registry.tsx would have drawn a pattern tile
+// beside every row of every salon and guesthouse menu, unconditionally.
+// `catalogueService` and `cafeSite.rows[0]` are the real fixture rows from
+// above, not invented ones, so this pins the exact predicate `Items` branches
+// on against real data instead of a hand-typed shape.
+eq('a service with no photo draws no tile, exactly as it rendered before tiles existed',
+  shouldDrawTile(catalogueService.kind, catalogueService.photo_path), false)
+eq('a product with no photo still draws its tile', shouldDrawTile(cafeSite.rows[0].kind, cafeSite.rows[0].photo_path), true)
+// The photo branch is untouched by this fix: a row that does have a photo
+// never reaches the tile decision at all, product or service.
+eq('a product that already has a photo does not also want a tile', shouldDrawTile(drink.kind, drink.photo_path), false)
 
 console.log('\nwhat the owner is told her assistant did')
 // The owner trying her own shop is asking one question: did that answer come

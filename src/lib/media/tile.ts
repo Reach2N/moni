@@ -1,4 +1,5 @@
 import { mulberry32 } from '../storefront/style.ts'
+import type { CatalogKind } from '../types.ts'
 
 /**
  * What a product row shows when there is no photograph.
@@ -68,6 +69,20 @@ function hash(text: string): number {
     h = Math.imul(h, 0x01000193)
   }
   return h >>> 0
+}
+
+/**
+ * Whether a menu row with no photograph draws a pattern tile instead.
+ *
+ * Only a product qualifies. A service, a haircut or a room-night, never had a
+ * photograph and never asked for one: before this tile feature a service row
+ * with no photo rendered as a plain name and price, and decorating every row
+ * of a salon's menu with generated art is a change nobody asked for. `Items`
+ * in `src/themes/registry.tsx` calls this rather than inlining the check, so
+ * `db/test.mjs` can pin the rule without rendering React.
+ */
+export function shouldDrawTile(kind: CatalogKind, photoUrl: string | null): boolean {
+  return kind === 'product' && !photoUrl
 }
 
 /**

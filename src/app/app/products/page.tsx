@@ -1,6 +1,7 @@
 import { ProductList } from '@/components/app/product-list.tsx'
 import { sellsFor } from '@/lib/types.ts'
 import { toKhmerDigits } from '@/lib/format/khmer.ts'
+import { shouldDrawTile } from '@/lib/media/tile.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,9 +24,11 @@ export default async function ProductsPage() {
     listCatalogue(member.businessId, { includeInactive: true }),
     getBusinessById(member.businessId),
   ])
-  // Services always carry photo_path null (db/schema.sql v_catalog), so only
-  // products count here: matches the `products` table query pinned in db/test.mjs.
-  const withoutPhoto = items.filter((item) => item.kind === 'product' && item.active && !item.photo_path).length
+  // Counts through the same predicate that decides whether the public site
+  // draws a tile (src/lib/media/tile.ts), so this note and the site can never
+  // disagree about what "no photo" means. Scoped to active rows because the
+  // storefront never renders an inactive one either.
+  const withoutPhoto = items.filter((item) => item.active && shouldDrawTile(item.kind, item.photo_path)).length
 
   return (
     <>

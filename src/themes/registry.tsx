@@ -1,7 +1,7 @@
 import type { StorefrontData, ThemeModule } from './types.ts'
 import { DAY_NAMES_KM, groupedItems, money, orderedHours } from './shared.ts'
 import type { ThemeId } from '@/lib/types.ts'
-import { tileFor } from '@/lib/media/tile.ts'
+import { shouldDrawTile, tileFor } from '@/lib/media/tile.ts'
 import { ProductTile } from '@/components/storefront/product-tile.tsx'
 
 /**
@@ -51,11 +51,19 @@ function Action({ data, className }: { data: StorefrontData; className?: string 
 /**
  * What the shop sells, grouped the way a menu reads.
  *
- * A photo is an enhancement and never the skeleton: a shop that uploaded
- * nothing gets a tile in its own seeded palette rather than a gap, which is
- * what most shops will have on their first day. The tile is drawn at the same
- * size and in the same rounded box as the photo it stands in for, so a half
- * photographed menu has one alignment and one rhythm rather than two.
+ * A photo is an enhancement and never the skeleton: a product a shop uploaded
+ * nothing for gets a tile in its own seeded palette rather than a gap, which
+ * is what most product menus will have on their first day. The tile is drawn
+ * at the same size and in the same rounded box as the photo it stands in for,
+ * so a half photographed menu has one alignment and one rhythm rather than
+ * two.
+ *
+ * A service never had a photo in the first place, a haircut or a room-night
+ * is not a thing you photograph, so `shouldDrawTile` keeps it out of this: a
+ * service row with no photo draws neither, exactly as it did before tiles
+ * existed. Without that check a services-only shop's whole menu would sprout
+ * decorative art beside every row, which is not a photo gap being filled, it
+ * is a look nobody chose.
  */
 function Items({ data, tileSeed, className }: { data: StorefrontData; tileSeed: number; className?: string }) {
   const groups = groupedItems(data.items)
@@ -82,12 +90,12 @@ function Items({ data, tileSeed, className }: { data: StorefrontData; tileSeed: 
                     loading="lazy"
                     className="size-14 shrink-0 rounded-[calc(var(--sf-radius)*0.75)] object-cover"
                   />
-                ) : (
+                ) : shouldDrawTile(item.kind, item.photoUrl) ? (
                   <ProductTile
                     spec={tileFor(tileSeed, item.id)}
                     className="size-14 shrink-0 overflow-hidden rounded-[calc(var(--sf-radius)*0.75)]"
                   />
-                )}
+                ) : null}
                 <span className="km min-w-0 flex-1">
                   <span className="block truncate">{item.name}</span>
                   {item.nameEn ? <span className="block truncate text-xs text-label-2">{item.nameEn}</span> : null}
