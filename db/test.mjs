@@ -28,6 +28,7 @@ import { createRateLimiter } from '../src/lib/ops/rate-limit.ts'
 import { shopSlugFromHost } from '../src/lib/hosting/subdomain.ts'
 import { sanityCheck } from '../src/lib/ai/storefront-check.ts'
 import { buildKhqrPayload, crc16, amountField, khqrMd5 } from '../src/lib/khqr/payload.ts'
+import { assertUploadable, storageKey, MediaError, MAX_IMAGE_BYTES } from '../src/lib/media/validate.ts'
 import { shopKhqrRail, isPollable } from '../src/lib/payments/shop-khqr.ts'
 import { KHQR_ACCOUNT_ID, paymentAccountFor } from '../src/lib/types.ts'
 import { createOrder, allocateInvoiceNumber, OrderError } from '../src/lib/orders/create.ts'
@@ -1169,6 +1170,40 @@ eq('every business type declares what it sells', BUSINESS_TYPES.every((t) => ['t
 eq('a cafe sells goods as well as time', sellsFor('cafe'), 'both')
 eq('a salon sells time', sellsFor('salon'), 'time')
 eq('an unknown type is assumed to sell both, so nothing is hidden from a shop', sellsFor('spaceship_repair'), 'both')
+
+console.log('\nproduct photos: what may be uploaded')
+const okUpload = assertUploadable('image/webp', 40_000)
+eq('a webp is accepted and names its extension', `${okUpload.mediaType} ${okUpload.extension}`, 'image/webp webp')
+eq('a jpeg is accepted', assertUploadable('image/jpeg', 1000).extension, 'jpg')
+eq('a png is accepted', assertUploadable('image/png', 1000).extension, 'png')
+// The content type arrives from a phone and decides what we write to a PUBLIC
+// bucket, so anything unrecognised is refused rather than stored and guessed at.
+const refusesUpload = (type, size, why) => {
+  try {
+    assertUploadable(type, size)
+    no(why, 'it was accepted')
+  } catch (error) {
+    if (error instanceof MediaError) ok(`${why} (${error.status})`)
+    else no(why, `wrong error type: ${error.message}`)
+  }
+}
+refusesUpload('image/gif', 1000, 'an animated gif is refused, since a menu photo is one frame')
+refusesUpload('application/pdf', 1000, 'a pdf is refused')
+refusesUpload(null, 1000, 'a missing content type is refused rather than assumed')
+refusesUpload('image/webp', MAX_IMAGE_BYTES + 1, 'an oversized image is refused before it reaches storage')
+refusesUpload('image/webp', 0, 'an empty body is refused')
+// A content type may carry parameters, which a naive equality check rejects.
+eq('a charset parameter does not break the check', assertUploadable('image/webp; charset=binary', 500).extension, 'webp')
+
+console.log('\nproduct photos: where they are written')
+const photoKey = storageKey(B_SALON, 'e2000000-0000-4000-8000-000000000001', 'webp')
+eq('the shop id leads the key, so one prefix is one shop', photoKey.startsWith(`${B_SALON}/`), true)
+eq('the product id follows it', photoKey.split('/')[1], 'e2000000-0000-4000-8000-000000000001')
+eq('and the file keeps its extension', photoKey.endsWith('.webp'), true)
+// Two uploads for one product must not collide, or replacing a photo would
+// serve the old one from a cache that already holds the name.
+eq('two uploads for the same product get different keys',
+  photoKey === storageKey(B_SALON, 'e2000000-0000-4000-8000-000000000001', 'webp'), false)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
