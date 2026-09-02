@@ -340,6 +340,15 @@
   /* The dashboard answers the same Beautiful UI hooks with Invitation values,
      so a component reused there reads plate ink on note paper rather than the
      homepage's palette. Delete with the rest of the Invitation in Phase 5. */
+
+  /* The Invitation has no radius by design (see the sourcing note in
+     components/app/panel.tsx: no cards, no shadows, no radius). The agent
+     components are shared with the onboarding screen, which DOES sit on the
+     Apple palette and owes it a 14px card, so the radius travels as a token
+     rather than as a prop threaded through four components. Zero here, the
+     root's 14px restored in .moni-app-hig below. */
+  --radius-card:  0;
+
   --surface:      #FFFFFF;
   --page:         var(--color-paper);
   --canvas:       var(--color-paper);
@@ -374,6 +383,11 @@
 
    Delete it in Phase 5 along with the Invitation. */
 .moni-app-hig {
+  /* Restores the root card radius inside the Invitation subtree this screen is
+     nested in. Without it the composer and the setup spine would inherit the
+     dashboard's zero and read as square boxes on a palette built around 14px. */
+  --radius-card:      14px;
+
   --color-paper:      var(--background);
   --color-rule:       var(--label-secondary);
   --color-hairline:   var(--separator);
@@ -381,6 +395,15 @@
   --color-seal-text:  var(--accent);
   --color-on-ink:     var(--background);
   --color-on-ink-dim: var(--label-tertiary);
+
+  /* :root pairs a near-black button with a SEAL GREEN label
+     (--color-primary-foreground: #059669), which is the Invitation's accent on
+     the Invitation's ink. On the Apple palette that reads as green text on a
+     black slab, and docs/HOMEPAGE.md's accent pairing is the opposite way
+     round: the green is the ground and #0B2E16 is the label. Green here means
+     confirmation, which is what every primary button on this screen is for. */
+  --color-primary:            var(--accent);
+  --color-primary-foreground: var(--on-accent);
 }
 
 ::selection            { background: var(--ui-accent); color: var(--ui-ground); }

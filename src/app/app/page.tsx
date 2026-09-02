@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { SetupTasks } from '@/components/agent/setup-tasks.tsx'
-import { AppShell } from '@/components/app/app-shell.tsx'
 import { AskMoni } from '@/components/app/ask-moni.tsx'
 import { DayLedger } from '@/components/app/day-ledger.tsx'
 import { RightRail } from '@/components/app/right-rail.tsx'
@@ -42,16 +41,10 @@ export default async function OwnerCommandCentre() {
   // catalogue.
   if ((await countCatalogue(member.businessId)) === 0) redirect('/app/onboarding')
   const signals = shopSignals(snapshot)
-  const urgent = signals.filter((signal) => signal.tone === 'act').length
   const steps = await loadSetupProgress(member.businessId)
 
   return (
-    <AppShell
-      shop={{ name: snapshot.business.name, place: snapshot.business.province ?? snapshot.business.address }}
-      inboxCount={snapshot.needsOwner.length}
-      urgent={urgent}
-      usageLeft={snapshot.usage.left}
-    >
+    <>
       <div className="mx-auto w-full max-w-[90rem] px-3 py-3 sm:px-4 sm:py-4 xl:px-6 xl:py-6">
         {!setupComplete(steps) && (
           <div className="mb-3 xl:mb-6">
@@ -81,6 +74,6 @@ export default async function OwnerCommandCentre() {
           </div>
         </div>
       </div>
-    </AppShell>
+    </>
   )
 }

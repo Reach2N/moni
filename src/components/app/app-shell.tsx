@@ -7,21 +7,25 @@ import { TabBar } from './tab-bar.tsx'
  * the bar on a phone. Before this, five of the six screens rendered a bare
  * `<main>` with a "back to dashboard" link and no way to reach each other.
  *
- * A server component with no data access of its own. The page loads the counts
- * (through its dynamic imports, which keep the database out of the build-time
- * graph) and hands them down, so a clean clone still builds the public site.
+ * A server component with no data access of its own. The LAYOUT loads the two
+ * things it shows and hands them down, so it is built once and survives every
+ * navigation between owner screens.
+ *
+ * It carried `urgent` and `usageLeft` while each page built its own shell: a
+ * needs-you badge and the month's remaining bookings, both of which needed the
+ * full dashboard snapshot. Neither survived the move, because the layout runs on
+ * every screen and cannot afford that read. The escalation count is the badge
+ * that matters and `loadShellCounts` answers it cheaply; the quota is still
+ * stated in full on the dashboard's own rail, which is where an owner looks for
+ * it.
  */
 export function AppShell({
   shop,
   inboxCount,
-  urgent = 0,
-  usageLeft = null,
   children,
 }: {
   shop: { name: string; place: string | null }
   inboxCount: number
-  urgent?: number
-  usageLeft?: number | null
   children: React.ReactNode
 }) {
   return (
@@ -29,7 +33,7 @@ export function AppShell({
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:bg-paper focus:px-3 focus:py-2">
         រំលងទៅមាតិកា
       </a>
-      <DesktopNav inboxCount={inboxCount} urgent={urgent} usageLeft={usageLeft} />
+      <DesktopNav inboxCount={inboxCount} />
 
       <div className="min-w-0">
         <ShopHeader name={shop.name} place={shop.place} />
@@ -38,7 +42,7 @@ export function AppShell({
         </main>
       </div>
 
-      <TabBar inboxCount={inboxCount} urgent={urgent} />
+      <TabBar inboxCount={inboxCount} />
     </div>
   )
 }

@@ -1,4 +1,3 @@
-import { AppShell } from '@/components/app/app-shell.tsx'
 import { ProductList } from '@/components/app/product-list.tsx'
 import { sellsFor } from '@/lib/types.ts'
 
@@ -12,23 +11,20 @@ export const metadata = { title: 'អ្វីដែលលក់' }
  * (docs/superpowers/specs/2026-09-02-products-photos-menu-design.md).
  */
 export default async function ProductsPage() {
-  const [{ requireMember }, { listCatalogue }, { getBusinessById }, { loadShellCounts }, { publicMediaUrl }] =
-    await Promise.all([
-      import('@/lib/auth/member.ts'),
-      import('@/lib/queries/catalogue.ts'),
-      import('@/lib/queries/business.ts'),
-      import('@/lib/queries/shell.ts'),
-      import('@/lib/media/storage.ts'),
-    ])
+  const [{ requireMember }, { listCatalogue }, { getBusinessById }, { publicMediaUrl }] = await Promise.all([
+    import('@/lib/auth/member.ts'),
+    import('@/lib/queries/catalogue.ts'),
+    import('@/lib/queries/business.ts'),
+    import('@/lib/media/storage.ts'),
+  ])
   const member = await requireMember()
-  const [items, business, counts] = await Promise.all([
+  const [items, business] = await Promise.all([
     listCatalogue(member.businessId, { includeInactive: true }),
     getBusinessById(member.businessId),
-    loadShellCounts(member.businessId),
   ])
 
   return (
-    <AppShell shop={{ name: business.name, place: business.province ?? business.address }} inboxCount={counts.inboxCount}>
+    <>
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
         <h1 className="km text-xl font-semibold text-ink">អ្វីដែលហាងលក់</h1>
         <p className="km mt-1 text-sm text-rule">
@@ -41,6 +37,6 @@ export default async function ProductsPage() {
           />
         </div>
       </div>
-    </AppShell>
+    </>
   )
 }

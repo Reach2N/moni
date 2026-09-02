@@ -1,4 +1,3 @@
-import { AppShell } from '@/components/app/app-shell.tsx'
 import { SiteEditor } from '@/components/app/site-editor.tsx'
 import type { StorefrontContent } from '@/lib/types.ts'
 
@@ -12,17 +11,10 @@ export default async function SitePage() {
     import('@/lib/queries/storefront.ts'),
   ])
   const member = await requireMember()
-  const [{ getBusinessById }, { loadShellCounts }] = await Promise.all([
-    import('@/lib/queries/business.ts'),
-    import('@/lib/queries/shell.ts'),
-  ])
-  // The shell wants the plate and the inbox badge on every screen; the page's
-  // own data is loaded beside them, not before them.
-  const [business, counts] = await Promise.all([getBusinessById(member.businessId), loadShellCounts(member.businessId)])
   const row = await getStorefrontRow(member.businessId)
 
   return (
-    <AppShell shop={{ name: business.name, place: business.province ?? business.address }} inboxCount={counts.inboxCount}>
+    <>
       <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
         <h1 className="km text-xl font-semibold text-ink">គេហទំព័រហាងរបស់អ្នក</h1>
         <p className="km mt-1 text-sm text-rule">
@@ -41,6 +33,6 @@ export default async function SitePage() {
           />
         </div>
       </div>
-    </AppShell>
+    </>
   )
 }

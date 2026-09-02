@@ -32,7 +32,7 @@ import { PanelCount } from './panel.tsx'
 const IN_BAR = APP_DESTINATIONS.slice(0, 3)
 const IN_SHEET = APP_DESTINATIONS.slice(3)
 
-export function TabBar({ inboxCount, urgent = 0 }: { inboxCount: number; urgent?: number }) {
+export function TabBar({ inboxCount }: { inboxCount: number }) {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
   const moreActive = IN_SHEET.some((item) => isActive(pathname, item.href))
@@ -44,7 +44,7 @@ export function TabBar({ inboxCount, urgent = 0 }: { inboxCount: number; urgent?
     >
       {IN_BAR.map(({ href, label, Icon }) => {
         const active = isActive(pathname, href)
-        const count = href === '/app/inbox' ? inboxCount : href === '/app' ? urgent : 0
+        const count = href === '/app/inbox' ? inboxCount : 0
         return (
           <Link
             key={href}

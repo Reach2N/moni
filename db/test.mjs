@@ -22,6 +22,7 @@ import { instructionsBlock } from '../src/lib/agent/instructions.ts'
 import { decryptSecret, encryptSecret, newWebhookSecret, secretsMatch } from '../src/lib/crypto/secrets.ts'
 import { extractIncoming, looksLikeBotToken } from '../src/lib/channels/telegram.ts'
 import { scopedExternalId } from '../src/lib/agent/identity.ts'
+import { describeTurn } from '../src/lib/agent/trace.ts'
 import { sortInbox } from '../src/lib/queries/inbox-order.ts'
 import { checkBudget, formatSpend, DEFAULT_CONVERSATION_CAP_MICRO_USD, DEFAULT_MONTH_CEILING_MICRO_USD } from '../src/lib/ops/budget.ts'
 import { createRateLimiter } from '../src/lib/ops/rate-limit.ts'
@@ -1217,6 +1218,29 @@ eq('and every one of them is a product', cafeSite.rows.every((r) => r.kind === '
 // A menu must read correctly for a shop that uploaded nothing, so a null photo
 // is a normal row and never a broken image.
 eq('a product with no photo is still a row', cafeSite.rows.every((r) => 'photo_path' in r), true)
+
+console.log('\nwhat the owner is told her assistant did')
+// The owner trying her own shop is asking one question: did that answer come
+// from MY prices, or did the model invent it. The tool calls are the evidence.
+const groundedTurn = describeTurn([{ tool: 'get_business' }, { tool: 'list_slots' }])
+eq('a reply that read the shop is marked grounded', groundedTurn.grounded, true)
+eq('and every call it made is listed', groundedTurn.steps.length, 2)
+eq('a reply that called nothing is NOT grounded', describeTurn([]).grounded, false)
+eq('and an undefined tool list is the same answer', describeTurn(undefined).grounded, false)
+// Handing over is not evidence about prices. A reply that only escalated rests
+// on nothing, and saying otherwise would be the exact lie this panel exists to
+// catch.
+eq('handing over alone is not grounding', describeTurn([{ tool: 'escalate_to_owner' }]).grounded, false)
+eq('but it is still shown as a step', describeTurn([{ tool: 'escalate_to_owner' }]).steps.length, 1)
+// The old map dropped anything it did not recognise, so a real call could
+// vanish from the trace entirely. A step the owner cannot read beats a step she
+// never learns about.
+const unknown = describeTurn([{ tool: 'some_new_tool' }])
+eq('an unlabelled tool is named, never dropped', unknown.steps.length, 1)
+eq('and it still counts as reading the shop', unknown.grounded, true)
+eq('repeated calls are not collapsed, because two lookups is what happened',
+  describeTurn([{ tool: 'list_slots' }, { tool: 'list_slots' }]).steps.length, 2)
+eq('no em dash reaches a trace line', groundedTurn.steps.some((s) => s.includes('—')), false)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

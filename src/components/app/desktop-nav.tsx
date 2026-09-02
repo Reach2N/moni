@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { CalendarDays, Globe, Inbox, Package, Radio, Store, Wallet, type LucideIcon } from 'lucide-react'
 import { PanelCount } from './panel.tsx'
-import { toKhmerDigits } from './dashboard-format.ts'
 
 /**
  * The one map of the owner app, on the left on a desk.
@@ -34,17 +33,7 @@ export function isActive(pathname: string, href: AppDestination): boolean {
   return href === '/app' ? pathname === '/app' : pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export function DesktopNav({
-  inboxCount,
-  urgent = 0,
-  usageLeft = null,
-}: {
-  inboxCount: number
-  /** Notice-board items that need her now; shown on the home entry, and only the home page knows it. */
-  urgent?: number
-  /** Bookings left on the free plan this month; null on screens that did not load the meter. */
-  usageLeft?: number | null
-}) {
+export function DesktopNav({ inboxCount }: { inboxCount: number }) {
   const pathname = usePathname()
 
   return (
@@ -56,7 +45,7 @@ export function DesktopNav({
       <nav aria-label="ការធ្វើដំណើរក្នុងទំព័រ" className="p-3">
         {APP_DESTINATIONS.map(({ href, label, Icon }) => {
           const active = isActive(pathname, href)
-          const count = href === '/app/inbox' ? inboxCount : href === '/app' ? urgent : 0
+          const count = href === '/app/inbox' ? inboxCount : 0
           return (
             <Link
               key={href}
@@ -71,13 +60,6 @@ export function DesktopNav({
           )
         })}
       </nav>
-      {usageLeft !== null ? (
-        <div className="mt-auto border-t border-hairline px-5 py-4">
-          <p className="km text-xs text-rule">គម្រោងឥតគិតថ្លៃ</p>
-          <p className="km tnum mt-1 text-sm font-semibold text-ink">នៅសល់ {toKhmerDigits(usageLeft)} ការកក់</p>
-          <p className="km text-xs text-rule">ក្នុងខែនេះ</p>
-        </div>
-      ) : null}
     </aside>
   )
 }

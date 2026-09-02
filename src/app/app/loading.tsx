@@ -1,28 +1,26 @@
-import { CompactPlate, Frame } from '@/components/app/frame.tsx'
-
 /**
- * The skeleton named a specific shop, which flickered into a different name once
- * the real snapshot landed. It now says only what is true while it is true: this
- * is Moni, and it is fetching.
+ * What fills the content area while a screen loads.
+ *
+ * It used to render a whole page: its own header, its own plate, and a block of
+ * dashboard-shaped copy about today's bookings, with no navigation in it at all.
+ * Every link between two owner screens therefore replaced the entire app with a
+ * skeleton of a different screen, which is why switching pages read as a full
+ * reload. The shell now lives in the layout, which Next does not re-render on a
+ * navigation, so this sits inside the chrome that stays put and says only what
+ * is true: something is on its way.
  */
-export default function LoadingOwnerCommandCentre() {
+export default function LoadingOwnerScreen() {
   return (
-    <div className="min-h-dvh bg-paper">
-      <header className="flex h-14 items-center border-b border-rule/70 px-3 sm:px-4">
-        <div className="w-full max-w-md">
-          <CompactPlate name="Moni" meta="កំពុងបើក" shortMeta="កំពុងបើក" />
-        </div>
-      </header>
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-3 py-3 sm:px-4">
-        <section className="bg-ink px-4 py-4 text-on-ink" aria-live="polite">
-          <p className="km text-sm font-semibold">កំពុងបើកហាងរបស់អ្នក</p>
-          <p className="km mt-1 text-sm text-on-ink-dim">Moni កំពុងយកការណាត់ថ្ងៃនេះ និងសារដែលរង់ចាំអ្នក។</p>
-        </section>
-        <Frame className="min-h-32 px-4 py-4">
-          <p className="km text-sm font-semibold text-ink">ថ្ងៃនេះ</p>
-          <p className="km mt-2 text-sm text-rule">កំពុងរៀបចំការណាត់តាមម៉ោង</p>
-        </Frame>
-      </main>
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6" aria-live="polite" aria-busy="true">
+      <p className="km text-sm text-rule">កំពុងបើក…</p>
+      {/* Three quiet bars at the shape of a heading and two rows. No numbers and
+          no shop name: a skeleton that guesses at content flickers into
+          different content the moment the real data lands. */}
+      <div className="mt-4 space-y-3" aria-hidden>
+        <div className="h-6 w-2/5 animate-pulse bg-ink/5" />
+        <div className="h-24 w-full animate-pulse bg-ink/5" />
+        <div className="h-24 w-full animate-pulse bg-ink/5" />
+      </div>
     </div>
   )
 }

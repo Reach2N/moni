@@ -1,31 +1,36 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Bot, CircleAlert, HandHelping, LoaderCircle, UserRound } from 'lucide-react'
+import { Bot, CircleAlert, HandHelping, LoaderCircle, ShieldCheck, TriangleAlert, UserRound } from 'lucide-react'
 import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { Button } from '@/components/ui/button.tsx'
+import { describeTurn } from '@/lib/agent/trace.ts'
 
 type Turn =
   | { role: 'customer'; text: string }
-  | { role: 'moni'; text: string | null; checks: string[]; handedOver: boolean; qrCode: string | null }
+  | {
+      role: 'moni'
+      text: string | null
+      checks: string[]
+      /** Did this answer rest on the shop's own rows, or on the model alone? */
+      grounded: boolean
+      handedOver: boolean
+      qrCode: string | null
+    }
 
 const VISITOR_KEY = 'moni.visitor'
 
-const CUSTOMER_STEP: Record<string, string> = {
-  get_business: 'Moni បានពិនិត្យព័ត៌មានហាង',
-  list_services: 'Moni បានពិនិត្យសេវា និងតម្លៃ',
-  search_catalogue: 'Moni បានរកមើលអ្វីដែលហាងលក់',
-  list_slots: 'Moni បានពិនិត្យពេលទំនេរ',
-  create_booking: 'Moni បានកត់ការណាត់',
-  reschedule_booking: 'Moni បានប្ដូរពេលការណាត់',
-  cancel_booking: 'Moni បានលុបការណាត់',
-  create_payment: 'Moni បានរៀបចំការទូទាត់',
-  escalate_to_owner: 'Moni បានផ្ទេរសារមកម្ចាស់ហាង',
-}
 
 /**
  * "Try it as a customer". `/api/chat` is the public customer endpoint and picks
  * its shop server side, so no tenant is named here.
+ *
+ * Every box here takes its corner from `--radius-card` rather than hardcoding
+ * one, the same mechanism the prompt bar and the setup spine already use. The
+ * token is 0 in the Invitation dashboard and 14px under `.moni-app-hig`, so this
+ * panel is square in one place and rounded in the other WITHOUT a prop. It was
+ * previously square everywhere, which put hard-cornered message boxes inside a
+ * rounded container on the onboarding screen and made one screen look like two.
  *
  * It answers as the signed-in member's own shop: `chatBusiness()` in
  * `src/app/api/chat/route.ts` resolves the member through `memberGate()` and only
@@ -71,9 +76,7 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
       })
       const body = await response.json()
       if (!response.ok || body.error) throw new Error(body.error ?? 'request failed')
-      const checks = Array.isArray(body.tool_calls)
-        ? body.tool_calls.map((call: { tool?: string }) => CUSTOMER_STEP[call.tool ?? '']).filter(Boolean)
-        : []
+      const trace = describeTurn(Array.isArray(body.tool_calls) ? body.tool_calls : undefined)
       const handed = Boolean(body.handed_over)
       // A create_payment call names a booking code, and /api/pay/{code} is the
       // card a real customer would be sent. The browser is the one channel that
@@ -84,7 +87,14 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
       const qrCode = typeof paid?.args?.code === 'string' ? paid.args.code.toUpperCase() : null
       setTurns((current) => [
         ...current,
-        { role: 'moni', text: typeof body.text === 'string' ? body.text : null, checks, handedOver: handed, qrCode },
+        {
+          role: 'moni',
+          text: typeof body.text === 'string' ? body.text : null,
+          checks: trace.steps,
+          grounded: trace.grounded,
+          handedOver: handed,
+          qrCode,
+        },
       ])
       setHandedOver(handed)
       onChanged?.()
@@ -109,7 +119,7 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
       <h3 id="customer-simulator-heading" className="sr-only">សាកជាអតិថិជន</h3>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {turns.length === 0 ? (
-          <div className="flex items-start gap-3 border border-rule/70 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-rule/70 px-4 py-3">
             <Bot className="mt-1 size-5 shrink-0 text-rule" strokeWidth={1.75} aria-hidden />
             <div>
               <p className="km text-sm font-semibold text-ink">សាកសួរដូចអតិថិជនពិត</p>
@@ -123,21 +133,41 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
             <li key={`${turn.role}-${index}`}>
               {turn.role === 'customer' ? (
                 <div className="flex items-start justify-end gap-2">
-                  <p className="km max-w-[82%] bg-ink px-3 py-2 text-base text-on-ink">{turn.text}</p>
+                  <p className="km max-w-[82%] rounded-[var(--radius-card)] bg-ink px-3 py-2 text-base text-on-ink">{turn.text}</p>
                   <UserRound className="mt-1 size-4 shrink-0 text-rule" strokeWidth={1.75} aria-hidden />
                 </div>
               ) : (
-                <div className="max-w-[92%] border border-rule/70 px-3 py-2.5">
-                  {turn.checks.length > 0 ? (
-                    <ul className="mb-2 border-b border-hairline pb-2">
-                      {turn.checks.map((check) => (
-                        <li key={check} className="km flex items-center gap-2 text-xs text-rule">
-                          <Bot className="size-3.5" strokeWidth={1.75} aria-hidden />
-                          {check}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
+                <div className="max-w-[92%] rounded-[var(--radius-card)] border border-rule/70 px-3 py-2.5">
+                  {/* What it actually did, and whether the answer rests on
+                      anything. A reply with no lookups is not automatically
+                      wrong: a greeting needs none. It is only alarming when the
+                      question was about a price, and the owner is the one who
+                      can tell the difference, so both cases are stated plainly
+                      rather than one being hidden. */}
+                  <div className="mb-2 border-b border-hairline pb-2">
+                    <p
+                      className={`km flex items-center gap-2 text-xs ${turn.grounded ? 'text-seal-text' : 'text-rule'}`}
+                    >
+                      {turn.grounded ? (
+                        <ShieldCheck className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+                      ) : (
+                        <TriangleAlert className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+                      )}
+                      {turn.grounded
+                        ? 'ឆ្លើយតាមទិន្នន័យក្នុងហាងរបស់អ្នក'
+                        : 'មិនបានអានទិន្នន័យហាងទេ។ ចម្លើយនេះមកពីការសន្ទនាតែប៉ុណ្ណោះ'}
+                    </p>
+                    {turn.checks.length > 0 ? (
+                      <ul className="mt-1">
+                        {turn.checks.map((check, checkIndex) => (
+                          <li key={`${check}-${checkIndex}`} className="km flex items-center gap-2 text-xs text-rule">
+                            <Bot className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+                            {check}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
                   {turn.text ? <p className="km whitespace-pre-wrap text-base text-ink">{turn.text}</p> : null}
                   {turn.qrCode ? (
                     // eslint-disable-next-line @next/next/no-img-element -- an SVG document from our own route, redrawn per payment and never optimised
@@ -146,7 +176,7 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
                       alt={`KHQR សម្រាប់ការណាត់ ${turn.qrCode}`}
                       width={300}
                       height={450}
-                      className="mt-2 h-auto w-full max-w-[18rem] border border-hairline"
+                      className="mt-2 h-auto w-full max-w-[18rem] rounded-[var(--radius-card)] border border-hairline"
                     />
                   ) : null}
                   {turn.handedOver ? (
@@ -162,9 +192,13 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
         </ul>
 
         {busy ? (
+          /* The only two things this screen actually knows while it waits: the
+             message went, and no reply is back. /api/chat does not stream, so
+             naming an activity here would be inventing one, which is the same
+             mistake the parse trace already had scripted out of it. */
           <p className="km mt-3 flex items-center gap-2 text-sm text-rule" role="status">
             <LoaderCircle className="size-4 animate-spin" strokeWidth={1.75} aria-hidden />
-            Moni កំពុងពិនិត្យតម្លៃ និងពេលទំនេរពីហាង
+            បានផ្ញើសារ។ កំពុងរង់ចាំចម្លើយ
           </p>
         ) : null}
         <div ref={endRef} />
@@ -189,7 +223,7 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
         )}
 
         {error ? (
-          <div role="alert" className="mt-3 flex items-start gap-2 border border-rule/70 px-3 py-2">
+          <div role="alert" className="mt-3 flex items-start gap-2 rounded-[var(--radius-card)] border border-rule/70 px-3 py-2">
             <CircleAlert className="mt-1 size-4 shrink-0 text-rule" strokeWidth={1.75} aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="km text-sm text-ink">{error}</p>
