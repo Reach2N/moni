@@ -73,7 +73,16 @@ export function AgentPromptBar({
   return (
     <form
       data-slot="agent-prompt-bar"
-      className={cn('border border-rule/70 bg-paper', className)}
+      /* A hairline, not the rule grey at 70%. Under .moni-app-hig --color-rule
+         resolves to rgba(60,60,67,.60), so `rule/70` drew a ~0.42 alpha border
+         against the 0.29 separator docs/HOMEPAGE.md mandates: on the onboarding
+         screen this box read twice as heavy as everything around it. The radius
+         travels as a token, so the Invitation's no-radius world still gets a
+         square composer and the Apple palette gets its 14px card. */
+      className={cn(
+        'overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-paper',
+        className,
+      )}
       onSubmit={(event) => {
         event.preventDefault()
         submit()

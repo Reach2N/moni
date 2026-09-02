@@ -165,7 +165,7 @@ export function ProductList({ items, leadWith }: { items: Row[]; leadWith: Sells
           </div>
           <div>
             <Button type="submit" disabled={busy} className="km min-h-11 rounded-none">
-              {busy ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <Plus data-icon="inline-start" aria-hidden />}
+              {busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <Plus data-icon="inline-start" aria-hidden />}
               រក្សាទុក
             </Button>
           </div>

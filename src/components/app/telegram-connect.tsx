@@ -75,7 +75,7 @@ export function TelegramConnect({ connection }: { connection: ChannelStatus | nu
               disabled={busy}
               className="km mt-2 min-h-11 rounded-none px-0"
             >
-              {busy ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <Link2Off data-icon="inline-start" aria-hidden />}
+              {busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <Link2Off data-icon="inline-start" aria-hidden />}
               ផ្តាច់ការភ្ជាប់
             </Button>
           </>
@@ -105,7 +105,7 @@ export function TelegramConnect({ connection }: { connection: ChannelStatus | nu
               disabled={busy || token.trim().length < 20}
               className="km mt-2 min-h-11 w-full rounded-none"
             >
-              {busy ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <Send data-icon="inline-start" aria-hidden />}
+              {busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <Send data-icon="inline-start" aria-hidden />}
               {busy ? 'កំពុងភ្ជាប់' : 'ភ្ជាប់ Telegram'}
             </Button>
           </>

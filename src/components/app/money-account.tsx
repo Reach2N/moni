@@ -146,7 +146,7 @@ export function MoneyAccount({ settings }: { settings: MoneySettingsView }) {
 
           <div className="flex flex-wrap items-center gap-2">
             <Button type="submit" disabled={busy || !accountId.trim()} className="km min-h-11 rounded-none">
-              {busy ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <QrCode data-icon="inline-start" aria-hidden />}
+              {busy ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <QrCode data-icon="inline-start" aria-hidden />}
               {connected ? 'រក្សាទុកការកែ' : 'រក្សាទុក និងបង្កើតកាតសាកល្បង'}
             </Button>
             {connected ? (

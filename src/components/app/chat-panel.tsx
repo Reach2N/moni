@@ -61,6 +61,10 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
 
     try {
       const response = await fetch('/api/chat', {
+        // The model chain is allowed fifty seconds and the route sixty, so this
+        // sits just past both: a timeout here means nothing is coming, never
+        // that a working answer was cut off.
+        signal: AbortSignal.timeout(65_000),
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ visitor_id: visitorId(), text: trimmed }),
@@ -84,8 +88,16 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
       ])
       setHandedOver(handed)
       onChanged?.()
-    } catch {
-      setError('មិនអាចភ្ជាប់បាន។ មិនបានផ្ញើសារនេះទេ។ សូមសាកម្តងទៀត។')
+    } catch (failure) {
+      // A timeout is its own answer and deserves its own sentence: the message
+      // did reach Moni, the reply did not come back, and "could not connect"
+      // would be a lie about which half failed.
+      const timedOut = failure instanceof DOMException && failure.name === 'TimeoutError'
+      setError(
+        timedOut
+          ? 'Moni មិនបានឆ្លើយតបទាន់ពេលទេ។ សូមសាកម្តងទៀត។'
+          : 'មិនអាចភ្ជាប់បាន។ មិនបានផ្ញើសារនេះទេ។ សូមសាកម្តងទៀត។',
+      )
     } finally {
       setBusy(false)
       requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'end' }))
@@ -151,7 +163,7 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
 
         {busy ? (
           <p className="km mt-3 flex items-center gap-2 text-sm text-rule" role="status">
-            <LoaderCircle className="size-4" strokeWidth={1.75} aria-hidden />
+            <LoaderCircle className="size-4 animate-spin" strokeWidth={1.75} aria-hidden />
             Moni កំពុងពិនិត្យតម្លៃ និងពេលទំនេរពីហាង
           </p>
         ) : null}

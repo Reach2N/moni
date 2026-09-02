@@ -6,10 +6,18 @@
  * the marketing page renders it and the homepage has a screenshot acceptance
  * target.
  *
- * The fork is one change: the scripted TICKS timeline is gone and every row's
- * state arrives as a prop derived from the database. A row that says Telegram is
- * connected means a channel_connections row says so. That is the whole
- * difference between guidance and decoration.
+ * The fork is two changes. First, the scripted TICKS timeline is gone and every
+ * row's state arrives as a prop derived from the database. A row that says
+ * Telegram is connected means a channel_connections row says so. That is the
+ * whole difference between guidance and decoration.
+ *
+ * Second, the rows are one hairline-divided group rather than four floating
+ * 22px pills with card shadows. docs/HOMEPAGE.md pins the card radius at 14px
+ * and says in as many words not to turn every card into a pill; four shadowed
+ * pills stacked above the composer were the loudest thing on the onboarding
+ * screen and belonged to no other surface in the product. The radius comes from
+ * --radius-card, so this reads square on the Invitation dashboard and 14px on
+ * the Apple palette without a prop.
  */
 import { useState } from 'react'
 import Link from 'next/link'
@@ -69,18 +77,17 @@ export function SetupTasks({
   }
 
   return (
-    <div className={`flex w-full flex-col gap-2${className ? ` ${className}` : ''}`}>
+    <div
+      className={`w-full overflow-hidden rounded-[var(--radius-card)] border border-hairline${className ? ` ${className}` : ''}`}
+    >
       {steps.map((step, i) => {
         const open = manualOpen[step.key] ?? false
         const expandable = step.state === 'failed' && step.error !== null
         return (
           <div
             key={step.key}
-            className="self-stretch overflow-hidden bg-surface shadow-card transition-[border-radius,background-color] duration-300 hover:bg-inset"
-            style={{
-              borderRadius: open ? 14 : 22,
-              animation: `fade-up 450ms cubic-bezier(0.23,1,0.32,1) ${i * 80}ms both`,
-            }}
+            className="border-t border-hairline transition-colors duration-300 first:border-t-0 hover:bg-inset"
+            style={{ animation: `fade-up 450ms cubic-bezier(0.23,1,0.32,1) ${i * 80}ms both` }}
           >
             <div className="flex min-h-14 w-full items-center gap-2.5 px-2.5 py-2 sm:min-h-11 sm:py-0">
               <span className="flex size-6 shrink-0 items-center justify-center">

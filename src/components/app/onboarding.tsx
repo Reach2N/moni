@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Check, Send } from 'lucide-react'
@@ -41,7 +42,26 @@ export function Onboarding({
 
   return (
     <div className="moni-hig moni-app-hig min-h-dvh bg-surface text-label">
-      <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+      {/* The screen opened on four unfinished checklist rows and nothing else:
+          no mark, no greeting, no indication of which product this was. This is
+          the first thing a founding shop sees after the site that sold them, so
+          it carries the same lockup that site's header carries. */}
+      <header className="border-b border-hairline">
+        <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-2 px-4 sm:px-6">
+          <Image
+            src="/logos/logo-mark-transparent.png"
+            alt=""
+            width={32}
+            height={20}
+            className="h-5 w-8 shrink-0 object-contain"
+            aria-hidden
+            priority
+          />
+          <span className="text-[17px] font-semibold tracking-tight text-label">Moni</span>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
       {saved ? (
         <>
           {/* No spine on this branch. `steps` is a server prop snapshotted before
@@ -58,14 +78,14 @@ export function Onboarding({
             </div>
           </div>
 
-          <div className="mt-6 border border-rule/70">
+          <div className="mt-6 overflow-hidden rounded-[var(--radius-card)] border border-hairline">
             <header className="border-b border-hairline px-3 py-2">
               <h2 className="km text-sm font-semibold text-ink">សាកជាអតិថិជន</h2>
             </header>
             <ChatPanel />
           </div>
 
-          <div className="mt-6 border border-rule/70 px-3 py-3">
+          <div className="mt-6 rounded-[var(--radius-card)] border border-hairline px-4 py-4">
             <p className="km flex items-center gap-2 text-sm font-semibold text-ink">
               <Send className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
               បន្ទាប់៖ ភ្ជាប់ Telegram
@@ -101,20 +121,20 @@ export function Onboarding({
         </>
       ) : (
         <>
-          {!setupComplete(steps) && (
-            <div className="mb-6">
-              <SetupTasks steps={steps} retryLabel="សាកម្តងទៀត" detailLabel="មើលកំហុស" />
-            </div>
-          )}
-          <h1 className="km text-xl font-semibold text-ink">
+          {/* The spine used to render ABOVE this, so an owner on her first second
+              opened the product on four rows reading មិនទាន់ against work she had
+              had no chance to do, before anything greeted her or told her what to
+              do. There is one action on this screen and it is the composer, so
+              the greeting and the composer come first and progress follows. */}
+          <h1 className="km text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
             {hasCatalogue ? 'កែពិពណ៌នាហាង' : `សូមស្វាគមន៍ ${shopName}`}
           </h1>
-          <p className="km mt-1 text-sm text-rule">
+          <p className="km mt-3 max-w-xl text-base text-rule">
             ប្រាប់ Moni ពីហាងរបស់អ្នកម្តង ដោយនិយាយ ឬវាយបញ្ចូល។ Moni រៀបចំសេវា តម្លៃ ម៉ោងបើក
             និងចំនួនបុគ្គលិកឱ្យអ្នកពិនិត្យ។
           </p>
 
-          <div className="mt-4 -mx-4 sm:mx-0">
+          <div className="mt-6 -mx-4 sm:mx-0">
             <ShopSetup
               initialInstructions={initialInstructions}
               initialShopName={shopName}
@@ -124,6 +144,20 @@ export function Onboarding({
               }}
             />
           </div>
+
+          {!setupComplete(steps) && (
+            <section aria-labelledby="setup-progress-heading" className="mt-10 border-t border-hairline pt-6">
+              <h2 id="setup-progress-heading" className="km text-sm font-semibold text-ink">
+                ជំហានរៀបចំ
+              </h2>
+              <p className="km mt-1 text-sm text-rule">
+                បំពេញម្តងមួយជំហាន។ អ្នកត្រឡប់មកបន្តពេលណាក៏បាន។
+              </p>
+              <div className="mt-4">
+                <SetupTasks steps={steps} retryLabel="សាកម្តងទៀត" detailLabel="មើលកំហុស" />
+              </div>
+            </section>
+          )}
         </>
       )}
       </main>

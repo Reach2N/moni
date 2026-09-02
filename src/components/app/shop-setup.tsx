@@ -244,6 +244,10 @@ export function ShopSetup({
 
     try {
       const response = await fetch('/api/setup', {
+        // Bounded like the parse above. A save that never returns leaves the
+        // owner unable to tell whether her shop was written or not, which is
+        // the worst thing this screen can do.
+        signal: AbortSignal.timeout(35_000),
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
@@ -368,9 +372,18 @@ export function ShopSetup({
                         type="number"
                         min={0}
                         step={service.currency === 'USD' ? 1 : 100}
-                        value={service.price_minor}
-                        onChange={(event) => updateService(index, 'price_minor', Math.max(0, Number(event.target.value)))}
-                        className="tnum mt-1 min-h-11 rounded-none border-rule/70 bg-paper text-base shadow-none md:text-base"
+                        /* Zero means the owner never said a price, and rendering
+                           it as "0" showed her a filled field holding a real
+                           number: 0 riel is free, which is a different claim.
+                           Blank with a placeholder asks the question instead. */
+                        value={service.price_minor === 0 ? '' : service.price_minor}
+                        placeholder="តម្លៃ?"
+                        aria-invalid={service.price_minor === 0}
+                        onChange={(event) => {
+                          const typed = event.target.value.trim()
+                          updateService(index, 'price_minor', typed === '' ? 0 : Math.max(0, Number(typed)))
+                        }}
+                        className="tnum mt-1 min-h-11 rounded-none border-rule/70 bg-paper text-base shadow-none placeholder:text-rule md:text-base aria-invalid:border-ink"
                       />
                     </label>
                     <label className="km text-xs font-semibold text-rule" htmlFor={`service-duration-${index}`}>
@@ -387,7 +400,11 @@ export function ShopSetup({
                     </label>
                   </div>
                   <p className="km tnum mt-2 text-xs text-rule">
-                    {moneyKm(service.price_minor, service.currency === 'USD' ? 'USD' : 'KHR')} · {toKhmerDigits(service.duration_min)} នាទី
+                    {service.price_minor === 0
+                      ? 'មិនទាន់មានតម្លៃ'
+                      : moneyKm(service.price_minor, service.currency === 'USD' ? 'USD' : 'KHR')}
+                    {' · '}
+                    {toKhmerDigits(service.duration_min)} នាទី
                   </p>
                   {(serviceWarnings.get(index) ?? []).map((issue, warningIndex) => (
                     <p

@@ -84,7 +84,7 @@ export function VoiceNote({
           className="km min-h-11 flex-1 rounded-none"
         >
           {transcribing ? (
-            <LoaderCircle data-icon="inline-start" aria-hidden />
+            <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden />
           ) : recording ? (
             <Square data-icon="inline-start" aria-hidden />
           ) : (

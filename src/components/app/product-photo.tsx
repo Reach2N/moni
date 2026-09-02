@@ -90,7 +90,7 @@ export function ProductPhoto({
             onClick={() => input.current?.click()}
             className="km min-h-11 rounded-none"
           >
-            {busy === 'upload' ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <ImagePlus data-icon="inline-start" aria-hidden />}
+            {busy === 'upload' ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <ImagePlus data-icon="inline-start" aria-hidden />}
             បញ្ចូលរូប
           </Button>
           <Button
@@ -101,7 +101,7 @@ export function ProductPhoto({
             onClick={() => void call('draw')}
             className="km min-h-11 rounded-none"
           >
-            {busy === 'draw' ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <Sparkles data-icon="inline-start" aria-hidden />}
+            {busy === 'draw' ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <Sparkles data-icon="inline-start" aria-hidden />}
             ឱ្យ Moni គូរ
           </Button>
           {photoUrl ? (

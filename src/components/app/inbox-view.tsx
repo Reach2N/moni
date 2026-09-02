@@ -250,7 +250,7 @@ export function InboxView({ rows, initialTranscript }: { rows: InboxRow[]; initi
               disabled={sending || !reply.trim()}
               className="km min-h-11 rounded-none"
             >
-              {sending ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <Send data-icon="inline-start" aria-hidden />}
+              {sending ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <Send data-icon="inline-start" aria-hidden />}
               ផ្ញើ
             </Button>
             <Button

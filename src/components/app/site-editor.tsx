@@ -66,7 +66,7 @@ export function SiteEditor({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" onClick={() => void call('generate')} disabled={busy !== null} className="km min-h-11 rounded-none">
-          {busy === 'generate' ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <WandSparkles data-icon="inline-start" aria-hidden />}
+          {busy === 'generate' ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <WandSparkles data-icon="inline-start" aria-hidden />}
           {draft ? 'សរសេរឡើងវិញ' : 'ឱ្យ Moni សរសេរគេហទំព័រ'}
         </Button>
         {published ? (
@@ -185,7 +185,7 @@ export function SiteEditor({
               រក្សាទុកសេចក្តីព្រាង
             </Button>
             <Button type="button" onClick={() => void call('publish')} disabled={busy !== null} className="km min-h-11 rounded-none">
-              {busy === 'publish' ? <LoaderCircle data-icon="inline-start" aria-hidden /> : <Send data-icon="inline-start" aria-hidden />}
+              {busy === 'publish' ? <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden /> : <Send data-icon="inline-start" aria-hidden />}
               ផ្សាយ
             </Button>
           </div>
