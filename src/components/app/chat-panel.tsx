@@ -14,6 +14,7 @@ const VISITOR_KEY = 'moni.visitor'
 const CUSTOMER_STEP: Record<string, string> = {
   get_business: 'Moni បានពិនិត្យព័ត៌មានហាង',
   list_services: 'Moni បានពិនិត្យសេវា និងតម្លៃ',
+  search_catalogue: 'Moni បានរកមើលអ្វីដែលហាងលក់',
   list_slots: 'Moni បានពិនិត្យពេលទំនេរ',
   create_booking: 'Moni បានកត់ការណាត់',
   reschedule_booking: 'Moni បានប្ដូរពេលការណាត់',

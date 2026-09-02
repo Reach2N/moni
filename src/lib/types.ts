@@ -499,10 +499,17 @@ export type ChannelConnection = {
 
 /** Available to the agent talking to CUSTOMERS on Telegram / Messenger / Instagram / web. */
 export const CUSTOMER_TOOLS = [
-  'get_business',        // hours, services, prices: the grounding call
+  'get_business',        // hours, catalogue, prices: the grounding call
+  'search_catalogue',    // "do you sell X": services and products, by name
   'list_slots',          // free slots for a service on a date
   'create_booking',
-  'reschedule_booking',
+  // 'reschedule_booking' was declared here from the beginning and NEVER built.
+  // Found on 2 September 2026 when `customerTools()` gained the same
+  // `satisfies Record<CustomerTool, Tool>` guard the owner set already had, and
+  // removed rather than invented: a customer moving a booking is served today
+  // by cancel_booking plus a new one, or by escalate_to_owner, and shipping a
+  // half-considered reschedule inside a catalogue pass would be worse than
+  // either. The list describes what exists.
   'cancel_booking',
   'find_booking',        // by code or phone
   'create_payment',      // returns a KHQR payload to show the customer

@@ -1,11 +1,12 @@
 import 'server-only'
-import { tool } from 'ai'
+import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
 import type { Json } from '../database.types.ts'
 import { listSlots } from './slots.ts'
-import { formatMoney, paymentAccountFor, type CurrencyCode } from '../types.ts'
+import { formatMoney, paymentAccountFor, type CurrencyCode, type CustomerTool } from '../types.ts'
+import { catalogueForAgent, listCatalogue } from '../queries/catalogue.ts'
 import { cambodiaDate } from '../time/cambodia.ts'
 import { idempotencyKey, QR_TTL_SECONDS } from '../payments.ts'
 import { railsFor } from '../payments/rails.ts'
@@ -32,6 +33,11 @@ const codeSchema = z.string().trim().toUpperCase().regex(/^[A-Z0-9]{4,12}$/)
  *
  * Every tool returns plain data. The model is not permitted to state a price or an
  * available time that did not come from one of these calls.
+ *
+ * `satisfies Record<CustomerTool, Tool>` at the bottom is the same guard the
+ * owner set carries: a tool declared in CUSTOMER_TOOLS and never built, or
+ * built and never declared, is a compile error rather than a drift nobody
+ * notices.
  */
 export function customerTools(businessId: string, customerId: string, conversationId: string) {
   return {
@@ -49,6 +55,11 @@ export function customerTools(businessId: string, customerId: string, conversati
           name: data.name,
           hours: data.hours,
           upcoming_closures: data.upcoming_closures,
+          // Both kinds. `v_agent_business` carries services only, which is right
+          // for the booking half and useless to a cafe, so the catalogue is read
+          // beside it rather than by widening a view four callers depend on.
+          // Only an item with bookable true may be passed to list_slots.
+          catalogue: await catalogueForAgent(businessId),
           resources: resources.map((resource) => ({
             id: String(resource.id ?? ''),
             name: String(resource.name ?? ''),
@@ -62,6 +73,28 @@ export function customerTools(businessId: string, customerId: string, conversati
             price_minor: Number(service.price_minor ?? 0),
             duration_min: Number(service.duration_min ?? 0),
             requires_deposit: Boolean(service.requires_deposit),
+          })),
+        }
+      },
+    }),
+
+    search_catalogue: tool({
+      description:
+        'Look up what the shop sells by name, services and products together. Use it when the customer asks whether the shop has something, or what it costs. Quote only what this returns.',
+      inputSchema: z.object({ query: z.string().trim().max(80) }),
+      execute: async ({ query }) => {
+        const items = await listCatalogue(businessId, { search: query })
+        return {
+          found: items.length,
+          items: items.map((item) => ({
+            id: item.id,
+            kind: item.kind,
+            name: item.name,
+            price: formatMoney(item.price_minor, item.currency as CurrencyCode),
+            // Only a service can be booked. The model must never offer a time
+            // for a cup of coffee, and a flag says so more plainly than a kind
+            // it has to reason about.
+            bookable: item.kind === 'service',
           })),
         }
       },
@@ -439,5 +472,5 @@ export function customerTools(businessId: string, customerId: string, conversati
         return { handed_over: true, tell_customer: 'the owner will reply here shortly' }
       },
     }),
-  }
+  } satisfies Record<CustomerTool, Tool>
 }
