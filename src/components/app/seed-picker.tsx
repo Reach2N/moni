@@ -81,7 +81,7 @@ export function SeedPicker({
           const style = styleFor(candidate, vibe, theme)
           const chosen = candidate === seed
           return (
-            <li key={candidate}>
+            <li key={candidate} role="presentation">
               <button
                 type="button"
                 role="radio"
