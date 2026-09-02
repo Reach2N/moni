@@ -11,9 +11,10 @@ product scope and build order, `ARCHITECTURE.md` for architectural decisions, an
 `docs/HOMEPAGE.md` for the active homepage UI contract. The former feature, UI, product,
 and Invitation design documents are archived under `docs/archive/`.
 
-The active implementation pass is the product catalogue, per
-`docs/superpowers/specs/2026-09-02-products-photos-menu-design.md` (PLAN.md Phase 11),
-following the universal-app pass in Phase 10. Homepage files stay frozen: `src/components/marketing/**`, `src/app/(marketing)/**`, and the two scripted
+The active implementation pass is the seeded storefront look, per
+`docs/superpowers/specs/2026-09-02-seeded-storefront-design.md` and
+`docs/superpowers/plans/2026-09-03-seeded-storefronts.md` (PLAN.md Phase 12), following
+the product catalogue pass in Phase 11. Homepage files stay frozen: `src/components/marketing/**`, `src/app/(marketing)/**`, and the two scripted
 primitives `src/components/primitives/TaskRows.tsx` and
 `src/components/primitives/ThinkingState.tsx` are not modified by this pass.
 
@@ -342,6 +343,22 @@ docs/archive/        historical research, never an implementation source
   the key can see refuses with the free tier's daily per-model quota spent, and the Vercel
   gateway refuses them on its free tier. The feature ships and reports which refusal it
   was; upload is the path that always works.
+- **A shop's look is a vibe plus a seed** (decided 3 September 2026). The theme comes
+  from what the shop is, the vibe is three closed enums the model reads from
+  `raw_description`, and the seed is a column the owner picks from four candidates.
+  `styleFor()` is pure so `db/test.mjs` proves the only claim that matters: no seed
+  produces unreadable Khmer on a real shop's public site. Tokens vary, composition
+  does not, and that narrowing is deliberate rather than unfinished.
+- **A product with no photo gets a seeded tile, never a stock photo.** A photograph of
+  somebody else's food beside a real shop's real price is the failure that loses an
+  owner permanently. `tileFor()` is keyed on the product id, so renaming an item does
+  not redraw the menu.
+- **The tile is for products only, never services.** A haircut or a room-night never had
+  a photograph and never asked for one: decorating every row of a salon's menu with
+  generated art is a change nobody asked for. `shouldDrawTile()` in `src/lib/media/tile.ts`
+  gates on `kind === 'product'` and a missing `photoUrl`, and the same function backs both
+  the storefront renderer and the owner-facing photoless count on `/app/products`, so the
+  two can never disagree about which rows are affected.
 
 ## Known gaps
 

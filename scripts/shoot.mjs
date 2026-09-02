@@ -62,7 +62,7 @@ async function shoot(name,w,h,dsf,act,viewportOnly,route='/app',settleMs=500,med
   await emulate(p,media)
   const errors=[]
   p.on('pageerror',e=>errors.push(e.message.split('\n')[0].slice(0,160)))
-  await p.goto(`${BASE_URL}${route}`,{waitUntil:'networkidle0'})
+  const res = await p.goto(`${BASE_URL}${route}`,{waitUntil:'networkidle0'})
   if(act) await act(p)
   await new Promise(r=>setTimeout(r,settleMs))
   // A viewport-only shot is deliberately NOT walked: its whole job is to show
@@ -72,8 +72,15 @@ async function shoot(name,w,h,dsf,act,viewportOnly,route='/app',settleMs=500,med
     over:[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>window.innerWidth+1).length,
     hidden:[...document.querySelectorAll('body *')].filter(e=>getComputedStyle(e).opacity==='0').length}))
   await p.screenshot({path:`${OUT}/${name}.png`, fullPage:!viewportOnly})
-  const flags=[m.over?`overflowing=${m.over}`:null, m.hidden?`invisible=${m.hidden}`:null, errors.length?`errors=${errors.length}`:null].filter(Boolean)
+  const status=res?.status()
+  // A 404 or 500 still screenshots cleanly: the failure is in what page loaded,
+  // not in the capture. Naming the status here is what makes an unresolved
+  // route (a slug the seed step never published, a stale one that got deleted)
+  // fail loudly instead of shipping a picture of an error page as if it were
+  // the feature.
+  const flags=[status&&status!==200?`status=${status}`:null, m.over?`overflowing=${m.over}`:null, m.hidden?`invisible=${m.hidden}`:null, errors.length?`errors=${errors.length}`:null].filter(Boolean)
   console.log(`${name}: ${route} ${w}x${h} scrollW=${m.sw} ${flags.join(' ')||'clean'}`)
+  if(status&&status!==200) console.log(`   ! ${route} did not resolve to a live page (HTTP ${status})`)
   if(errors.length) console.log(`   ! ${errors.slice(0,3).join(' | ')}`)
   await p.close()
 }
@@ -105,6 +112,19 @@ await shoot('landing-desktop-viewport',1440,900,1,undefined,true,'/',     1800,L
 // Proof that the page is complete with every animation refused. If anything is
 // missing here, a reveal is hiding content rather than decorating its arrival.
 await shoot('landing-desktop-still',1440,900,1,undefined,false,'/',1200,{scheme:'light',motion:'reduce'})
+
+// ── Phase 1b: a published storefront, the public /s/[slug] route.
+//
+// No route list here ever named /s/[slug], so every seeded-storefront check in
+// this phase (contrast, tokens, the photoless tile) was verified with one-off
+// scripts instead of the project's own tool. `sansethireach` is the one shop
+// published in the live database as of this phase; override with
+// MONI_CAPTURE_SLUG for a different shop. The status flag on `shoot()` is what
+// keeps this honest: a slug that is not actually published renders a 404 page,
+// and that now says so in the log line instead of quietly becoming a screenshot.
+const STOREFRONT_SLUG = process.env.MONI_CAPTURE_SLUG ?? 'sansethireach'
+await shoot('storefront-desktop', 1440,900,1,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,LIGHT)
+await shoot('storefront-mobile',   390,844,2,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,LIGHT)
 
 // ── Phase 2: the dashboard. Light locked, so no scheme emulation.
 await shoot('mobile',390,844,2,undefined,false,'/app',500,{scheme:null})

@@ -274,6 +274,29 @@ about, sections, contact, cta). The owner agent fills it with `Output.object`, e
 catches what a schema cannot. The model also picks a `theme_id` and a small token set, writes to
 `storefronts.draft`, and the owner reviews and publishes. The model never emits markup.
 
+**Style, added Phase 12.** A shop's look is now decided in two layers, and the theme is only
+the lower one. `src/lib/storefront/style.ts` exports a pure `styleFor(seed, vibe, theme)` that
+turns the `storefronts.seed` integer and the model-picked `vibe` into a small set of `--sf-*`
+CSS custom properties: an accent and surface pair already clamped past the WCAG contrast floors,
+a radius, a type scale and ratio, a section and row rhythm, and a Khmer leading that cannot fall
+below 1.75. `getStorefront()` in `src/lib/queries/storefront.ts` calls `styleFor()` once, on the
+way out of the query, and hands the result to the page alongside the same `StorefrontData` the
+theme has always taken. A theme's `Component` never receives the seed and computes no colour,
+radius or spacing of its own: it renders the markup it already rendered before this phase, and an
+unlayered `.sf` block in `globals.css` remaps whatever `--sf-*` values are already on the root
+onto the runtime variables each theme resolves (`--accent`, `--surface`, `--green`, and so on),
+the same cascade-layer technique the Khmer line-height fix already uses.
+
+The style is computed in the query and not inside a theme for the same reason `v_catalog` is one
+view and not four branches: a second call site is a second place to disagree. A theme that read
+the seed itself could clamp contrast differently from its neighbour, or forget the clamp
+entirely, and nothing would catch a real shop's page going unreadable until a person looked at
+it. One function, called once, is what makes "no seed produces unreadable Khmer" a claim
+`db/test.mjs` can prove rather than a habit each theme is trusted to keep. The same reasoning
+sets `src/lib/media/tile.ts`'s `shouldDrawTile()` and `tileFor()` outside the theme layer too: a
+product's photoless tile is a property of the row, keyed on the product id, not of whichever
+theme happens to be rendering it.
+
 ---
 
 ## 7. The guardrail harness

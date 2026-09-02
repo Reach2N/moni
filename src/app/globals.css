@@ -1,4 +1,17 @@
 @import "tailwindcss";
+/* Tailwind v4 has no config file here, so its automatic content heuristic
+   scans every file below the repo root that is not gitignored or a known
+   binary type, docs included. A plan document is prose that happens to
+   contain literal class strings inside fenced code blocks, and every one of
+   those strings was being lifted into the shipped stylesheet: a dead rule
+   pairing an `aria-pressed` variant with a `border-accent` colour, present
+   nowhere in this app's own source, was in a real production build, which is
+   what caught this. `docs/` holds specs and plans, never source the app
+   imports, so it is excluded outright rather than trusted to stay
+   accidentally harmless. (This comment names the two tokens separately,
+   deliberately not joined as one string, so it does not reintroduce the very
+   rule it describes.) */
+@source not "../../docs";
 @import "@fontsource/kantumruy-pro/khmer-400.css";
 @import "@fontsource/kantumruy-pro/khmer-600.css";
 @import "@fontsource/kantumruy-pro/khmer-700.css";

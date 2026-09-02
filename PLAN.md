@@ -609,6 +609,101 @@ Design: `docs/superpowers/specs/2026-09-02-products-photos-menu-design.md`. Plan
   its own address. Proved so far in `db/test.mjs` and the pure suites; the live run needs
   the Supabase keys, and generation needs billing enabled.
 
+### Phase 12: A seeded look per shop
+
+Design: `docs/superpowers/specs/2026-09-02-seeded-storefront-design.md`. Plan:
+`docs/superpowers/plans/2026-09-03-seeded-storefronts.md`. Shipped 3 September 2026,
+58 new assertions in `npm run db:test` (379 passing).
+
+- **Every shop of a given theme looked the same shop**, and that was the bug. `counter`
+  is one hand-built component with one literal accent, one radius, one type scale. Two
+  cafes describing themselves in completely different words got pixel-identical pages
+  with different sentences in them, which tells an owner her site was not derived from
+  anything.
+- **A shop's look is now a theme, a vibe and a seed, applied in that order.** The theme
+  still comes from what the shop is, unchanged from Phase 11. The vibe is three closed
+  enums, `WARMTHS`, `VOICES` and `DENSITIES` on `StorefrontContent['vibe']`, that the
+  model reads from the owner's own `raw_description`, optional on the type and required
+  by the zod schema so a generation that omits it fails validation rather than rendering
+  with an invented mood; `vibeOf()` is the one place a stored or malformed value falls
+  back to `DEFAULT_VIBE`. The seed is a plain `storefronts.seed` integer
+  (migration `20260903000000_storefront_seed`), column-defaulted so every existing row
+  got one for free, and the owner is the only one who can change it: `/api/storefront/seed`
+  and a four-candidate `SeedPicker` on `/app/site` let her reroll and keep the one she
+  wants.
+- **`styleFor(seed, vibe, theme)`, in `src/lib/storefront/style.ts`, is pure and is the
+  only function in the codebase that turns a seed into anything.** It returns a small set
+  of `--sf-*` CSS custom properties, already clamped: an accent and surface pair that
+  clears WCAG contrast against both white text and the page ground, a radius, a type
+  scale and ratio, a section and row rhythm, and a Khmer leading floored at 1.75 whatever
+  the density asked for. `getStorefront()` calls it once, on the way out of the query
+  (ARCHITECTURE.md section 6), and an unlayered `.sf` block in `globals.css` remaps the
+  result onto the runtime variables the four theme components already resolve, the same
+  cascade-layer technique the Khmer line-height fix used. No theme component was
+  restructured: this phase changes the tokens they resolve, not the tags they emit.
+- **The assertions prove the one claim that matters:** that no seed can put unreadable
+  Khmer on a real shop's public site. `db/test.mjs` sweeps the full 10800-palette space,
+  400 sampled seeds by all 27 vibes, and checks contrast on every pair a real page draws
+  a call to action, accent text and body copy against the page ground, plus determinism
+  (the same seed and vibe give a byte-identical style forever) and the four-candidate
+  picker's own reproducibility.
+- **A product with no photo draws a seeded geometric tile instead of a stock photo.**
+  `src/lib/media/tile.ts` keys `tileFor()` on the product id, not the name, so correcting
+  a spelling does not redraw the menu, and `patternGeometry()` is pure so the harness
+  rotates the actual coordinates to prove `ROTATIONS_FOR` names only the rotations a
+  pattern's symmetry actually repeats under. `shouldDrawTile(kind, photoUrl)` gates on
+  `kind === 'product'`, so a service, which never had a photo and never asked for one,
+  renders exactly as it did before this phase. The same function backs both `ProductTile`
+  and the new photoless-item count on `/app/products`, so the two can never disagree
+  about which rows are affected.
+- **Two defects, unrelated to the seed work, were found and fixed while closing the
+  phase.** `globals.css` had no `@source` directive, so Tailwind v4's automatic content
+  heuristic was scanning `docs/**` and lifting literal class strings out of plan
+  documents into the shipped stylesheet: a dead rule pairing an `aria-pressed` variant
+  with a `border-accent` colour, present nowhere in this app's own source, was in the
+  production build. `@source not "../../docs";` removed it and every
+  other docs-only rule (106630 to 105470 bytes, about 1.1% smaller), verified against a
+  clean rebuild with no real utility lost. Separately, `npm run shoot` had no `/s/[slug]`
+  entry, which meant this phase's own acceptance check had no repeatable tool and every
+  storefront verification in tasks 4 to 7 used one-off scripts; it now captures the one
+  published storefront at desktop and mobile widths, slug configurable through
+  `MONI_CAPTURE_SLUG`, and reports the HTTP status of every route so an unresolved slug
+  fails loudly instead of quietly becoming a screenshot of a 404 page.
+- **A named blocking prerequisite for Phase 13.** Onboarding writes every parsed
+  catalogue row into `services` and never into `products`: `src/lib/setup/schema.ts` and
+  `src/lib/setup/persist.ts` contain zero occurrences of the word "product", `db/seed.sql`
+  has two `insert into services` and zero `insert into products`, and the live `products`
+  table is empty database-wide. The only writers to `products` today are the manual and
+  agent tools on `/app/products` and the owner conversation. Consequences:
+  - the tile feature built in this phase is correct but currently INERT for every shop
+    that came through onboarding, because none of them has a product row to be
+    photoless;
+  - this is the same bug class Phase 11 already named for `v_catalog`, where the
+    storefront and the `/app` redirect were fixed but the setup WRITE path was not;
+  - it blocks more than tiles: Phase 13's checkout is built on `createOrder`, which
+    operates on `products` only, so a shop onboarded today could never take an order
+    either;
+  - the fix is well defined and simply not yet applied: `src/lib/types.ts` already
+    exports `sellsFor()`, and CLAUDE.md already decides that what a shop sells is
+    `sells` on the business type. This needs its own spec before Phase 13 starts, not a
+    patch inside it.
+- Acceptance, as verified in this environment: `npm run db:test`, `npm run test:signals`,
+  `npx tsc --noEmit` and `npm run build` all pass. `npm run shoot` captures the one shop
+  published in the live database, `sansethireach`, cleanly at both widths, and its menu
+  (two `services` rows, per the finding above, not products) renders with no gaps. The
+  spec's literal acceptance check asks for four published shops of one business type on
+  four different seeds; only one shop is published in the live database and `/app/site`
+  is behind Clerk with no test credentials in this environment, so that specific
+  four-shop comparison was not run against real browser output. The stronger claim, that
+  no seed in the full vibe space produces unreadable text, is what `db/test.mjs`'s
+  10800-palette sweep proves instead, and it is proof rather than a spot check. The
+  tile's live rendering on a real shop's page is likewise unconfirmed beyond synthetic
+  and service data, for the reason named above: no live shop has a product row yet.
+- Deliberately left out, per the spec: composition variation (section order, hero and
+  item-row variants; the token layer is built so this can be added without redoing it),
+  photo-derived palettes, an explicit owner-set brand colour override, and a second
+  vendored font family. None of these have stubs or reserved fields.
+
 ### Explicit room left, not built now
 
 Four items moved INTO scope and are now phases 7 and 8: payment
