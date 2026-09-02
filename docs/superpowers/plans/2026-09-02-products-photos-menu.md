@@ -129,9 +129,10 @@ export function sellsFor(businessTypeId: string): Sells {
 }
 ```
 
-- [ ] **Step 3: Add the `Product` and `CatalogItem` row types**
+- [ ] **Step 3: Extend `Product` and add `CatalogItem`**
 
-Put `Product` immediately after the `Service` type so the siblings read together:
+`Product` ALREADY EXISTS in the orders section of `src/lib/types.ts`, carrying nine columns.
+Extend it in place rather than adding a second one, and put `CatalogItem` beside it:
 
 ```ts
 /**

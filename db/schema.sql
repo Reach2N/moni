@@ -361,6 +361,9 @@ create table if not exists products (
   price_minor  integer not null,
   currency     text not null default 'USD',
   stock        integer,
+  category     text,
+  photo_path   text,
+  photo_alt    text,
   active       boolean not null default true,
   sort_order   integer not null default 0,
   created_at   timestamptz not null default now(),
@@ -369,6 +372,8 @@ create table if not exists products (
   constraint products_stock_nonneg check (stock is null or stock >= 0)
 );
 comment on column products.stock is 'NULL means this product is not stock counted, which is different from zero. A kitchen does not count soup.';
+comment on column products.category is 'The menu''s own grouping, in the owner''s words. NULL means ungrouped, which is correct for a shop with six things.';
+comment on column products.photo_path is 'Supabase Storage key inside the shop-media bucket, never a URL. The bucket or the CDN in front of it can change without rewriting every row.';
 create index if not exists products_business on products (business_id) where active;
 
 create table if not exists orders (
@@ -638,6 +643,32 @@ left join (select business_id, sum(cost_micro_usd) spend from messages
               and created_at >= date_trunc('month', now())
             group by business_id) ai on ai.business_id = b.id;
 comment on view v_month_usage is 'The free-tier meter. Transactions, not conversations: the owner is charged when the product made her money, which is the only fair place to meter.';
+
+-- One catalogue, two kinds. Every READ of what a shop sells goes through this;
+-- every WRITE goes to the table that owns the row. Without it each consumer
+-- (storefront, agent, dashboard, setup spine) grows its own branch on business
+-- type, and the branch is where a cafe gets forgotten.
+create or replace view v_catalog with (security_invoker = true) as
+  select 'service'::text        as kind,
+         s.id, s.business_id, s.name, s.name_en, s.description,
+         s.price_minor, s.currency,
+         null::integer          as stock,
+         null::text             as category,
+         null::text             as photo_path,
+         null::text             as photo_alt,
+         s.active, s.sort_order,
+         s.duration_min,
+         s.unit
+    from services s
+  union all
+  select 'product'::text,
+         p.id, p.business_id, p.name, p.name_en, p.description,
+         p.price_minor, p.currency,
+         p.stock, p.category, p.photo_path, p.photo_alt,
+         p.active, p.sort_order,
+         null::integer,
+         'item'::text
+    from products p;
 
 -- Self-documenting schema: feed this to the agent instead of maintaining a
 -- hand-written description that drifts from reality.

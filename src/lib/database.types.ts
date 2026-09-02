@@ -1074,12 +1074,15 @@ export type Database = {
         Row: {
           active: boolean
           business_id: string
+          category: string | null
           created_at: string
           currency: string
           description: string | null
           id: string
           name: string
           name_en: string | null
+          photo_alt: string | null
+          photo_path: string | null
           price_minor: number
           sort_order: number
           stock: number | null
@@ -1088,12 +1091,15 @@ export type Database = {
         Insert: {
           active?: boolean
           business_id: string
+          category?: string | null
           created_at?: string
           currency?: string
           description?: string | null
           id?: string
           name: string
           name_en?: string | null
+          photo_alt?: string | null
+          photo_path?: string | null
           price_minor: number
           sort_order?: number
           stock?: number | null
@@ -1102,12 +1108,15 @@ export type Database = {
         Update: {
           active?: boolean
           business_id?: string
+          category?: string | null
           created_at?: string
           currency?: string
           description?: string | null
           id?: string
           name?: string
           name_en?: string | null
+          photo_alt?: string | null
+          photo_path?: string | null
           price_minor?: number
           sort_order?: number
           stock?: number | null
@@ -1639,6 +1648,27 @@ export type Database = {
             referencedColumns: ["business_id"]
           },
         ]
+      }
+      v_catalog: {
+        Row: {
+          active: boolean | null
+          business_id: string | null
+          category: string | null
+          currency: string | null
+          description: string | null
+          duration_min: number | null
+          id: string | null
+          kind: string | null
+          name: string | null
+          name_en: string | null
+          photo_alt: string | null
+          photo_path: string | null
+          price_minor: number | null
+          sort_order: number | null
+          stock: number | null
+          unit: string | null
+        }
+        Relationships: []
       }
       v_month_stats: {
         Row: {

@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHmac } from 'node:crypto'
 import { PGlite } from '@electric-sql/pglite'
-import { formatMoney, BILLABLE_BOOKING_STATUSES } from '../src/lib/types.ts'
+import { formatMoney, BILLABLE_BOOKING_STATUSES, BUSINESS_TYPES, sellsFor } from '../src/lib/types.ts'
 import { amountsMatch, idempotencyKey, shouldFallback, QR_TTL_SECONDS } from '../src/lib/payments.ts'
 import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
@@ -1116,6 +1116,59 @@ eq('and the meter counts exactly the same booking', Number(meterSet.c), 1)
 // this is what turns red.
 const viewSays = await one(db, `select txn_used from v_month_usage where business_id = '${B_NEW}'`)
 eq('and v_month_usage itself agrees: one billable booking is one transaction', Number(viewSays.txn_used), 1)
+
+console.log('\nthe catalogue: one view, two kinds')
+await db.exec(`
+  insert into products (id, business_id, name, price_minor, currency, stock, category, photo_path) values
+   ('e2000000-0000-4000-8000-000000000001','${B_SALON}','កាហ្វេទឹកកក', 5000, 'KHR', null, 'ភេសជ្ជៈ', '${B_SALON}/e2000000/cup.webp'),
+   ('e2000000-0000-4000-8000-000000000002','${B_HOUSE}','ទឹកសុទ្ធតូច', 1000, 'KHR', 24, null, null)`)
+
+const salonCatalogue = await db.query(
+  `select kind, name, price_minor, stock, photo_path, duration_min, unit
+     from v_catalog where business_id = '${B_SALON}' and active order by kind, name`)
+const kinds = [...new Set(salonCatalogue.rows.map((r) => r.kind))].sort()
+eq('the view carries both kinds for a shop that has both', kinds.join(','), 'product,service')
+
+const drink = salonCatalogue.rows.find((r) => r.name === 'កាហ្វេទឹកកក')
+eq('a product keeps its own price through the view', drink.price_minor, 5000)
+eq('a product has no duration, because handing something over takes no appointment', drink.duration_min, null)
+eq('a product reads as one item', drink.unit, 'item')
+eq('and its photo travels as a storage key, never a URL', drink.photo_path.startsWith('http'), false)
+
+const catalogueService = salonCatalogue.rows.find((r) => r.kind === 'service')
+eq('a service still carries its duration', typeof catalogueService.duration_min, 'number')
+eq('and a service has no stock, which is not the same as zero', catalogueService.stock, null)
+
+// NULL stock means "we do not count this". The view must not flatten it to 0, or
+// a kitchen that does not count soup starts reporting soup as sold out.
+eq('an uncounted product stays uncounted through the view', drink.stock, null)
+const countedProduct = await one(db, `select stock from v_catalog where id = 'e2000000-0000-4000-8000-000000000002'`)
+eq('and a counted one keeps its number', countedProduct.stock, 24)
+
+// The whole point of the tenant argument. The view is security_invoker and every
+// caller filters by business_id; this proves the other shop's row is reachable
+// only under its own id.
+const catalogueLeak = await one(db, `select count(*) c from v_catalog where business_id = '${B_SALON}' and name = 'ទឹកសុទ្ធតូច'`)
+eq('another shop\'s product is not in this shop\'s catalogue', Number(catalogueLeak.c), 0)
+
+// The bug this whole pass exists to fix: a cafe has a full menu and no services,
+// and every catalogue check in the product counted services only.
+const B_CAFE = 'b0000000-0000-4000-8000-000000000009'
+await db.exec(`
+  insert into businesses (id, slug, name, business_type, default_currency)
+   values ('${B_CAFE}', 'test-cafe', 'ហាងកាហ្វេសាកល្បង', 'cafe', 'KHR');
+  insert into products (business_id, name, price_minor, currency)
+   values ('${B_CAFE}', 'កាហ្វេខ្មៅ', 4000, 'KHR')`)
+const cafeCatalogue = await one(db, `select count(*) c from v_catalog where business_id = '${B_CAFE}' and active`)
+eq('a cafe with a menu and no services has a catalogue', Number(cafeCatalogue.c), 1)
+const cafeServices = await one(db, `select count(*) c from services where business_id = '${B_CAFE}'`)
+eq('and it has no services at all, which is why counting those was the bug', Number(cafeServices.c), 0)
+
+console.log('\nwhat a shop sells')
+eq('every business type declares what it sells', BUSINESS_TYPES.every((t) => ['time', 'goods', 'both'].includes(t.sells)), true)
+eq('a cafe sells goods as well as time', sellsFor('cafe'), 'both')
+eq('a salon sells time', sellsFor('salon'), 'time')
+eq('an unknown type is assumed to sell both, so nothing is hidden from a shop', sellsFor('spaceship_repair'), 'both')
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

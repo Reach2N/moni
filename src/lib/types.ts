@@ -52,6 +52,22 @@ export const CATEGORIES = [
 ] as const
 export type Category = (typeof CATEGORIES)[number]
 
+/**
+ * What a business type sells.
+ *
+ * A TypeScript field and not a column, per hard rule 5: a taxonomy that grows
+ * stays `as const` here, so adding a vertical is a code change rather than a
+ * migration. `businesses.capabilities`, which ARCHITECTURE.md section 5 also
+ * proposes, is deliberately not built. It exists to let an owner override this
+ * default and nobody has asked to yet.
+ *
+ * No current type is 'goods', because the taxonomy has no pure retail entry: a
+ * phone accessories shop picks 'other', which is why 'other' sells both. The
+ * variant stays because the next vertical added may be one.
+ */
+export const SELLS = ['time', 'goods', 'both'] as const
+export type Sells = (typeof SELLS)[number]
+
 export type BusinessTypeDef = {
   id: string
   category: Category
@@ -62,67 +78,74 @@ export type BusinessTypeDef = {
   defaultDurationMin: number
   /** deposits meaningfully reduce no-shows for this type */
   depositByDefault: boolean
+  /** whether this kind of shop sells time, things, or both. Decides which catalogue its dashboard leads with. */
+  sells: Sells
 }
 
 export const BUSINESS_TYPES = [
   // beauty
-  { id: 'salon',          category: 'beauty', en: 'Hair salon',        km: 'ហាងកាត់សក់',        unit: 'session', resourceKind: 'chair', defaultDurationMin: 30,  depositByDefault: false },
-  { id: 'barber',         category: 'beauty', en: 'Barber shop',       km: 'ហាងកាត់សក់បុរស',    unit: 'session', resourceKind: 'chair', defaultDurationMin: 30,  depositByDefault: false },
-  { id: 'nail',           category: 'beauty', en: 'Nail salon',         km: 'ហាងថែរក្សាក្រចក',   unit: 'session', resourceKind: 'staff', defaultDurationMin: 45,  depositByDefault: false },
-  { id: 'spa',            category: 'beauty', en: 'Spa & massage',      km: 'ស្ប៉ា និងម៉ាស្សា',   unit: 'session', resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: true  },
-  { id: 'makeup',         category: 'beauty', en: 'Makeup & bridal',    km: 'តុបតែងមុខ',         unit: 'session', resourceKind: 'staff', defaultDurationMin: 90,  depositByDefault: true  },
+  { id: 'salon',          category: 'beauty', en: 'Hair salon',        km: 'ហាងកាត់សក់',        unit: 'session', resourceKind: 'chair', defaultDurationMin: 30,  depositByDefault: false, sells: 'time' },
+  { id: 'barber',         category: 'beauty', en: 'Barber shop',       km: 'ហាងកាត់សក់បុរស',    unit: 'session', resourceKind: 'chair', defaultDurationMin: 30,  depositByDefault: false, sells: 'time' },
+  { id: 'nail',           category: 'beauty', en: 'Nail salon',         km: 'ហាងថែរក្សាក្រចក',   unit: 'session', resourceKind: 'staff', defaultDurationMin: 45,  depositByDefault: false, sells: 'time' },
+  { id: 'spa',            category: 'beauty', en: 'Spa & massage',      km: 'ស្ប៉ា និងម៉ាស្សា',   unit: 'session', resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: true, sells: 'time' },
+  { id: 'makeup',         category: 'beauty', en: 'Makeup & bridal',    km: 'តុបតែងមុខ',         unit: 'session', resourceKind: 'staff', defaultDurationMin: 90,  depositByDefault: true, sells: 'time' },
   // health
-  { id: 'clinic',         category: 'health', en: 'Clinic',            km: 'គ្លីនិក',            unit: 'session', resourceKind: 'room',  defaultDurationMin: 20,  depositByDefault: false },
-  { id: 'dental',         category: 'health', en: 'Dental clinic',     km: 'គ្លីនិកធ្មេញ',        unit: 'session', resourceKind: 'room',  defaultDurationMin: 30,  depositByDefault: false },
-  { id: 'optical',        category: 'health', en: 'Optical shop',      km: 'ហាងកញ្ចក់ភ្នែក',     unit: 'session', resourceKind: 'staff', defaultDurationMin: 20,  depositByDefault: false },
-  { id: 'pharmacy',       category: 'health', en: 'Pharmacy',          km: 'ឱសថស្ថាន',          unit: 'walk_in', resourceKind: 'staff', defaultDurationMin: 10,  depositByDefault: false },
-  { id: 'physio',         category: 'health', en: 'Physiotherapy',     km: 'កាយចលនា',           unit: 'session', resourceKind: 'room',  defaultDurationMin: 45,  depositByDefault: false },
+  { id: 'clinic',         category: 'health', en: 'Clinic',            km: 'គ្លីនិក',            unit: 'session', resourceKind: 'room',  defaultDurationMin: 20,  depositByDefault: false, sells: 'time' },
+  { id: 'dental',         category: 'health', en: 'Dental clinic',     km: 'គ្លីនិកធ្មេញ',        unit: 'session', resourceKind: 'room',  defaultDurationMin: 30,  depositByDefault: false, sells: 'time' },
+  { id: 'optical',        category: 'health', en: 'Optical shop',      km: 'ហាងកញ្ចក់ភ្នែក',     unit: 'session', resourceKind: 'staff', defaultDurationMin: 20,  depositByDefault: false, sells: 'both' },
+  { id: 'pharmacy',       category: 'health', en: 'Pharmacy',          km: 'ឱសថស្ថាន',          unit: 'walk_in', resourceKind: 'staff', defaultDurationMin: 10,  depositByDefault: false, sells: 'both' },
+  { id: 'physio',         category: 'health', en: 'Physiotherapy',     km: 'កាយចលនា',           unit: 'session', resourceKind: 'room',  defaultDurationMin: 45,  depositByDefault: false, sells: 'time' },
   // auto
-  { id: 'car_repair',     category: 'auto',   en: 'Car repair',        km: 'ជួសជុលរថយន្ត',      unit: 'hour',    resourceKind: 'bay',   defaultDurationMin: 120, depositByDefault: false },
-  { id: 'moto_repair',    category: 'auto',   en: 'Motorbike repair',  km: 'ជួសជុលម៉ូតូ',        unit: 'hour',    resourceKind: 'bay',   defaultDurationMin: 60,  depositByDefault: false },
-  { id: 'car_wash',       category: 'auto',   en: 'Car wash',          km: 'លាងរថយន្ត',         unit: 'session', resourceKind: 'bay',   defaultDurationMin: 45,  depositByDefault: false },
-  { id: 'tire_shop',      category: 'auto',   en: 'Tire & battery',    km: 'ហាងកង់ និងថ្ម',      unit: 'session', resourceKind: 'bay',   defaultDurationMin: 30,  depositByDefault: false },
+  { id: 'car_repair',     category: 'auto',   en: 'Car repair',        km: 'ជួសជុលរថយន្ត',      unit: 'hour',    resourceKind: 'bay',   defaultDurationMin: 120, depositByDefault: false, sells: 'both' },
+  { id: 'moto_repair',    category: 'auto',   en: 'Motorbike repair',  km: 'ជួសជុលម៉ូតូ',        unit: 'hour',    resourceKind: 'bay',   defaultDurationMin: 60,  depositByDefault: false, sells: 'both' },
+  { id: 'car_wash',       category: 'auto',   en: 'Car wash',          km: 'លាងរថយន្ត',         unit: 'session', resourceKind: 'bay',   defaultDurationMin: 45,  depositByDefault: false, sells: 'time' },
+  { id: 'tire_shop',      category: 'auto',   en: 'Tire & battery',    km: 'ហាងកង់ និងថ្ម',      unit: 'session', resourceKind: 'bay',   defaultDurationMin: 30,  depositByDefault: false, sells: 'both' },
   // education
-  { id: 'tutoring',       category: 'education', en: 'Tutoring centre', km: 'មជ្ឈមណ្ឌលបង្រៀន',  unit: 'session', resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: true  },
-  { id: 'language_school',category: 'education', en: 'Language school', km: 'សាលាភាសា',         unit: 'session', resourceKind: 'room',  defaultDurationMin: 90,  depositByDefault: true  },
-  { id: 'music_school',   category: 'education', en: 'Music lessons',   km: 'បង្រៀនតន្ត្រី',      unit: 'session', resourceKind: 'staff', defaultDurationMin: 45,  depositByDefault: false },
-  { id: 'driving_school', category: 'education', en: 'Driving school',  km: 'សាលាបង្រៀនបរ',     unit: 'hour',    resourceKind: 'staff', defaultDurationMin: 60,  depositByDefault: true  },
+  { id: 'tutoring',       category: 'education', en: 'Tutoring centre', km: 'មជ្ឈមណ្ឌលបង្រៀន',  unit: 'session', resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: true, sells: 'time' },
+  { id: 'language_school',category: 'education', en: 'Language school', km: 'សាលាភាសា',         unit: 'session', resourceKind: 'room',  defaultDurationMin: 90,  depositByDefault: true, sells: 'time' },
+  { id: 'music_school',   category: 'education', en: 'Music lessons',   km: 'បង្រៀនតន្ត្រី',      unit: 'session', resourceKind: 'staff', defaultDurationMin: 45,  depositByDefault: false, sells: 'time' },
+  { id: 'driving_school', category: 'education', en: 'Driving school',  km: 'សាលាបង្រៀនបរ',     unit: 'hour',    resourceKind: 'staff', defaultDurationMin: 60,  depositByDefault: true, sells: 'time' },
   // fitness
-  { id: 'gym',            category: 'fitness', en: 'Gym',              km: 'ហាត់ប្រាណ',          unit: 'session', resourceKind: 'staff', defaultDurationMin: 60,  depositByDefault: false },
-  { id: 'yoga',           category: 'fitness', en: 'Yoga studio',      km: 'យូហ្គា',             unit: 'session', resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: false },
-  { id: 'sports_court',   category: 'fitness', en: 'Sports court hire', km: 'ជួលទីលានកីឡា',      unit: 'hour',    resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: true  },
+  { id: 'gym',            category: 'fitness', en: 'Gym',              km: 'ហាត់ប្រាណ',          unit: 'session', resourceKind: 'staff', defaultDurationMin: 60,  depositByDefault: false, sells: 'time' },
+  { id: 'yoga',           category: 'fitness', en: 'Yoga studio',      km: 'យូហ្គា',             unit: 'session', resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: false, sells: 'time' },
+  { id: 'sports_court',   category: 'fitness', en: 'Sports court hire', km: 'ជួលទីលានកីឡា',      unit: 'hour',    resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: true, sells: 'time' },
   // hospitality  ← hotels ride the same rails: room = resource, night = unit
-  { id: 'hotel',          category: 'hospitality', en: 'Hotel',        km: 'សណ្ឋាគារ',           unit: 'night',   resourceKind: 'room',  defaultDurationMin: 1440, depositByDefault: true  },
-  { id: 'guesthouse',     category: 'hospitality', en: 'Guesthouse',   km: 'ផ្ទះសំណាក់',         unit: 'night',   resourceKind: 'room',  defaultDurationMin: 1440, depositByDefault: true  },
-  { id: 'homestay',       category: 'hospitality', en: 'Homestay',     km: 'ស្នាក់នៅជាមួយគ្រួសារ', unit: 'night', resourceKind: 'room',  defaultDurationMin: 1440, depositByDefault: true  },
-  { id: 'tour',           category: 'hospitality', en: 'Tours & travel', km: 'ទេសចរណ៍',         unit: 'day',     resourceKind: 'staff', defaultDurationMin: 480,  depositByDefault: true  },
+  { id: 'hotel',          category: 'hospitality', en: 'Hotel',        km: 'សណ្ឋាគារ',           unit: 'night',   resourceKind: 'room',  defaultDurationMin: 1440, depositByDefault: true, sells: 'time' },
+  { id: 'guesthouse',     category: 'hospitality', en: 'Guesthouse',   km: 'ផ្ទះសំណាក់',         unit: 'night',   resourceKind: 'room',  defaultDurationMin: 1440, depositByDefault: true, sells: 'time' },
+  { id: 'homestay',       category: 'hospitality', en: 'Homestay',     km: 'ស្នាក់នៅជាមួយគ្រួសារ', unit: 'night', resourceKind: 'room',  defaultDurationMin: 1440, depositByDefault: true, sells: 'time' },
+  { id: 'tour',           category: 'hospitality', en: 'Tours & travel', km: 'ទេសចរណ៍',         unit: 'day',     resourceKind: 'staff', defaultDurationMin: 480,  depositByDefault: true, sells: 'time' },
   // food
-  { id: 'restaurant',     category: 'food',   en: 'Restaurant',        km: 'ភោជនីយដ្ឋាន',       unit: 'session', resourceKind: 'table', defaultDurationMin: 90,  depositByDefault: false },
-  { id: 'cafe',           category: 'food',   en: 'Café',              km: 'ហាងកាហ្វេ',          unit: 'walk_in', resourceKind: 'table', defaultDurationMin: 60,  depositByDefault: false },
-  { id: 'catering',       category: 'food',   en: 'Catering',          km: 'ម្ហូបចង្កៀន',         unit: 'day',     resourceKind: 'staff', defaultDurationMin: 480, depositByDefault: true  },
+  { id: 'restaurant',     category: 'food',   en: 'Restaurant',        km: 'ភោជនីយដ្ឋាន',       unit: 'session', resourceKind: 'table', defaultDurationMin: 90,  depositByDefault: false, sells: 'both' },
+  { id: 'cafe',           category: 'food',   en: 'Café',              km: 'ហាងកាហ្វេ',          unit: 'walk_in', resourceKind: 'table', defaultDurationMin: 60,  depositByDefault: false, sells: 'both' },
+  { id: 'catering',       category: 'food',   en: 'Catering',          km: 'ម្ហូបចង្កៀន',         unit: 'day',     resourceKind: 'staff', defaultDurationMin: 480, depositByDefault: true, sells: 'both' },
   // services / retail-service
-  { id: 'phone_repair',   category: 'services', en: 'Phone repair',    km: 'ជួសជុលទូរស័ព្ទ',     unit: 'session', resourceKind: 'staff', defaultDurationMin: 30,  depositByDefault: false },
-  { id: 'tailor',         category: 'services', en: 'Tailor',          km: 'ហាងកាត់ដេរ',        unit: 'day',     resourceKind: 'staff', defaultDurationMin: 1440, depositByDefault: true },
-  { id: 'laundry',        category: 'services', en: 'Laundry',         km: 'ហាងអ៊ុតសម្លៀកបំពាក់', unit: 'day',    resourceKind: 'staff', defaultDurationMin: 1440, depositByDefault: false },
-  { id: 'print_shop',     category: 'services', en: 'Printing shop',   km: 'ហាងព្រីន',           unit: 'walk_in', resourceKind: 'staff', defaultDurationMin: 15,  depositByDefault: false },
-  { id: 'photo_studio',   category: 'services', en: 'Photo studio',    km: 'ស្ទូឌីយោថតរូប',      unit: 'session', resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: true  },
-  { id: 'pet_grooming',   category: 'services', en: 'Pet grooming',    km: 'កាត់រោមសត្វ',        unit: 'session', resourceKind: 'staff', defaultDurationMin: 60,  depositByDefault: false },
+  { id: 'phone_repair',   category: 'services', en: 'Phone repair',    km: 'ជួសជុលទូរស័ព្ទ',     unit: 'session', resourceKind: 'staff', defaultDurationMin: 30,  depositByDefault: false, sells: 'both' },
+  { id: 'tailor',         category: 'services', en: 'Tailor',          km: 'ហាងកាត់ដេរ',        unit: 'day',     resourceKind: 'staff', defaultDurationMin: 1440, depositByDefault: true, sells: 'both' },
+  { id: 'laundry',        category: 'services', en: 'Laundry',         km: 'ហាងអ៊ុតសម្លៀកបំពាក់', unit: 'day',    resourceKind: 'staff', defaultDurationMin: 1440, depositByDefault: false, sells: 'time' },
+  { id: 'print_shop',     category: 'services', en: 'Printing shop',   km: 'ហាងព្រីន',           unit: 'walk_in', resourceKind: 'staff', defaultDurationMin: 15,  depositByDefault: false, sells: 'both' },
+  { id: 'photo_studio',   category: 'services', en: 'Photo studio',    km: 'ស្ទូឌីយោថតរូប',      unit: 'session', resourceKind: 'room',  defaultDurationMin: 60,  depositByDefault: true, sells: 'both' },
+  { id: 'pet_grooming',   category: 'services', en: 'Pet grooming',    km: 'កាត់រោមសត្វ',        unit: 'session', resourceKind: 'staff', defaultDurationMin: 60,  depositByDefault: false, sells: 'time' },
   // home
-  { id: 'aircon',         category: 'home',   en: 'Aircon service',    km: 'សេវាម៉ាស៊ីនត្រជាក់',  unit: 'hour',    resourceKind: 'staff', defaultDurationMin: 90,  depositByDefault: false },
-  { id: 'handyman',       category: 'home',   en: 'Handyman & repair', km: 'ជួសជុលទូទៅ',        unit: 'hour',    resourceKind: 'staff', defaultDurationMin: 120, depositByDefault: false },
-  { id: 'cleaning',       category: 'home',   en: 'Cleaning service',  km: 'សេវាសម្អាត',         unit: 'hour',    resourceKind: 'staff', defaultDurationMin: 120, depositByDefault: false },
-  { id: 'construction',   category: 'home',   en: 'Construction',      km: 'សំណង់',              unit: 'day',     resourceKind: 'staff', defaultDurationMin: 480, depositByDefault: true  },
+  { id: 'aircon',         category: 'home',   en: 'Aircon service',    km: 'សេវាម៉ាស៊ីនត្រជាក់',  unit: 'hour',    resourceKind: 'staff', defaultDurationMin: 90,  depositByDefault: false, sells: 'both' },
+  { id: 'handyman',       category: 'home',   en: 'Handyman & repair', km: 'ជួសជុលទូទៅ',        unit: 'hour',    resourceKind: 'staff', defaultDurationMin: 120, depositByDefault: false, sells: 'both' },
+  { id: 'cleaning',       category: 'home',   en: 'Cleaning service',  km: 'សេវាសម្អាត',         unit: 'hour',    resourceKind: 'staff', defaultDurationMin: 120, depositByDefault: false, sells: 'time' },
+  { id: 'construction',   category: 'home',   en: 'Construction',      km: 'សំណង់',              unit: 'day',     resourceKind: 'staff', defaultDurationMin: 480, depositByDefault: true, sells: 'time' },
   // events
-  { id: 'wedding_rental', category: 'events', en: 'Wedding & rental',  km: 'ជួលកម្មវិធីមង្គលការ', unit: 'day',     resourceKind: 'equipment', defaultDurationMin: 480, depositByDefault: true },
-  { id: 'event_venue',    category: 'events', en: 'Event venue',       km: 'សាលកម្មវិធី',        unit: 'day',     resourceKind: 'room',  defaultDurationMin: 480, depositByDefault: true  },
-  { id: 'karaoke',        category: 'events', en: 'Karaoke / KTV',     km: 'ខារ៉ាអូខេ',          unit: 'hour',    resourceKind: 'room',  defaultDurationMin: 120, depositByDefault: false },
-  { id: 'other',          category: 'services', en: 'Something else',  km: 'ផ្សេងទៀត',           unit: 'session', resourceKind: 'staff', defaultDurationMin: 30,  depositByDefault: false },
+  { id: 'wedding_rental', category: 'events', en: 'Wedding & rental',  km: 'ជួលកម្មវិធីមង្គលការ', unit: 'day',     resourceKind: 'equipment', defaultDurationMin: 480, depositByDefault: true, sells: 'time' },
+  { id: 'event_venue',    category: 'events', en: 'Event venue',       km: 'សាលកម្មវិធី',        unit: 'day',     resourceKind: 'room',  defaultDurationMin: 480, depositByDefault: true, sells: 'time' },
+  { id: 'karaoke',        category: 'events', en: 'Karaoke / KTV',     km: 'ខារ៉ាអូខេ',          unit: 'hour',    resourceKind: 'room',  defaultDurationMin: 120, depositByDefault: false, sells: 'both' },
+  { id: 'other',          category: 'services', en: 'Something else',  km: 'ផ្សេងទៀត',           unit: 'session', resourceKind: 'staff', defaultDurationMin: 30,  depositByDefault: false, sells: 'both' },
 ] as const satisfies readonly BusinessTypeDef[]
 
 export type BusinessTypeId = (typeof BUSINESS_TYPES)[number]['id']
 
 export const businessType = (id: string): BusinessTypeDef =>
   BUSINESS_TYPES.find((t) => t.id === id) ?? BUSINESS_TYPES.find((t) => t.id === 'other')!
+
+/** What this type sells. An unknown id answers 'both', so nothing is ever hidden from a shop. */
+export function sellsFor(businessTypeId: string): Sells {
+  return BUSINESS_TYPES.find((type) => type.id === businessTypeId)?.sells ?? 'both'
+}
 
 /** Starter services shown pre-filled after onboarding. Owner edits, never retypes. */
 export const SERVICE_TEMPLATES: Partial<Record<BusinessTypeId, Array<{
@@ -187,6 +210,14 @@ export type PaymentProvider = (typeof PAYMENT_PROVIDERS)[number]
 
 export const PAYMENT_KINDS = ['deposit', 'full', 'balance', 'walk_in_sale'] as const
 export type PaymentKind = (typeof PAYMENT_KINDS)[number]
+
+/**
+ * A shop sells time or it sells things, and usually one shop does both. These
+ * are the two, and `v_catalog` is the view that unions them so no reader has to
+ * branch on business type: the branch is where a cafe gets forgotten.
+ */
+export const CATALOG_KINDS = ['service', 'product'] as const
+export type CatalogKind = (typeof CATALOG_KINDS)[number]
 
 // ─────────────────────────────────────────────────────────── row types
 // These mirror db/schema.sql 1:1. Timestamps are ISO strings over the wire.
@@ -289,6 +320,27 @@ export type Service = {
   attributes: Record<string, unknown>
   created_at: string
   updated_at: string
+}
+
+/** One row of `v_catalog`: a service or a product, in the shape every reader wants. */
+export type CatalogItem = {
+  kind: CatalogKind
+  id: string
+  business_id: string
+  name: string
+  name_en: string | null
+  description: string | null
+  price_minor: number
+  currency: CurrencyCode
+  stock: number | null
+  category: string | null
+  photo_path: string | null
+  photo_alt: string | null
+  active: boolean
+  sort_order: number
+  /** Services only. Null on a product, which takes no time to hand over. */
+  duration_min: number | null
+  unit: string
 }
 
 export type Resource = {
@@ -633,6 +685,13 @@ export type Storefront = {
 export const ORDER_STATUSES = ['pending', 'confirmed', 'fulfilled', 'cancelled'] as const
 export type OrderStatus = (typeof ORDER_STATUSES)[number]
 
+/**
+ * What a shop sells that is not time.
+ *
+ * A sibling of Service, never a replacement: a cafe has products, a salon has
+ * services, and a repair shop has both. `v_catalog` is what stops every reader
+ * branching between them, and `CatalogItem` above is the shape it returns.
+ */
 export type Product = {
   id: string
   business_id: string
@@ -643,8 +702,15 @@ export type Product = {
   currency: CurrencyCode
   /** NULL means "we do not count this one", not "none left". */
   stock: number | null
+  /** The menu's own grouping, in the owner's words. NULL is correct for a shop with six things. */
+  category: string | null
+  /** Supabase Storage key, never a URL, so the bucket can move without rewriting rows. */
+  photo_path: string | null
+  photo_alt: string | null
   active: boolean
   sort_order: number
+  created_at: string
+  updated_at: string
 }
 
 export type OrderItem = {

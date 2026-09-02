@@ -20,9 +20,9 @@ books a time range against a resource. A coffee shop has a menu, not appointment
 product's own first-run example produces a shop that can never say what it sells.
 
 **2. `products` is a table nobody can reach.** It ships with stock decrement, orders,
-gapless invoice numbers and real transactional assertions behind it. It also has no
-TypeScript row type, no image column, no category, and not one reference in the dashboard
-or in either agent tool set. `POST /api/orders` consumes product ids that no surface in the
+gapless invoice numbers and real transactional assertions behind it. Its TypeScript row type is a stub carrying
+nine of its columns, it has no image column and no category, and there is not one reference
+to it in the dashboard or in either agent tool set. `POST /api/orders` consumes product ids that no surface in the
 product can create.
 
 **3. There is no image path at all.** No storage bucket, no upload route, and
@@ -107,23 +107,12 @@ Seven pieces, in build order. Nothing else.
 export const CATALOG_KINDS = ['service', 'product'] as const
 export type CatalogKind = (typeof CATALOG_KINDS)[number]
 
-export type Product = {
-  id: string
-  business_id: string
-  name: string
-  name_en: string | null
-  description: string | null
-  price_minor: number
-  currency: CurrencyCode
-  stock: number | null      // NULL means uncounted, which is not zero
-  category: string | null   // "drinks", "pastries": the menu's own grouping
-  photo_path: string | null // Storage key, never a URL. The bucket can move.
-  photo_alt: string | null
-  active: boolean
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
+// The existing Product type is EXTENDED, not replaced. It already lives in the
+// orders section of types.ts and carries nine columns; it gains these three and
+// the two timestamps the table has always had.
+category: string | null   // "drinks", "pastries": the menu's own grouping
+photo_path: string | null // Storage key, never a URL. The bucket can move.
+photo_alt: string | null
 ```
 
 `photo_path` holds a Storage key and never a full URL, so the bucket or the CDN in front of
