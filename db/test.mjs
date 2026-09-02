@@ -39,6 +39,7 @@ import {
   statusFromEvent, verifyCutluyDelivery, withinReplayWindow,
 } from '../src/lib/payments/cutluy-webhook.ts'
 import { THEMES, WARMTHS, VOICES, DENSITIES, DEFAULT_VIBE, vibeOf } from '../src/lib/types.ts'
+import { candidateSeeds, contrastRatio, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
@@ -1266,6 +1267,59 @@ if (!existingCafeStorefront) {
 const seeded = await one(db, `select seed from storefronts where id = '${B_CAFE}'`)
 eq('a new storefront row gets a seed without being given one', Number.isInteger(Number(seeded.seed)), true)
 eq('and it is inside the 31 bit range', Number(seeded.seed) >= 0 && Number(seeded.seed) <= 2147483647, true)
+
+console.log('\nno seed may produce a site a customer cannot read')
+// This is the guardrail that matters. A generated palette that renders
+// unreadable Khmer on a real shop's public site is the same class of failure
+// the never-emit-markup rule exists to prevent, so it gets the same treatment:
+// the function clamps, and the harness proves the clamp.
+const VIBES = []
+for (const warmth of WARMTHS) for (const voice of VOICES) for (const density of DENSITIES) {
+  VIBES.push({ warmth, voice, density })
+}
+eq('the vibe space is twenty seven', VIBES.length, 27)
+
+let worstButton = Infinity, worstAccent = Infinity, worstBody = Infinity, worstLeading = Infinity
+const SEEDS = []
+for (let i = 0; i < 400; i++) SEEDS.push(Math.floor((i * 5_381_923) % 2147483647))
+for (const seed of SEEDS) {
+  for (const vibe of VIBES) {
+    const p = paletteFor(seed, vibe)
+    worstButton = Math.min(worstButton, contrastRatio(p.accent, p.onAccent))
+    worstAccent = Math.min(worstAccent, contrastRatio(p.accent, p.surface))
+    worstBody = Math.min(worstBody, contrastRatio(p.label, p.surface))
+    for (const theme of THEMES) {
+      const s = styleFor(seed, vibe, theme.id)
+      worstLeading = Math.min(worstLeading, parseFloat(s.vars['--sf-leading']))
+    }
+  }
+}
+eq(`a call to action is legible on every one of ${SEEDS.length * VIBES.length} palettes`, worstButton >= 4.5, true)
+eq('accent text on the page ground is legible', worstAccent >= 3, true)
+eq('body copy on the page ground is legible', worstBody >= 7, true)
+eq('and Khmer never drops below 1.75 leading', worstLeading >= 1.75, true)
+
+// Determinism is not a convenience. A shop whose site changed colour between
+// two page loads would look broken to its own customers.
+const a1 = styleFor(12345, { warmth: 'warm', voice: 'crafted', density: 'airy' }, 'counter')
+const a2 = styleFor(12345, { warmth: 'warm', voice: 'crafted', density: 'airy' }, 'counter')
+eq('the same seed and vibe give a byte identical style', JSON.stringify(a1), JSON.stringify(a2))
+const b1 = styleFor(999, { warmth: 'warm', voice: 'crafted', density: 'airy' }, 'counter')
+eq('a different seed gives a different style', JSON.stringify(a1) === JSON.stringify(b1), false)
+// The vibe has to actually do something, or the model is filling a field for
+// nothing.
+const warmHue = paletteFor(4242, { warmth: 'warm', voice: 'plain', density: 'airy' }).accent.h
+const coolHue = paletteFor(4242, { warmth: 'cool', voice: 'plain', density: 'airy' }).accent.h
+eq('warm and cool land in different hue bands', Math.abs(warmHue - coolHue) > 100, true)
+
+// The picker offers four looks. It must never offer the one she already has,
+// or a reshuffle would silently do nothing.
+const cands = candidateSeeds(777, 4)
+eq('the picker offers four candidates', cands.length, 4)
+eq('all four are distinct', new Set(cands).size, 4)
+eq('and none is the seed she already has', cands.includes(777), false)
+eq('every candidate is a valid 31 bit seed', cands.every((s) => Number.isInteger(s) && s >= 0 && s <= 2147483647), true)
+eq('the shuffle is reproducible from its input', JSON.stringify(candidateSeeds(777, 4)), JSON.stringify(cands))
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
