@@ -39,7 +39,7 @@ import {
   statusFromEvent, verifyCutluyDelivery, withinReplayWindow,
 } from '../src/lib/payments/cutluy-webhook.ts'
 import { THEMES, WARMTHS, VOICES, DENSITIES, DEFAULT_VIBE, vibeOf } from '../src/lib/types.ts'
-import { candidateSeeds, contrastRatio, mulberry32, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
+import { candidateSeeds, contrastRatio, isSeed, mulberry32, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
 import { TILE_PATTERNS, ROTATIONS_FOR, tileFor, patternGeometry } from '../src/lib/media/tile.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
@@ -1518,6 +1518,19 @@ eq('every primitive of every pattern fits inside the 56 by 56 tile at every dens
 const spread = new Set()
 for (let i = 0; i < 60; i++) spread.add(JSON.stringify(tileFor(4242, `product-${i}`)))
 eq(`sixty items produce ${spread.size} distinct tiles`, spread.size >= 45, true)
+
+console.log('\nthe owner chooses her own shop\'s look')
+// The route accepts an integer and nothing else. A seed is the one number that
+// decides a whole public site, so a float, a negative or an overflow is a
+// refusal rather than a coerced value that renders something nobody chose.
+eq('a valid seed passes the guard', isSeed(12345), true)
+eq('zero is a valid seed', isSeed(0), true)
+eq('the top of the range is valid', isSeed(2147483647), true)
+eq('a float is refused', isSeed(1.5), false)
+eq('a negative is refused', isSeed(-1), false)
+eq('past the range is refused', isSeed(2147483648), false)
+eq('a string is refused', isSeed('12345'), false)
+eq('NaN is refused', isSeed(NaN), false)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

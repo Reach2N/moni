@@ -330,3 +330,45 @@ one alignment and one rhythm.
 
 Re-evaluate when Beautiful UI or 21st.dev publishes a seed-to-pattern or placeholder-tile
 component.
+
+## The seed picker: a reported gap, 3 September 2026
+
+`src/components/app/seed-picker.tsx` composes an installed primitive rather than adopting
+a library component, and this entry is the report the sourcing rule asks for when nothing
+fits.
+
+The need: four visual previews of the same shop site in a grid, one of them marked as the
+currently chosen look, where tapping any of the other three chooses it immediately. That is
+a card-select or option-grid with a selected state, not a form field the owner fills in and
+submits.
+
+Searched in order:
+
+1. **Beautiful UI**'s published set (Loading State, Thinking, Streaming Text, Approval Card,
+   Tool Chips, Task Rows, Chat, Prompt Bar, Recommendation Card, Context Cards, Diff Table,
+   Records Table, Filter Table, Sidebar Nav, Search, Flowchart, Insight Cards, Code Block,
+   Fine-tune Card, Selection Actions) has no card-select or option-grid. Approval Card comes
+   closest, but its choice is a row of labelled buttons for a single mutually-exclusive
+   decision ("Three" / "Five" / "Just one hero"), not a grid of rendered visual previews with
+   a persistent selected state.
+2. **21st.dev Agent Elements** is chat and tool-call surfaces end to end (MessageList,
+   InputBar, Markdown, the Bash/Search/Edit/Todo/Plan tool cards, ToolGroup, SubagentTool,
+   McpTool, ThinkingTool, the Question tool). Its Question tool renders a multiple-choice
+   prompt as text options, not a grid of visually distinct previews.
+3. **DaisyUI**'s selection primitives are Radio, Checkbox, Select and the Filter component
+   (a radio-button group with its own layout). None renders a preview per option: they carry
+   a label, not a rendered miniature of what choosing that option produces.
+4. **shadcn/ui or Radix**: the closest primitive is a Radix `RadioGroup`, which is not
+   installed in this project. It was not added, because the interaction here is not "pick
+   one of a set and submit": each tap is an immediate, independent action against the API,
+   which is the native `aria-pressed` toggle-button pattern rather than a radio group's
+   select-then-commit model. No accessibility behaviour is missing that a primitive would
+   supply.
+
+`SeedPicker` is therefore four plain `<button>` elements in a grid, each rendering a live
+`styleFor()` preview and exposing its selected state through `aria-pressed`, composed from
+the already-installed `Button` (for the reroll action) and this app's existing card and
+error-state grammar. No new visual language, no new dependency.
+
+Re-evaluate when Beautiful UI, 21st.dev or DaisyUI publishes a card-select or option-grid
+component.

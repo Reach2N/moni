@@ -230,3 +230,12 @@ export function candidateSeeds(from: number, count: number): number[] {
   }
   return out
 }
+
+/**
+ * One number decides a whole public site, so it is validated in a pure function
+ * the harness can prove rather than inline in a route handler where it would be
+ * asserted by nobody.
+ */
+export function isSeed(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 2147483647
+}

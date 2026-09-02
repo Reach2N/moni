@@ -1,5 +1,6 @@
 import { SiteEditor } from '@/components/app/site-editor.tsx'
-import type { StorefrontContent } from '@/lib/types.ts'
+import { SeedPicker } from '@/components/app/seed-picker.tsx'
+import { vibeOf, type StorefrontContent } from '@/lib/types.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,17 @@ export default async function SitePage() {
         <p className="km mt-1 text-xs text-rule">
           អាសយដ្ឋាន៖ {member.slug}.moni.cam
         </p>
+
+        {row?.draft || row?.published ? (
+          <div className="mt-6">
+            <SeedPicker
+              seed={row.seed}
+              vibe={vibeOf(row.draft ?? row.published)}
+              theme={((row.draft ?? row.published) as StorefrontContent).theme}
+              headline={((row.draft ?? row.published) as StorefrontContent).headline}
+            />
+          </div>
+        ) : null}
 
         <div className="mt-6">
           <SiteEditor
