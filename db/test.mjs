@@ -40,7 +40,7 @@ import {
 } from '../src/lib/payments/cutluy-webhook.ts'
 import { THEMES, WARMTHS, VOICES, DENSITIES, DEFAULT_VIBE, vibeOf } from '../src/lib/types.ts'
 import { candidateSeeds, contrastRatio, mulberry32, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
-import { TILE_PATTERNS, ROTATIONS_FOR, tileFor } from '../src/lib/media/tile.ts'
+import { TILE_PATTERNS, ROTATIONS_FOR, tileFor, patternGeometry } from '../src/lib/media/tile.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
@@ -1374,18 +1374,139 @@ eq('and the same product in a different shop differs too', JSON.stringify(tileA)
 eq('every tile names a real pattern', TILE_PATTERNS.includes(tileA.pattern), true)
 eq('and a rotation the SVG can use', [0, 90, 180, 270].includes(tileA.rotation), true)
 
-// grid and dots are four-fold symmetric and bars and waves repeat after 180
-// degrees, so a rotation recorded outside a pattern's own list would be a
-// difference nobody can see: two products could look identical while their
-// specs claim otherwise. Once every rotation drawn is one its pattern can
-// actually show, a distinct recorded spec and a distinct rendered look are
-// the same fact, which is what makes the spread count below mean anything.
-let everyRotationVisible = true
-for (let i = 0; i < 5000; i++) {
-  const t = tileFor(i, `symmetry-check-${i}`)
-  if (!ROTATIONS_FOR[t.pattern].includes(t.rotation)) everyRotationVisible = false
+// ROTATIONS_FOR is a claim about the ART: that its listed rotations are
+// pairwise genuinely different pictures, and every rotation it leaves out
+// reproduces exactly one of them. Checking that tileFor draws from the table
+// proves nothing, since tileFor's own implementation IS that draw: it cannot
+// fail whatever the table holds. This instead rotates patternGeometry's real
+// coordinates about the tile's own centre and compares the actual shapes, so
+// a future redraw of a pattern, or a wrong entry in the table, breaks this
+// immediately. A degree-90 rotation's opposite pair is not always the base
+// (0): bars' four rotations split into {0, 180} and {90, 270}, so 270
+// reproduces 90, not 0. The check below asks the general question, not that
+// specific shape.
+const ROTATION_EPSILON = 1e-6
+function rotatePoint(x, y, deg) {
+  const rad = (deg * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const dx = x - 28
+  const dy = y - 28
+  return [28 + dx * cos - dy * sin, 28 + dx * sin + dy * cos]
 }
-eq('every rotation drawn is one its own pattern can actually show', everyRotationVisible, true)
+function rotateGeometry(primitives, deg) {
+  return primitives.map((p) => {
+    if (p.kind === 'line') {
+      const [x1, y1] = rotatePoint(p.x1, p.y1, deg)
+      const [x2, y2] = rotatePoint(p.x2, p.y2, deg)
+      return { kind: 'line', x1, y1, x2, y2 }
+    }
+    if (p.kind === 'circle') {
+      const [cx, cy] = rotatePoint(p.cx, p.cy, deg)
+      return { kind: 'circle', cx, cy, r: p.r }
+    }
+    return { kind: 'path', points: p.points.map(({ x, y }) => { const [rx, ry] = rotatePoint(x, y, deg); return { x: rx, y: ry } }) }
+  })
+}
+function near(a, b) {
+  return Math.abs(a - b) < ROTATION_EPSILON
+}
+// A line has no direction and a sampled curve's trace direction is not part
+// of what a viewer sees, so two primitives are the same shape if they match
+// point for point either forwards or backwards, comparing by value with an
+// epsilon rather than by a rounded string, which a value that lands near a
+// rounding boundary (an exact .xxxx5) can flip either way on.
+function samePrimitive(a, b) {
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'circle') return near(a.cx, b.cx) && near(a.cy, b.cy) && near(a.r, b.r)
+  if (a.kind === 'line') {
+    const straight = near(a.x1, b.x1) && near(a.y1, b.y1) && near(a.x2, b.x2) && near(a.y2, b.y2)
+    const reversed = near(a.x1, b.x2) && near(a.y1, b.y2) && near(a.x2, b.x1) && near(a.y2, b.y1)
+    return straight || reversed
+  }
+  if (a.points.length !== b.points.length) return false
+  const n = a.points.length
+  let forward = true
+  let backward = true
+  for (let i = 0; i < n; i++) {
+    if (!(near(a.points[i].x, b.points[i].x) && near(a.points[i].y, b.points[i].y))) forward = false
+    const j = n - 1 - i
+    if (!(near(a.points[i].x, b.points[j].x) && near(a.points[i].y, b.points[j].y))) backward = false
+  }
+  return forward || backward
+}
+// Two whole pictures match when every primitive in one has an unused,
+// matching primitive in the other: primitive order is not part of what a
+// viewer sees either.
+function samePicture(listA, listB) {
+  if (listA.length !== listB.length) return false
+  const used = new Array(listB.length).fill(false)
+  for (const a of listA) {
+    const j = listB.findIndex((b, k) => !used[k] && samePrimitive(a, b))
+    if (j === -1) return false
+    used[j] = true
+  }
+  return true
+}
+let rotationTableTrueAboutTheArt = true
+for (const pattern of TILE_PATTERNS) {
+  for (const density of [2, 3, 4, 5]) {
+    const base = patternGeometry(pattern, density)
+    const pictures = { 0: base, 90: rotateGeometry(base, 90), 180: rotateGeometry(base, 180), 270: rotateGeometry(base, 270) }
+    const listed = ROTATIONS_FOR[pattern]
+    // Every rotation must match exactly one listed representative.
+    for (const deg of [0, 90, 180, 270]) {
+      const matches = listed.filter((ld) => samePicture(pictures[deg], pictures[ld]))
+      if (matches.length !== 1) rotationTableTrueAboutTheArt = false
+    }
+    // The listed representatives must be pairwise distinct pictures, or the
+    // table is claiming two different rotations for what is really one look.
+    for (let i = 0; i < listed.length; i++) {
+      for (let j = i + 1; j < listed.length; j++) {
+        if (samePicture(pictures[listed[i]], pictures[listed[j]])) rotationTableTrueAboutTheArt = false
+      }
+    }
+  }
+}
+eq('ROTATIONS_FOR names exactly the rotations each pattern repeats under, at every density', rotationTableTrueAboutTheArt, true)
+
+// arcs used to reach r = 38, a semicircle spanning x from -11.5 to 67.5
+// against this 56 by 56 box: it fit only because the wrapper clips overflow,
+// silently truncating the largest ring into a flat sliver on every arcs tile
+// on every real shop's menu. Every primitive of every pattern, at every
+// density, must fit inside the tile, stroke width included, or the same
+// silent clipping can happen again to any pattern.
+const STROKE = 3
+// Display rounding only, for the console line below: the containment check
+// itself compares the unrounded numbers against 0 and 56 directly.
+function roundN(n) {
+  return Math.round(n * 10000) / 10000
+}
+let everyPrimitiveContained = true
+const measuredBounds = {}
+for (const pattern of TILE_PATTERNS) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const density of [2, 3, 4, 5]) {
+    for (const p of patternGeometry(pattern, density)) {
+      const corners =
+        p.kind === 'circle'
+          ? [[p.cx - p.r, p.cy], [p.cx + p.r, p.cy], [p.cx, p.cy - p.r], [p.cx, p.cy + p.r]]
+          : p.kind === 'line'
+            ? [[p.x1, p.y1], [p.x2, p.y2]]
+            : p.points.map(({ x, y }) => [x, y])
+      for (const [x, y] of corners) {
+        minX = Math.min(minX, x - STROKE / 2)
+        minY = Math.min(minY, y - STROKE / 2)
+        maxX = Math.max(maxX, x + STROKE / 2)
+        maxY = Math.max(maxY, y + STROKE / 2)
+      }
+    }
+  }
+  measuredBounds[pattern] = { minX: roundN(minX), minY: roundN(minY), maxX: roundN(maxX), maxY: roundN(maxY) }
+  if (minX < 0 || minY < 0 || maxX > 56 || maxY > 56) everyPrimitiveContained = false
+}
+console.log('measured bounds, stroke included:', JSON.stringify(measuredBounds))
+eq('every primitive of every pattern fits inside the 56 by 56 tile at every density', everyPrimitiveContained, true)
 
 // Across a shop's whole menu the tiles must actually vary, or the fallback is
 // one grey square repeated and the owner may as well have had nothing. The
