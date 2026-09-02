@@ -12,6 +12,12 @@ import type { ThemeId } from '@/lib/types.ts'
  * The model never reaches this file. It fills a validated `StorefrontContent`
  * object of plain strings and picks an id; the markup is ours. That is what
  * makes a bad generation read badly instead of breaking a shop.
+ *
+ * The markup below is ours and stays fixed. The colour, radius and rhythm it
+ * renders in are seeded: classes like `bg-green` and the `--sf-radius` and
+ * `sf-section` tokens used here resolve through the `.sf` remap in
+ * globals.css, which `src/lib/storefront/style.ts` fills in per shop. A theme
+ * never sees the seed and never computes a style: it only wears one.
  */
 
 function Hours({ data }: { data: StorefrontData }) {
@@ -53,7 +59,7 @@ function Items({ data, className }: { data: StorefrontData; className?: string }
   return (
     <div className={className}>
       {groups.map((group) => (
-        <section key={group.category ?? 'ungrouped'} className="mb-6 last:mb-0">
+        <section key={group.category ?? 'ungrouped'} className="sf-section">
           {group.category ? (
             <h3 className="km mb-1 text-sm font-semibold tracking-wide text-label-2">{group.category}</h3>
           ) : null}
@@ -61,7 +67,7 @@ function Items({ data, className }: { data: StorefrontData; className?: string }
             {group.rows.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center gap-3 border-b border-separator py-2 last:border-b-0"
+                className="sf-row flex items-center gap-3"
               >
                 {item.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- a Supabase Storage URL on a public page, sized here rather than through the image pipeline
@@ -71,7 +77,7 @@ function Items({ data, className }: { data: StorefrontData; className?: string }
                     width={56}
                     height={56}
                     loading="lazy"
-                    className="size-14 shrink-0 rounded-md object-cover"
+                    className="size-14 shrink-0 rounded-[calc(var(--sf-radius)*0.75)] object-cover"
                   />
                 ) : null}
                 <span className="km min-w-0 flex-1">
@@ -95,7 +101,7 @@ function SalonStorefront({ data }: { data: StorefrontData }) {
       <p className="km text-sm tracking-wide text-label-2">{data.shop.province ?? 'កម្ពុជា'}</p>
       <h1 className="km mt-1 text-3xl font-semibold">{data.content.headline}</h1>
       <p className="km mt-3 text-lg text-label-2">{data.content.subhead}</p>
-      <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-full bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
+      <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
 
       <h2 className="km mt-12 text-sm font-semibold tracking-wide text-label-2">សេវា និងតម្លៃ</h2>
       <Items data={data} className="mt-2" />
@@ -116,7 +122,7 @@ function StayStorefront({ data }: { data: StorefrontData }) {
       <header className="border-b border-separator pb-8">
         <h1 className="km text-4xl font-semibold tracking-tight">{data.content.headline}</h1>
         <p className="km mt-3 max-w-xl text-lg text-label-2">{data.content.subhead}</p>
-        <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-full bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
+        <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
       </header>
 
       <div className="mt-8 grid gap-10 sm:grid-cols-2">
@@ -157,7 +163,7 @@ function WorkshopStorefront({ data }: { data: StorefrontData }) {
       <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">ការងារ និងតម្លៃ</h2>
       <Items data={data} className="mt-2" />
       <p className="km mt-8 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
-      <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-full bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
+      <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
       <div className="mt-10"><Hours data={data} /></div>
     </div>
   )
@@ -176,7 +182,7 @@ function CounterStorefront({ data }: { data: StorefrontData }) {
       <div className="mt-8 border-t border-separator pt-6">
         <Hours data={data} />
         <p className="km mt-4 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
-        <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-full bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
+        <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import type { CSSProperties } from 'react'
 import { themeFor } from '@/themes/registry.tsx'
 
 export const dynamic = 'force-dynamic'
@@ -15,8 +16,9 @@ export const dynamic = 'force-dynamic'
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
   const { getStorefront } = await import('@/lib/queries/storefront.ts')
-  const data = await getStorefront(slug)
-  if (!data) return { title: 'Moni' }
+  const result = await getStorefront(slug)
+  if (!result) return { title: 'Moni' }
+  const { data } = result
   return {
     title: `${data.shop.name}`,
     description: data.content.subhead,
@@ -28,15 +30,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function StorefrontPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const { getStorefront } = await import('@/lib/queries/storefront.ts')
-  const data = await getStorefront(slug)
+  const result = await getStorefront(slug)
   // Unpublished is a 404, not an empty page: a shop that never pressed publish
   // has no site, and showing its prices anyway would be publishing for it.
-  if (!data) notFound()
-
+  if (!result) notFound()
+  const { data, style } = result
   const theme = themeFor(data.content.theme)
 
   return (
-    <div className="min-h-dvh bg-surface text-label">
+    <div
+      className="sf min-h-dvh bg-surface text-label"
+      style={style.vars as CSSProperties}
+      data-rule={style.rule}
+    >
       <theme.Storefront data={data} />
       <footer className="border-t border-separator px-5 py-6">
         <p className="km text-xs text-label-3">

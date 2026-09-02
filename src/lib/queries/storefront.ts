@@ -3,9 +3,12 @@ import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
 import type { StorefrontContent } from '../types.ts'
 import type { CurrencyCode } from '../types.ts'
+import { vibeOf } from '../types.ts'
 import type { StorefrontData } from '@/themes/types.ts'
 import { listCatalogue } from './catalogue.ts'
 import { publicMediaUrl } from '../media/storage.ts'
+import { styleFor } from '../storefront/style.ts'
+import type { StorefrontStyle } from '../storefront/style.ts'
 
 /**
  * Everything a public shop site needs, in one read, addressed by slug.
@@ -16,7 +19,9 @@ import { publicMediaUrl } from '../media/storage.ts'
  * bookings, no conversations, no tokens: a catalogue, opening hours, and text
  * the owner published on purpose.
  */
-export async function getStorefront(slug: string): Promise<StorefrontData | null> {
+export async function getStorefront(
+  slug: string,
+): Promise<{ data: StorefrontData; style: StorefrontStyle } | null> {
   const businessResult = await db
     .from('businesses')
     .select('id, slug, name, province, address, phone, default_currency, hours')
@@ -29,7 +34,7 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
   // The catalogue, not just the services. A cafe's site listed nothing at all
   // until 2 September 2026, because this read `services` and a cafe has none.
   const [storefrontResult, items, channelResult] = await Promise.all([
-    db.from('storefronts').select('theme, published').eq('id', business.id).maybeSingle(),
+    db.from('storefronts').select('theme, seed, published').eq('id', business.id).maybeSingle(),
     listCatalogue(business.id),
     db
       .from('channel_connections')
@@ -53,7 +58,7 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
       ? { kind: 'phone', href: `tel:${business.phone.replace(/\s+/g, '')}`, label: business.phone }
       : { kind: 'none', href: null, label: 'សូមទាក់ទងមកហាងដោយផ្ទាល់' }
 
-  return {
+  const data: StorefrontData = {
     shop: {
       name: business.name,
       slug: business.slug,
@@ -79,13 +84,17 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
     content: published,
     action,
   }
+  // The style is computed here and not inside a theme, so a theme cannot reach
+  // the seed and no theme can disagree with another about what a seed means.
+  const style = styleFor(storefrontResult.data?.seed ?? 0, vibeOf(published), published.theme)
+  return { data, style }
 }
 
 /** The owner's own view: draft and published side by side. */
 export async function getStorefrontRow(businessId: string) {
   const result = await db
     .from('storefronts')
-    .select('theme, draft, published, published_at, generated_by')
+    .select('theme, seed, draft, published, published_at, generated_by')
     .eq('id', businessId)
     .maybeSingle()
   throwIfDbError('load storefront row', result.error)

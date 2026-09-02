@@ -497,3 +497,38 @@ body:has(.moni-hig) {
   [data-motion='on'] [data-enter='stagger'] > * { opacity: 0; }
   [data-motion='on'] [data-enter='mask'] { transform: translateY(104%); }
 }
+
+/* ── a shop's own site wears its own tokens ───────────────────────────────
+   The seeded style arrives as custom properties on `.sf`. Everything below is
+   a REMAPPING, not a new palette: `bg-green` and `text-label-2` in the four
+   theme components already resolve through these names, so the themes change
+   almost not at all and a new token is one line here rather than four edits
+   across four files.
+
+   Unlayered on purpose, the same cascade-layer trick as the Khmer line height:
+   Tailwind emits its utilities inside @layer utilities, so these win without
+   an !important anywhere. */
+.sf {
+  --accent:       var(--sf-accent);
+  --on-accent:    var(--sf-on-accent);
+  --green:        var(--sf-accent);
+  --green-tint:   var(--sf-accent-tint);
+  --accent-tint:  var(--sf-accent-tint);
+  --background:   var(--sf-surface);
+  --surface:      var(--sf-surface);
+  --page:         var(--sf-surface);
+  font-size:      var(--sf-scale);
+}
+
+.sf h1, .sf h2, .sf h3 { font-weight: var(--sf-weight-heading); }
+
+/* Khmer clusters clip below 1.75 whatever the scale did, so the leading is a
+   floor applied here rather than a number a theme is trusted to remember. */
+.sf .km, .sf :lang(km) { line-height: var(--sf-leading); }
+
+.sf .sf-section + .sf-section { margin-top: var(--sf-gap-section); }
+.sf .sf-row { padding-block: var(--sf-gap-row); border-bottom: 1px solid var(--separator); }
+.sf .sf-row:last-child { border-bottom: 0; }
+.sf[data-rule='tint'] .sf-row { border-bottom: 0; }
+.sf[data-rule='tint'] .sf-row:nth-child(odd) { background: var(--sf-accent-tint); }
+.sf[data-rule='none'] .sf-row { border-bottom: 0; }
