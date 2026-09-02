@@ -261,3 +261,31 @@ The review step therefore keeps Moni's existing purpose built services table in
 delivered instead attaches each parse warning to the row it concerns, so a row Moni was
 unsure about is visually distinct at the point the owner is looking at it, rather than
 listed separately below the table.
+
+## The catalogue screen: a reported gap, 2 September 2026
+
+`/app/products` composes installed primitives rather than adopting a library component,
+and this entry is the report the sourcing rule asks for when nothing fits.
+
+Searched in order:
+
+1. **Beautiful UI** has no catalogue, product, or menu component. Its agentic set covers
+   prompt bars, chat, streaming, thinking and tool traces, approvals, task rows, records
+   and insight cards. A shop's price list with a photo per row is not among them.
+2. **`src/components/primitives/RecordsTable.tsx`**, already vendored, was checked and does
+   not fit. Its columns are a closed union of CRM fields (`company`, `categories`, `last`,
+   `strength`, `links`, `ai`), its row type is fixed to that shape, and it contains no image
+   cell of any kind. Using it would mean replacing its column model, its row type and its
+   cell renderers, which is the "substantially rewriting it into a Moni-specific component"
+   the rule forbids. It was rejected once before, for the onboarding review table, for the
+   same class of reason.
+3. **21st.dev Agent Elements** covers agent interaction surfaces, not catalogue editing.
+4. **shadcn/ui**, the low-level tier the rule permits: `Input` and `Button` are installed
+   and are used here as primitives.
+
+What `product-list.tsx` and `product-photo.tsx` therefore are: the owner app's own
+documented grammar, the hairline-divided list already used by `inbox-view.tsx`, composed
+from those installed primitives. No new visual language, no new dependency, and no library
+component redrawn.
+
+Re-evaluate when Beautiful UI publishes a catalogue or media-grid component.

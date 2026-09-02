@@ -2,14 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, Globe, Inbox, Radio, Store, Wallet, type LucideIcon } from 'lucide-react'
+import { CalendarDays, Globe, Inbox, Package, Radio, Store, Wallet, type LucideIcon } from 'lucide-react'
 import { PanelCount } from './panel.tsx'
 import { toKhmerDigits } from './dashboard-format.ts'
 
 /**
  * The one map of the owner app, on the left on a desk.
  *
- * Six destinations, every one a route. Until the universal-app pass two of
+ * Seven destinations, every one a route. Until the universal-app pass two of
  * these were in-page anchors and three screens (site, channels, money) were
  * reachable only through the setup spine, which disappears once setup is done:
  * an owner who finished setting up lost the way to her own payment settings.
@@ -20,6 +20,7 @@ import { toKhmerDigits } from './dashboard-format.ts'
 export const APP_DESTINATIONS = [
   { href: '/app', label: 'ផ្ទាំងដើម', Icon: Store },
   { href: '/app/inbox', label: 'សារ', Icon: Inbox },
+  { href: '/app/products', label: 'អ្វីដែលលក់', Icon: Package },
   { href: '/app/calendar', label: 'ប្រតិទិន', Icon: CalendarDays },
   { href: '/app/site', label: 'គេហទំព័រ', Icon: Globe },
   { href: '/app/channels', label: 'បណ្តាញ', Icon: Radio },
