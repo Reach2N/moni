@@ -40,7 +40,7 @@ import {
 } from '../src/lib/payments/cutluy-webhook.ts'
 import { THEMES, WARMTHS, VOICES, DENSITIES, DEFAULT_VIBE, vibeOf } from '../src/lib/types.ts'
 import { candidateSeeds, contrastRatio, mulberry32, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
-import { TILE_PATTERNS, tileFor } from '../src/lib/media/tile.ts'
+import { TILE_PATTERNS, ROTATIONS_FOR, tileFor } from '../src/lib/media/tile.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
@@ -1373,11 +1373,30 @@ const tileD = tileFor(999, '11111111-1111-1111-1111-111111111111')
 eq('and the same product in a different shop differs too', JSON.stringify(tileA) === JSON.stringify(tileD), false)
 eq('every tile names a real pattern', TILE_PATTERNS.includes(tileA.pattern), true)
 eq('and a rotation the SVG can use', [0, 90, 180, 270].includes(tileA.rotation), true)
+
+// grid and dots are four-fold symmetric and bars and waves repeat after 180
+// degrees, so a rotation recorded outside a pattern's own list would be a
+// difference nobody can see: two products could look identical while their
+// specs claim otherwise. Once every rotation drawn is one its pattern can
+// actually show, a distinct recorded spec and a distinct rendered look are
+// the same fact, which is what makes the spread count below mean anything.
+let everyRotationVisible = true
+for (let i = 0; i < 5000; i++) {
+  const t = tileFor(i, `symmetry-check-${i}`)
+  if (!ROTATIONS_FOR[t.pattern].includes(t.rotation)) everyRotationVisible = false
+}
+eq('every rotation drawn is one its own pattern can actually show', everyRotationVisible, true)
+
 // Across a shop's whole menu the tiles must actually vary, or the fallback is
-// one grey square repeated and the owner may as well have had nothing.
+// one grey square repeated and the owner may as well have had nothing. The
+// visual space is pattern times its own rotation count times tint times
+// density: 1+1+2+2+4+4 rotation classes across the six patterns, times 3
+// tints, times 4 densities, is 168 genuinely different pictures, so 60
+// products drawing from it should mostly miss each other. Measured directly:
+// 60 products produce 52 distinct tiles here, comfortably above the 45 floor.
 const spread = new Set()
 for (let i = 0; i < 60; i++) spread.add(JSON.stringify(tileFor(4242, `product-${i}`)))
-eq(`sixty items produce ${spread.size} distinct tiles`, spread.size >= 20, true)
+eq(`sixty items produce ${spread.size} distinct tiles`, spread.size >= 45, true)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
