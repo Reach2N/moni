@@ -667,8 +667,10 @@ Design: `docs/superpowers/specs/2026-09-02-seeded-storefront-design.md`. Plan:
   entry, which meant this phase's own acceptance check had no repeatable tool and every
   storefront verification in tasks 4 to 7 used one-off scripts; it now captures the one
   published storefront at desktop and mobile widths, slug configurable through
-  `MONI_CAPTURE_SLUG`, and reports the HTTP status of every route so an unresolved slug
-  fails loudly instead of quietly becoming a screenshot of a 404 page.
+  `MONI_CAPTURE_SLUG`. Every capture logs its HTTP status, and the storefront capture
+  specifically exits the script non-zero on anything but 200, since it is the one route
+  in the list that must be a real published page; `/app`'s legitimate sign-in redirect
+  keeps its own captures exempt from that check.
 - **A named blocking prerequisite for Phase 13.** Onboarding writes every parsed
   catalogue row into `services` and never into `products`: `src/lib/setup/schema.ts` and
   `src/lib/setup/persist.ts` contain zero occurrences of the word "product", `db/seed.sql`

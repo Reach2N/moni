@@ -281,11 +281,13 @@ CSS custom properties: an accent and surface pair already clamped past the WCAG 
 a radius, a type scale and ratio, a section and row rhythm, and a Khmer leading that cannot fall
 below 1.75. `getStorefront()` in `src/lib/queries/storefront.ts` calls `styleFor()` once, on the
 way out of the query, and hands the result to the page alongside the same `StorefrontData` the
-theme has always taken. A theme's `Component` never receives the seed and computes no colour,
-radius or spacing of its own: it renders the markup it already rendered before this phase, and an
-unlayered `.sf` block in `globals.css` remaps whatever `--sf-*` values are already on the root
-onto the runtime variables each theme resolves (`--accent`, `--surface`, `--green`, and so on),
-the same cascade-layer technique the Khmer line-height fix already uses.
+theme has always taken. A theme's `Component` does receive the seed, as `tileSeed`, but only so
+its `Items` helper can call `tileFor(tileSeed, item.id)` and draw a photoless product's pattern
+tile (`src/themes/registry.tsx`). It computes no colour, radius or spacing from that integer
+itself: it renders the markup it already rendered before this phase, and an unlayered `.sf` block
+in `globals.css` remaps whatever `--sf-*` values are already on the root onto the runtime
+variables each theme resolves (`--accent`, `--surface`, `--green`, and so on), the same
+cascade-layer technique the Khmer line-height fix already uses.
 
 The style is computed in the query and not inside a theme for the same reason `v_catalog` is one
 view and not four branches: a second call site is a second place to disagree. A theme that read

@@ -56,7 +56,7 @@ async function scrollThrough(p){
   }))
 }
 
-async function shoot(name,w,h,dsf,act,viewportOnly,route='/app',settleMs=500,media={}){
+async function shoot(name,w,h,dsf,act,viewportOnly,route='/app',settleMs=500,media={},requireOk=false){
   const p = await b.newPage()
   await p.setViewport({width:w,height:h,deviceScaleFactor:dsf,isMobile:w<600,hasTouch:w<600})
   await emulate(p,media)
@@ -74,15 +74,28 @@ async function shoot(name,w,h,dsf,act,viewportOnly,route='/app',settleMs=500,med
   await p.screenshot({path:`${OUT}/${name}.png`, fullPage:!viewportOnly})
   const status=res?.status()
   // A 404 or 500 still screenshots cleanly: the failure is in what page loaded,
-  // not in the capture. Naming the status here is what makes an unresolved
-  // route (a slug the seed step never published, a stale one that got deleted)
-  // fail loudly instead of shipping a picture of an error page as if it were
-  // the feature.
+  // not in the capture. Every call records the status in the log line below;
+  // whether an unresolved route (a slug the seed step never published, a
+  // stale one that got deleted) actually fails the script is the `requireOk`
+  // flag's decision, made per call below.
   const flags=[status&&status!==200?`status=${status}`:null, m.over?`overflowing=${m.over}`:null, m.hidden?`invisible=${m.hidden}`:null, errors.length?`errors=${errors.length}`:null].filter(Boolean)
   console.log(`${name}: ${route} ${w}x${h} scrollW=${m.sw} ${flags.join(' ')||'clean'}`)
   if(status&&status!==200) console.log(`   ! ${route} did not resolve to a live page (HTTP ${status})`)
   if(errors.length) console.log(`   ! ${errors.slice(0,3).join(' | ')}`)
   await p.close()
+  // requireOk is the difference between a note and a guardrail. /app legitimately
+  // redirects a signed-out visitor to sign-in, so a blanket non-200 check across
+  // every route would break that existing, correct capture. Only a route that MUST
+  // be a real published page sets this, which today is only the storefront: a 404
+  // there means the seed step never published the slug, or the shop was deleted,
+  // and a warning line nobody but a human reads is not what stops that from
+  // shipping as a silent screenshot of an error page.
+  if(requireOk && status!==200){
+    console.error(`FAILED: ${route} returned HTTP ${status}, expected 200. This capture must be a real published page.`)
+    await b.close()
+    process.exit(1)
+  }
+  return status
 }
 
 // the real product moment: paste the shop text and let Gemini parse it
@@ -119,12 +132,14 @@ await shoot('landing-desktop-still',1440,900,1,undefined,false,'/',1200,{scheme:
 // this phase (contrast, tokens, the photoless tile) was verified with one-off
 // scripts instead of the project's own tool. `sansethireach` is the one shop
 // published in the live database as of this phase; override with
-// MONI_CAPTURE_SLUG for a different shop. The status flag on `shoot()` is what
-// keeps this honest: a slug that is not actually published renders a 404 page,
-// and that now says so in the log line instead of quietly becoming a screenshot.
+// MONI_CAPTURE_SLUG for a different shop. This is the one route in the list
+// that MUST resolve to a real published page, so it is the one call passing
+// `requireOk`: a slug that is not actually published exits the whole script
+// non-zero with the HTTP status named, rather than quietly saving a screenshot
+// of Next's 404 page and calling the capture done.
 const STOREFRONT_SLUG = process.env.MONI_CAPTURE_SLUG ?? 'sansethireach'
-await shoot('storefront-desktop', 1440,900,1,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,LIGHT)
-await shoot('storefront-mobile',   390,844,2,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,LIGHT)
+await shoot('storefront-desktop', 1440,900,1,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,LIGHT,true)
+await shoot('storefront-mobile',   390,844,2,undefined,false,`/s/${STOREFRONT_SLUG}`,1200,LIGHT,true)
 
 // ── Phase 2: the dashboard. Light locked, so no scheme emulation.
 await shoot('mobile',390,844,2,undefined,false,'/app',500,{scheme:null})

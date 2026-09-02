@@ -19,7 +19,10 @@ import { ProductTile } from '@/components/storefront/product-tile.tsx'
  * renders in are seeded: classes like `bg-green` and the `--sf-radius` and
  * `sf-section` tokens used here resolve through the `.sf` remap in
  * globals.css, which `src/lib/storefront/style.ts` fills in per shop. A theme
- * never sees the seed and never computes a style: it only wears one.
+ * does receive the seed, as `tileSeed` below, but only to hand it to
+ * `tileFor()` for a photoless row's pattern tile. It never computes a colour,
+ * radius or spacing from that integer: it only wears the `--sf-*` values
+ * already resolved above it.
  */
 
 function Hours({ data }: { data: StorefrontData }) {

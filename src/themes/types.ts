@@ -47,10 +47,12 @@ export type ThemeModule = {
   id: ThemeId
   name: string
   /**
-   * `tileSeed` is opaque to a theme: it exists only so the private `Items`
-   * helper in `registry.tsx` can draw a tile for a photoless row, and every
-   * theme forwards it without reading it. A theme still derives no style of
-   * its own.
+   * A theme receives `tileSeed`, the same integer `styleFor()` was seeded
+   * with, as a plain prop. It exists only so the private `Items` helper in
+   * `registry.tsx` can call `tileFor(tileSeed, item.id)` and draw a tile for
+   * a photoless row: a theme forwards it for that one purpose and computes no
+   * colour, radius or spacing from it. Every one of those already arrived as
+   * a `--sf-*` CSS custom property, resolved above this component.
    */
   Storefront: (props: { data: StorefrontData; tileSeed: number }) => React.ReactNode
 }
