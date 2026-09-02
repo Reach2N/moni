@@ -43,7 +43,7 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
       style={style.vars as CSSProperties}
       data-rule={style.rule}
     >
-      <theme.Storefront data={data} />
+      <theme.Storefront data={data} tileSeed={style.tileSeed} />
       <footer className="border-t border-separator px-5 py-6">
         <p className="km text-xs text-label-3">
           {data.shop.address ? `${data.shop.address} · ` : ''}

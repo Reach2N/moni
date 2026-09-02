@@ -46,5 +46,11 @@ export type StorefrontData = {
 export type ThemeModule = {
   id: ThemeId
   name: string
-  Storefront: (props: { data: StorefrontData }) => React.ReactNode
+  /**
+   * `tileSeed` is opaque to a theme: it exists only so the private `Items`
+   * helper in `registry.tsx` can draw a tile for a photoless row, and every
+   * theme forwards it without reading it. A theme still derives no style of
+   * its own.
+   */
+  Storefront: (props: { data: StorefrontData; tileSeed: number }) => React.ReactNode
 }

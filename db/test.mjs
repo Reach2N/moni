@@ -40,6 +40,7 @@ import {
 } from '../src/lib/payments/cutluy-webhook.ts'
 import { THEMES, WARMTHS, VOICES, DENSITIES, DEFAULT_VIBE, vibeOf } from '../src/lib/types.ts'
 import { candidateSeeds, contrastRatio, mulberry32, paletteFor, styleFor } from '../src/lib/storefront/style.ts'
+import { TILE_PATTERNS, tileFor } from '../src/lib/media/tile.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import {
@@ -1357,6 +1358,26 @@ const badVibe = sanityCheck({ theme: 'counter', vibe: { warmth: 'purple', voice:
 eq('a vibe outside the taxonomy is flagged', badVibe.some((w) => w.field === 'vibe'), true)
 const goodVibe = sanityCheck({ theme: 'counter', vibe: { warmth: 'warm', voice: 'plain', density: 'airy' }, headline: 'Good coffee', subhead: 'Open early every day', about: 'A small cafe run by one family since the shop opened.', highlights: ['Open Saturday', 'Two staff'], callToAction: 'Order', notice: null }, 'Sok Cafe')
 eq('a stated vibe passes', goodVibe.some((w) => w.field === 'vibe'), false)
+
+console.log('\na menu with half its photos still reads as a menu')
+// Uploading stays the real path. A tile is what a row gets when there is
+// nothing to upload yet, and it must never resemble a photograph or a broken
+// image. Keyed on the product id and not the name, so renaming an item does
+// not change how it looks.
+const tileA = tileFor(4242, '11111111-1111-1111-1111-111111111111')
+const tileB = tileFor(4242, '11111111-1111-1111-1111-111111111111')
+eq('the same product gets the same tile every time', JSON.stringify(tileA), JSON.stringify(tileB))
+const tileC = tileFor(4242, '22222222-2222-2222-2222-222222222222')
+eq('a different product gets a different tile', JSON.stringify(tileA) === JSON.stringify(tileC), false)
+const tileD = tileFor(999, '11111111-1111-1111-1111-111111111111')
+eq('and the same product in a different shop differs too', JSON.stringify(tileA) === JSON.stringify(tileD), false)
+eq('every tile names a real pattern', TILE_PATTERNS.includes(tileA.pattern), true)
+eq('and a rotation the SVG can use', [0, 90, 180, 270].includes(tileA.rotation), true)
+// Across a shop's whole menu the tiles must actually vary, or the fallback is
+// one grey square repeated and the owner may as well have had nothing.
+const spread = new Set()
+for (let i = 0; i < 60; i++) spread.add(JSON.stringify(tileFor(4242, `product-${i}`)))
+eq(`sixty items produce ${spread.size} distinct tiles`, spread.size >= 20, true)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

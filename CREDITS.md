@@ -289,3 +289,44 @@ from those installed primitives. No new visual language, no new dependency, and 
 component redrawn.
 
 Re-evaluate when Beautiful UI publishes a catalogue or media-grid component.
+
+## The unphotographed product tile: a reported gap, 3 September 2026
+
+`src/components/storefront/product-tile.tsx` is authored SVG, not an adopted library
+component, and this entry is the report the sourcing rule asks for when nothing fits.
+
+The need: a deterministic, geometric fallback for a product row with no photo, drawn from
+the shop's own seed and accent colour, at the same size and the same rounded box as the
+photo it stands in for. It must never resemble a photograph, per PLAN.md: a customer who
+believes she is looking at a picture of the food has been misled, which is a worse failure
+than an unphotographed row admitting it has no photo.
+
+Searched in order:
+
+1. **Beautiful UI** has no placeholder, pattern, or generative-avatar component. Its
+   published set (Loading State, Thinking, Streaming Text, Approval Card, Tool Chips, Task
+   Rows, Chat, Prompt Bar, Recommendation Card, Context Cards, Diff Table, Records Table,
+   Filter Table, Sidebar Nav, Search, Flowchart, Insight Cards, Code Block, Fine-tune Card,
+   Selection Actions) is agentic surfaces end to end. The source's own avatar-like glyphs
+   next to named entities are hand-authored per instance, not a reusable seed-to-pattern
+   component.
+2. **21st.dev Agent Elements** is 26 components, all chat and tool-call surfaces (AgentChat,
+   BashTool, EditTool, SearchTool, TodoTool, PlanTool, ToolGroup, SubagentTool, McpTool,
+   ThinkingTool, GenericTool, the Question tool, InputBar and its composer pieces, Markdown,
+   TextShimmer, SpiralLoader). None generates a decorative fill for a missing image.
+3. **DaisyUI** has an Avatar component, but it is a profile-picture placeholder: a shaped
+   frame that falls back to initials text, not a geometric pattern, and it has no notion of
+   a seed. Its Mask component supplies shapes to crop an existing image into, which is the
+   opposite of this need. Neither fits a product photo slot without becoming the "guessed
+   markup" the rule forbids.
+4. **shadcn/ui or Radix**: no low-level primitive applies here either. There is no
+   accessibility behaviour or interaction to borrow, only a static decorative fill.
+
+Rule 10 permits authored SVG art when no library component fits. `ProductTile` is that:
+six geometric patterns (bars, arcs, grid, chevron, dots, waves) drawn in `currentColor` so
+the wrapper sets the tint, deterministic per product id via `tileFor()`, sized and
+rounded identically to the `<img>` branch it replaces so a half-photographed menu keeps
+one alignment and one rhythm.
+
+Re-evaluate when Beautiful UI or 21st.dev publishes a seed-to-pattern or placeholder-tile
+component.

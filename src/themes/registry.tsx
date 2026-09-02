@@ -1,6 +1,8 @@
 import type { StorefrontData, ThemeModule } from './types.ts'
 import { DAY_NAMES_KM, groupedItems, money, orderedHours } from './shared.ts'
 import type { ThemeId } from '@/lib/types.ts'
+import { tileFor } from '@/lib/media/tile.ts'
+import { ProductTile } from '@/components/storefront/product-tile.tsx'
 
 /**
  * Four hand-built themes over one typed prop.
@@ -50,11 +52,12 @@ function Action({ data, className }: { data: StorefrontData; className?: string 
  * What the shop sells, grouped the way a menu reads.
  *
  * A photo is an enhancement and never the skeleton: a shop that uploaded
- * nothing gets a clean list of names and prices, which is what most shops will
- * have on their first day. The image is fixed size and cropped so one tall
- * photo cannot stretch a row and break the price column's alignment.
+ * nothing gets a tile in its own seeded palette rather than a gap, which is
+ * what most shops will have on their first day. The tile is drawn at the same
+ * size and in the same rounded box as the photo it stands in for, so a half
+ * photographed menu has one alignment and one rhythm rather than two.
  */
-function Items({ data, className }: { data: StorefrontData; className?: string }) {
+function Items({ data, tileSeed, className }: { data: StorefrontData; tileSeed: number; className?: string }) {
   const groups = groupedItems(data.items)
   return (
     <div className={className}>
@@ -79,7 +82,12 @@ function Items({ data, className }: { data: StorefrontData; className?: string }
                     loading="lazy"
                     className="size-14 shrink-0 rounded-[calc(var(--sf-radius)*0.75)] object-cover"
                   />
-                ) : null}
+                ) : (
+                  <ProductTile
+                    spec={tileFor(tileSeed, item.id)}
+                    className="size-14 shrink-0 overflow-hidden rounded-[calc(var(--sf-radius)*0.75)]"
+                  />
+                )}
                 <span className="km min-w-0 flex-1">
                   <span className="block truncate">{item.name}</span>
                   {item.nameEn ? <span className="block truncate text-xs text-label-2">{item.nameEn}</span> : null}
@@ -95,7 +103,7 @@ function Items({ data, className }: { data: StorefrontData; className?: string }
 }
 
 /** Soft and service led: hair, beauty, nails. */
-function SalonStorefront({ data }: { data: StorefrontData }) {
+function SalonStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: number }) {
   return (
     <div className="mx-auto w-full max-w-2xl px-5 py-12">
       <p className="km text-sm tracking-wide text-label-2">{data.shop.province ?? 'កម្ពុជា'}</p>
@@ -104,7 +112,7 @@ function SalonStorefront({ data }: { data: StorefrontData }) {
       <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
 
       <h2 className="km mt-12 text-sm font-semibold tracking-wide text-label-2">សេវា និងតម្លៃ</h2>
-      <Items data={data} className="mt-2" />
+      <Items data={data} tileSeed={tileSeed} className="mt-2" />
 
       <h2 className="km mt-10 text-sm font-semibold tracking-wide text-label-2">អំពីយើង</h2>
       <p className="km mt-2 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
@@ -116,7 +124,7 @@ function SalonStorefront({ data }: { data: StorefrontData }) {
 }
 
 /** Rooms and nights: guesthouses and hotels. */
-function StayStorefront({ data }: { data: StorefrontData }) {
+function StayStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: number }) {
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-12">
       <header className="border-b border-separator pb-8">
@@ -128,7 +136,7 @@ function StayStorefront({ data }: { data: StorefrontData }) {
       <div className="mt-8 grid gap-10 sm:grid-cols-2">
         <section>
           <h2 className="km text-sm font-semibold tracking-wide text-label-2">បន្ទប់ និងតម្លៃ</h2>
-          <Items data={data} className="mt-2" />
+          <Items data={data} tileSeed={tileSeed} className="mt-2" />
         </section>
         <section>
           <h2 className="km text-sm font-semibold tracking-wide text-label-2">អំពីកន្លែងស្នាក់នៅ</h2>
@@ -145,7 +153,7 @@ function StayStorefront({ data }: { data: StorefrontData }) {
 }
 
 /** Jobs booked in and collected: repairs, tailoring. */
-function WorkshopStorefront({ data }: { data: StorefrontData }) {
+function WorkshopStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: number }) {
   return (
     <div className="mx-auto w-full max-w-2xl px-5 py-12">
       <h1 className="km text-3xl font-semibold">{data.content.headline}</h1>
@@ -161,7 +169,7 @@ function WorkshopStorefront({ data }: { data: StorefrontData }) {
       </ol>
 
       <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">ការងារ និងតម្លៃ</h2>
-      <Items data={data} className="mt-2" />
+      <Items data={data} tileSeed={tileSeed} className="mt-2" />
       <p className="km mt-8 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
       <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
       <div className="mt-10"><Hours data={data} /></div>
@@ -170,14 +178,14 @@ function WorkshopStorefront({ data }: { data: StorefrontData }) {
 }
 
 /** Walk in and order: food, drinks, retail. */
-function CounterStorefront({ data }: { data: StorefrontData }) {
+function CounterStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: number }) {
   return (
     <div className="mx-auto w-full max-w-xl px-5 py-10">
       <h1 className="km text-2xl font-semibold">{data.content.headline}</h1>
       <p className="km mt-2 text-[0.9375rem] text-label-2">{data.content.subhead}</p>
 
       <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">មុខម្ហូប និងតម្លៃ</h2>
-      <Items data={data} className="mt-2" />
+      <Items data={data} tileSeed={tileSeed} className="mt-2" />
 
       <div className="mt-8 border-t border-separator pt-6">
         <Hours data={data} />
