@@ -21,6 +21,7 @@ process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
 process.env.MONI_MODEL_PARSE = 'google/one,google:two,google:three,anthropic:four'
 
 const { withFallback, modelsFor, resetModelAvailability } = await import('../src/lib/ai/models.ts')
+const { classifyRefusal, productPhotoPrompt } = await import('../src/lib/ai/photo-refusal.ts')
 
 const failures = []
 async function check(name, run) {
@@ -244,6 +245,66 @@ await check('the whole chain stops when the request budget is spent, before tryi
   } finally {
     process.env.MONI_TIMEOUT_PARSE_MS = '150'
   }
+})
+
+
+// ── the image task ────────────────────────────────────────────────────────
+// Verified against the live key on 2 September 2026: every image model it can
+// see refuses with the free tier's DAILY per-model quota already spent, and the
+// gateway refuses them outright. The feature ships anyway, so what has to be
+// right is the REASON it reports, because each one names a different next move
+// for the owner: enable billing, wait for tomorrow, or photograph it herself.
+
+await check('the image task has a chain, so a photo has somewhere to come from', () => {
+  process.env.MONI_MODEL_IMAGE = 'google/pic,google:pic2'
+  try {
+    assert.deepEqual(modelsFor('image').map((c) => c.ref), ['google/pic', 'google:pic2'])
+  } finally {
+    delete process.env.MONI_MODEL_IMAGE
+  }
+})
+
+await check('a plan refusal on an image model falls through to the direct one', async () => {
+  process.env.MONI_MODEL_IMAGE = 'google/pic,google:pic2'
+  try {
+    const tried = []
+    const { ref } = await withFallback('image', async (_model, r) => {
+      tried.push(r)
+      if (r === 'google/pic') throw new Error(ENTITLEMENT)
+      return 'drawn'
+    })
+    assert.deepEqual(tried, ['google/pic', 'google:pic2'])
+    assert.equal(ref, 'google:pic2')
+  } finally {
+    delete process.env.MONI_MODEL_IMAGE
+  }
+})
+
+await check('a spent daily quota reads as quota, not as a dead plan', () => {
+  assert.equal(
+    classifyRefusal('You exceeded your current quota. GenerateRequestsPerDayPerProjectPerModel-FreeTier'),
+    'quota',
+  )
+})
+
+await check('a plan refusal reads as unavailable, because waiting will not fix it', () => {
+  assert.equal(classifyRefusal(ENTITLEMENT), 'unavailable')
+})
+
+await check('the router\'s own timeout reads as slow, and is worth retrying', () => {
+  assert.equal(classifyRefusal('google:pic did not answer within 25s'), 'slow')
+})
+
+await check('anything else is a plain failure', () => {
+  assert.equal(classifyRefusal('the socket closed'), 'failed')
+})
+
+await check('the prompt forbids text, because letters on a menu photo would be a lie', () => {
+  const prompt = productPhotoPrompt({ name: 'កាហ្វេទឹកកក', description: null, businessType: 'cafe' })
+  assert.ok(/no text/i.test(prompt), 'the prompt does not forbid text')
+  assert.ok(/no watermark/i.test(prompt))
+  assert.ok(prompt.includes('កាហ្វេទឹកកក'), 'the product name is not in the prompt')
+  assert.ok(!prompt.includes('—'), 'an em dash reached the prompt')
 })
 
 console.log(`\n${failures.length === 0 ? '\x1b[32m' : '\x1b[31m'}${failures.length} failed\x1b[0m\n`)

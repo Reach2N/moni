@@ -81,6 +81,8 @@ const CHANGE_LABEL: Record<string, string> = {
   duration_min: 'រយៈពេលថ្មី',
   name: 'ឈ្មោះថ្មី',
   active: 'ស្ថានភាពប្រើប្រាស់',
+  category: 'ក្រុមក្នុងម៉ឺនុយ',
+  stock: 'ចំនួនក្នុងស្តុក',
 }
 
 const BOOKING_STATUS: Record<string, string> = {
@@ -237,6 +239,39 @@ function ownerStep(step: ApiStep): OwnerStep {
         failed: false,
       }
     }
+    case 'create_product':
+      return { title: `បានបន្ថែម ${String(result.added ?? '')}`, details: [], failed: false }
+    case 'create_products_bulk': {
+      const names = strings(result.names)
+      return {
+        title: `បានបន្ថែម ${toKhmerDigits(String(result.added ?? 0))} មុខ`,
+        details: names.slice(0, 6),
+        failed: false,
+      }
+    }
+    case 'update_product': {
+      const changes = record(result.changes)
+      return {
+        title: `បានកែ ${String(result.name ?? '')}`,
+        details: Object.entries(changes).map(([field, value]) => `${CHANGE_LABEL[field] ?? field}: ${toKhmerDigits(String(value))}`),
+        failed: false,
+      }
+    }
+    case 'search_catalogue': {
+      const items = Array.isArray(result.items) ? result.items.map(record) : []
+      return {
+        title: `រកឃើញ ${toKhmerDigits(String(result.found ?? 0))} មុខ`,
+        details: items.slice(0, 5).map((item) => `${String(item.name ?? '')} · ${toKhmerDigits(String(item.price ?? ''))}`),
+        failed: false,
+      }
+    }
+    case 'generate_product_photo':
+      // A refusal is not a failure of Moni's, it is a fact about the plan, and
+      // the owner can act on it. Show her sentence rather than a red row.
+      if (result.refused) {
+        return { title: 'មិនបានបង្កើតរូបភាពទេ', details: [String(result.message ?? '')], failed: false }
+      }
+      return { title: `បានបង្កើតរូបភាពសម្រាប់ ${String(result.drawn ?? '')}`, details: [], failed: false }
     case 'publish_shop_site':
       return {
         title: 'បានផ្សាយគេហទំព័រហាង',

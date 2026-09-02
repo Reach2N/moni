@@ -5,6 +5,8 @@ import { db } from '@/lib/db.ts'
 import { requireDbData, throwIfDbError } from '@/lib/db-result.ts'
 import { assertUploadable, MAX_IMAGE_BYTES, MediaError } from '@/lib/media/validate.ts'
 import { deleteStoredPhoto, uploadProductPhoto } from '@/lib/media/storage.ts'
+import { generateProductPhoto } from '@/lib/ai/product-photo.ts'
+import { REFUSAL_STATUS } from '@/lib/ai/photo-refusal.ts'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -78,6 +80,60 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     })
     await attach(member.businessId, product.id, path, product.photo_path)
     return NextResponse.json({ photo_path: path })
+  } catch (error) {
+    return failure(error)
+  }
+}
+
+/**
+ * Draw one, rather than upload one.
+ *
+ * A refusal is answered with its own status and its own sentence, because the
+ * owner's next move depends on which refusal it was: enable billing, wait until
+ * tomorrow, or photograph it herself. The product keeps whatever photo it had.
+ */
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    assertSameOriginBrowserPost(req)
+    const member = await requireMemberApi()
+    const { id } = await params
+    const product = await ownedProduct(member.businessId, id)
+
+    const detail = await db
+      .from('products')
+      .select('name, description')
+      .eq('id', product.id)
+      .eq('business_id', member.businessId)
+      .single()
+    const row = requireDbData('load product for generation', detail)
+    const shopResult = await db
+      .from('businesses')
+      .select('business_type')
+      .eq('id', member.businessId)
+      .single()
+    const shop = requireDbData('load shop for generation', shopResult)
+
+    const photo = await generateProductPhoto({
+      name: row.name,
+      description: row.description,
+      businessType: shop.business_type,
+    })
+    if (!photo.ok) {
+      return NextResponse.json(
+        { error: photo.message, reason: photo.reason },
+        { status: REFUSAL_STATUS[photo.reason] },
+      )
+    }
+
+    const path = await uploadProductPhoto({
+      businessId: member.businessId,
+      productId: product.id,
+      bytes: photo.bytes,
+      mediaType: photo.mediaType,
+      extension: photo.mediaType === 'image/png' ? 'png' : 'jpg',
+    })
+    await attach(member.businessId, product.id, path, product.photo_path)
+    return NextResponse.json({ photo_path: path, model: photo.model })
   } catch (error) {
     return failure(error)
   }

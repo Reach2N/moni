@@ -24,7 +24,7 @@ import { anthropic } from '@ai-sdk/anthropic'
 import type { LanguageModel } from 'ai'
 
 /** The jobs this product needs a model for. Add one, wire one line below. */
-export type Task = 'parse' | 'chat' | 'classify' | 'transcribe'
+export type Task = 'parse' | 'chat' | 'classify' | 'transcribe' | 'image'
 
 /**
  * Two shapes, and the shape IS the routing.
@@ -72,6 +72,17 @@ const DEFAULTS: Record<Task, ModelRef[]> = {
     'google/gemini-3.7-flash',
     'google:gemini-3.7-flash',
     'google:gemini-3.5-flash',
+  ],
+  // A product photo for a shop's menu. The ids were verified against the live
+  // model list on 2 September 2026: six image models are visible to the key, and
+  // the free tier's DAILY per-model quota for every one of them was already
+  // spent, so this chain is EXPECTED to be refused until billing is enabled.
+  // It ships anyway, because the refusal reaches the owner in her own words and
+  // the upload button sits beside it.
+  image: [
+    'google/gemini-3.1-flash-image',
+    'google:gemini-3.1-flash-image',
+    'google:gemini-3.1-flash-lite-image',
   ],
   // "is this a booking request or a complaint", cheapest possible
   classify: [
@@ -222,6 +233,9 @@ const BUDGET: Record<Task, { total: number; perAttempt: number }> = {
   // attempt gets longer and fewer of them fit.
   transcribe: { total: 50_000, perAttempt: 30_000 },
   classify: { total: 20_000, perAttempt: 10_000 },
+  // Drawing takes longer than writing a sentence, and /api/products/[id]/photo
+  // allows sixty seconds.
+  image: { total: 50_000, perAttempt: 25_000 },
 }
 
 /** `MONI_TIMEOUT_PARSE_MS=8000` overrides one attempt, for a demo on bad wifi. */
@@ -448,6 +462,14 @@ const RATES: Record<string, { in: number; out: number }> = {
   'google:gemini-3.5-flash': { in: 0.3, out: 2.5 },
   'google:gemini-3.5-flash-lite': { in: 0.1, out: 0.4 },
   'anthropic:claude-sonnet-5': { in: 3, out: 15 },
+  // Image models are billed PER IMAGE, not per token, so token rates cannot
+  // express them and these zeros deliberately UNDER-report. Recorded here rather
+  // than left absent, because a missing key silently falls through to the
+  // 1-per-million default below and reports a plausible wrong number instead of
+  // an obvious zero. Model per-image pricing when an image bill actually exists.
+  'google/gemini-3.1-flash-image': { in: 0, out: 0 },
+  'google:gemini-3.1-flash-image': { in: 0, out: 0 },
+  'google:gemini-3.1-flash-lite-image': { in: 0, out: 0 },
 }
 
 export function costMicroUsd(ref: string, inputTokens = 0, outputTokens = 0): number {

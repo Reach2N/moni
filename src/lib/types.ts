@@ -528,6 +528,7 @@ export const OWNER_TOOLS = [
   'create_product',
   'create_products_bulk', // "here is my menu": one call, not fifteen
   'update_product',
+  'generate_product_photo',
   'set_hours',
   'add_closure',
   // PLAN

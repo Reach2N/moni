@@ -8,6 +8,8 @@ import { cambodiaDate, cambodiaDayBounds } from '../time/cambodia.ts'
 import { confirmPayment } from '../payments/confirm.ts'
 import { getPaymentSettings, PaymentAccountError, setPaymentAccount } from '../payments/account.ts'
 import { createProduct, createProductsBulk, ProductError, updateProduct } from '../products/write.ts'
+import { generateProductPhoto } from '../ai/product-photo.ts'
+import { uploadProductPhoto } from '../media/storage.ts'
 import { listCatalogue } from '../queries/catalogue.ts'
 import { generateShopSiteDraft, publishShopSite } from '../storefront/generate.ts'
 import { getStorefrontRow } from '../queries/storefront.ts'
@@ -296,6 +298,47 @@ export function ownerTools(businessId: string) {
           if (error instanceof ProductError) return { error: error.message }
           throw error
         }
+      },
+    }),
+
+    generate_product_photo: tool({
+      description:
+        'ORGANIZE. Draw a photo for a product that has none, from what the shop already told us. It CAN be refused, and when it is, tell her the reason it gives and that she can add a photo from her phone on the catalogue screen.',
+      inputSchema: z.object({ product_id: z.string().uuid() }),
+      execute: async ({ product_id }) => {
+        const productResult = await db
+          .from('products')
+          .select('id, name, description')
+          .eq('id', product_id)
+          .eq('business_id', businessId)
+          .maybeSingle()
+        if (!productResult.data) return { error: 'no such product in this shop' }
+        const product = productResult.data
+
+        const shopResult = await db.from('businesses').select('business_type').eq('id', businessId).single()
+        const shop = requireDbData('load shop for product photo', shopResult)
+
+        const photo = await generateProductPhoto({
+          name: product.name,
+          description: product.description,
+          businessType: shop.business_type,
+        })
+        if (!photo.ok) return { refused: photo.reason, message: photo.message, upload_on: '/app/products' }
+
+        const path = await uploadProductPhoto({
+          businessId,
+          productId: product.id,
+          bytes: photo.bytes,
+          mediaType: photo.mediaType,
+          extension: photo.mediaType === 'image/png' ? 'png' : 'jpg',
+        })
+        const saved = await db
+          .from('products')
+          .update({ photo_path: path })
+          .eq('id', product.id)
+          .eq('business_id', businessId)
+        if (saved.error) return { error: 'the photo was drawn but could not be attached' }
+        return { drawn: product.name, model: photo.model }
       },
     }),
 
