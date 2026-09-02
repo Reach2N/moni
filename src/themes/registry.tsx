@@ -1,5 +1,5 @@
 import type { StorefrontData, ThemeModule } from './types.ts'
-import { DAY_NAMES_KM, money, orderedHours } from './shared.ts'
+import { DAY_NAMES_KM, groupedItems, money, orderedHours } from './shared.ts'
 import type { ThemeId } from '@/lib/types.ts'
 
 /**
@@ -40,19 +40,51 @@ function Action({ data, className }: { data: StorefrontData; className?: string 
   )
 }
 
-function Services({ data, className }: { data: StorefrontData; className?: string }) {
+/**
+ * What the shop sells, grouped the way a menu reads.
+ *
+ * A photo is an enhancement and never the skeleton: a shop that uploaded
+ * nothing gets a clean list of names and prices, which is what most shops will
+ * have on their first day. The image is fixed size and cropped so one tall
+ * photo cannot stretch a row and break the price column's alignment.
+ */
+function Items({ data, className }: { data: StorefrontData; className?: string }) {
+  const groups = groupedItems(data.items)
   return (
-    <ul className={className}>
-      {data.services.map((service) => (
-        <li key={service.id} className="flex items-baseline justify-between gap-4 border-b border-separator py-2 last:border-b-0">
-          <span className="km min-w-0">
-            <span className="block truncate">{service.name}</span>
-            {service.nameEn ? <span className="block truncate text-xs text-label-2">{service.nameEn}</span> : null}
-          </span>
-          <span className="tnum shrink-0 text-right">{money(service)}</span>
-        </li>
+    <div className={className}>
+      {groups.map((group) => (
+        <section key={group.category ?? 'ungrouped'} className="mb-6 last:mb-0">
+          {group.category ? (
+            <h3 className="km mb-1 text-sm font-semibold tracking-wide text-label-2">{group.category}</h3>
+          ) : null}
+          <ul>
+            {group.rows.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-center gap-3 border-b border-separator py-2 last:border-b-0"
+              >
+                {item.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- a Supabase Storage URL on a public page, sized here rather than through the image pipeline
+                  <img
+                    src={item.photoUrl}
+                    alt={item.name}
+                    width={56}
+                    height={56}
+                    loading="lazy"
+                    className="size-14 shrink-0 rounded-md object-cover"
+                  />
+                ) : null}
+                <span className="km min-w-0 flex-1">
+                  <span className="block truncate">{item.name}</span>
+                  {item.nameEn ? <span className="block truncate text-xs text-label-2">{item.nameEn}</span> : null}
+                </span>
+                <span className="tnum shrink-0 text-right">{money(item)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ))}
-    </ul>
+    </div>
   )
 }
 
@@ -66,7 +98,7 @@ function SalonStorefront({ data }: { data: StorefrontData }) {
       <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-full bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
 
       <h2 className="km mt-12 text-sm font-semibold tracking-wide text-label-2">សេវា និងតម្លៃ</h2>
-      <Services data={data} className="mt-2" />
+      <Items data={data} className="mt-2" />
 
       <h2 className="km mt-10 text-sm font-semibold tracking-wide text-label-2">អំពីយើង</h2>
       <p className="km mt-2 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
@@ -90,7 +122,7 @@ function StayStorefront({ data }: { data: StorefrontData }) {
       <div className="mt-8 grid gap-10 sm:grid-cols-2">
         <section>
           <h2 className="km text-sm font-semibold tracking-wide text-label-2">បន្ទប់ និងតម្លៃ</h2>
-          <Services data={data} className="mt-2" />
+          <Items data={data} className="mt-2" />
         </section>
         <section>
           <h2 className="km text-sm font-semibold tracking-wide text-label-2">អំពីកន្លែងស្នាក់នៅ</h2>
@@ -123,7 +155,7 @@ function WorkshopStorefront({ data }: { data: StorefrontData }) {
       </ol>
 
       <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">ការងារ និងតម្លៃ</h2>
-      <Services data={data} className="mt-2" />
+      <Items data={data} className="mt-2" />
       <p className="km mt-8 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
       <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-full bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
       <div className="mt-10"><Hours data={data} /></div>
@@ -139,7 +171,7 @@ function CounterStorefront({ data }: { data: StorefrontData }) {
       <p className="km mt-2 text-[0.9375rem] text-label-2">{data.content.subhead}</p>
 
       <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">មុខម្ហូប និងតម្លៃ</h2>
-      <Services data={data} className="mt-2" />
+      <Items data={data} className="mt-2" />
 
       <div className="mt-8 border-t border-separator pt-6">
         <Hours data={data} />

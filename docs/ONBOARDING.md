@@ -73,7 +73,7 @@ rows are complete.
 | Row | Khmer label | Complete when | Source |
 | --- | --- | --- | --- |
 | 1. Describe | ពិពណ៌នាហាង | `businesses.raw_description` is non-null | `getBusinessById(businessId)` |
-| 2. Catalogue | បញ្ជីសេវា | at least one active service | `hasCatalogue(businessId)` |
+| 2. Catalogue | បញ្ជីអ្វីដែលលក់ | at least one active row in `v_catalog`, service or product | `hasCatalogue(businessId)` |
 | 3. Money | ទទួលប្រាក់តាម KHQR | `businesses.khqr_account_id` is non-null: the shop's own Bakong account is set on `/app/money` | `loadSetupProgress` reads the column |
 | 4. Channel | ភ្ជាប់ Telegram | a `channel_connections` row has `status = 'connected'` | `getChannelConnections(businessId)` |
 | 5. First customer | អតិថិជនដំបូង | at least one booking that reached confirmed or completed, or one paid standalone sale | **not yet written**, see below |

@@ -11,11 +11,9 @@ product scope and build order, `ARCHITECTURE.md` for architectural decisions, an
 `docs/HOMEPAGE.md` for the active homepage UI contract. The former feature, UI, product,
 and Invitation design documents are archived under `docs/archive/`.
 
-The active implementation pass is the owner app as one universal app, per
-`docs/superpowers/specs/2026-09-02-universal-app-design.md` (PLAN.md Phase 10): the
-shop's own Bakong account as the payment rail, the agent's SETUP tools, and one shell
-around every owner screen. It builds on `docs/ONBOARDING.md`. Homepage files stay
-frozen: `src/components/marketing/**`, `src/app/(marketing)/**`, and the two scripted
+The active implementation pass is the product catalogue, per
+`docs/superpowers/specs/2026-09-02-products-photos-menu-design.md` (PLAN.md Phase 11),
+following the universal-app pass in Phase 10. Homepage files stay frozen: `src/components/marketing/**`, `src/app/(marketing)/**`, and the two scripted
 primitives `src/components/primitives/TaskRows.tsx` and
 `src/components/primitives/ThinkingState.tsx` are not modified by this pass.
 
@@ -331,6 +329,19 @@ docs/archive/        historical research, never an implementation source
   the email must be in `waitlist` or manually approved (`approved_at`). The gate is one
   `requireMember()` helper so launch is deleting one call site.
 - Hotels, courts and tailoring jobs need no new tables. Resource plus range covers them.
+- **A catalogue is `v_catalog`, never `services`** (decided 2 September 2026). A cafe has
+  products and no services, so any code asking "does this shop have anything to sell"
+  reads the view. Three places got this wrong at once and all three shipped: the setup
+  spine, the storefront and the `/app` redirect.
+- **`products.photo_path` is a Supabase Storage key, never a URL.** `publicMediaUrl()` in
+  `src/lib/media/storage.ts` is the only function that knows the `shop-media` bucket is
+  public, so if that ever changes, one function changes and no row does.
+- **What a shop sells is `sells` on the business type**, in TypeScript, not a column.
+  `businesses.capabilities` is reserved and deliberately unbuilt.
+- **Image generation needs billing.** Verified 2 September 2026: every Gemini image model
+  the key can see refuses with the free tier's daily per-model quota spent, and the Vercel
+  gateway refuses them on its free tier. The feature ships and reports which refusal it
+  was; upload is the path that always works.
 
 ## Known gaps
 

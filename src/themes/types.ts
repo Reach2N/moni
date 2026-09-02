@@ -1,4 +1,4 @@
-import type { CurrencyCode, StorefrontContent, ThemeId } from '@/lib/types.ts'
+import type { CatalogKind, CurrencyCode, StorefrontContent, ThemeId } from '@/lib/types.ts'
 
 /**
  * Everything a theme is allowed to see. One typed prop, four themes, so a theme
@@ -15,15 +15,28 @@ export type StorefrontData = {
     currency: CurrencyCode
     hours: Array<{ dow: number; open: string; close: string }>
   }
-  services: Array<{
+  /**
+   * What the shop sells, both kinds, from `v_catalog`.
+   *
+   * One array and not two on purpose: two would leave each of the four themes
+   * deciding how to interleave them, and four themes would decide four
+   * different ways. A theme reads `kind` when it wants to draw a menu row
+   * differently from a bookable one.
+   */
+  items: Array<{
     id: string
+    kind: CatalogKind
     name: string
     nameEn: string | null
     description: string | null
     priceMinor: number
     currency: CurrencyCode
-    durationMin: number
+    /** Services only. Null on a product, which takes no time to hand over. */
+    durationMin: number | null
     unit: string
+    category: string | null
+    /** Already a URL. A theme never learns where the bucket is. */
+    photoUrl: string | null
   }>
   content: StorefrontContent
   /** Where the book-or-order action points. Telegram when connected, else the shop's phone. */

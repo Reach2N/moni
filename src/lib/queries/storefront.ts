@@ -1,8 +1,11 @@
 import 'server-only'
 import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
-import type { CurrencyCode, StorefrontContent } from '../types.ts'
+import type { StorefrontContent } from '../types.ts'
+import type { CurrencyCode } from '../types.ts'
 import type { StorefrontData } from '@/themes/types.ts'
+import { listCatalogue } from './catalogue.ts'
+import { publicMediaUrl } from '../media/storage.ts'
 
 /**
  * Everything a public shop site needs, in one read, addressed by slug.
@@ -23,15 +26,11 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
   const business = businessResult.data
   if (!business) return null
 
-  const [storefrontResult, servicesResult, channelResult] = await Promise.all([
+  // The catalogue, not just the services. A cafe's site listed nothing at all
+  // until 2 September 2026, because this read `services` and a cafe has none.
+  const [storefrontResult, items, channelResult] = await Promise.all([
     db.from('storefronts').select('theme, published').eq('id', business.id).maybeSingle(),
-    db
-      .from('services')
-      .select('id, name, name_en, description, price_minor, currency, duration_min, unit')
-      .eq('business_id', business.id)
-      .eq('active', true)
-      .order('sort_order')
-      .order('name'),
+    listCatalogue(business.id),
     db
       .from('channel_connections')
       .select('channel, display_name, status')
@@ -39,7 +38,6 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
       .eq('status', 'connected'),
   ])
   throwIfDbError('load storefront', storefrontResult.error)
-  throwIfDbError('load storefront services', servicesResult.error)
   throwIfDbError('load storefront channels', channelResult.error)
 
   const published = storefrontResult.data?.published as StorefrontContent | null | undefined
@@ -65,15 +63,18 @@ export async function getStorefront(slug: string): Promise<StorefrontData | null
       currency: business.default_currency as CurrencyCode,
       hours: (business.hours as StorefrontData['shop']['hours']) ?? [],
     },
-    services: (servicesResult.data ?? []).map((service) => ({
-      id: service.id,
-      name: service.name,
-      nameEn: service.name_en,
-      description: service.description,
-      priceMinor: service.price_minor,
-      currency: service.currency as CurrencyCode,
-      durationMin: service.duration_min,
-      unit: service.unit,
+    items: items.map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      name: item.name,
+      nameEn: item.name_en,
+      description: item.description,
+      priceMinor: item.price_minor,
+      currency: item.currency as CurrencyCode,
+      durationMin: item.duration_min,
+      unit: item.unit,
+      category: item.category,
+      photoUrl: publicMediaUrl(item.photo_path),
     })),
     content: published,
     action,

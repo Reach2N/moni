@@ -564,6 +564,51 @@ Design: `docs/superpowers/specs/2026-09-02-universal-app-design.md`. Shipped 2 S
   proved in `db/test.mjs` and `scripts/setup-progress-test.mjs`; the phone run needs the
   keys listed in section 7.
 
+### Phase 11: Products, photos, and the menu
+
+Design: `docs/superpowers/specs/2026-09-02-products-photos-menu-design.md`. Plan:
+`docs/superpowers/plans/2026-09-02-products-photos-menu.md`. Shipped 2 September 2026,
+32 new assertions in `npm run db:test` (321 passing).
+
+- **A cafe could not be modelled**, and that was the bug. The parse correctly answers
+  `business_type: cafe`, and then every consumer downstream read `services`: the setup
+  spine's catalogue row could never complete, the storefront listed nothing, the customer
+  agent said the shop offered nothing, and `/app` redirected a shop with a full menu back
+  to onboarding on every visit.
+- **`v_catalog`** unions services and products into one shape (ARCHITECTURE.md section 5).
+  Every read of what a shop sells goes through it and every write goes to the table that
+  owns the row, so no consumer branches on business type: the branch is where a cafe gets
+  forgotten. `products` gains `category`, `photo_path` and `photo_alt`, migration
+  `20260902140000_product_catalogue`.
+- **What a shop sells is `sells` on the 42 business types**, in TypeScript per hard rule 5,
+  not a column. `businesses.capabilities` stays reserved rather than shipped for a
+  hypothetical. No current type is `goods` because the taxonomy has no pure retail entry,
+  which is why `other` sells both.
+- **Photos** live in a public `shop-media` Supabase Storage bucket, keyed
+  `{business}/{product}/{uuid}.{ext}` so one shop is one prefix. Upload takes raw bytes
+  like `/api/transcribe`; the rules (three types, six megabytes, a refused missing content
+  type) are pure and asserted because they decide what reaches a public bucket. The row's
+  pointer moves before the old file is dropped.
+- **Generation is offered and allowed to be refused.** Verified against the live key: six
+  image models are visible and every one answers 429 with the free tier's daily per-model
+  quota spent, and the gateway refuses them outright. So the refusal is a result carrying
+  one of four reasons, each with its own status and its own Khmer sentence, because the
+  owner's next move differs: enable billing, wait, retry, or photograph it herself. No job
+  queue was built for a capability that cannot currently run once.
+- **The tools**: `create_product`, `create_products_bulk`, `update_product`,
+  `generate_product_photo` and `search_catalogue` on the owner agent; `search_catalogue`
+  and a catalogue-returning `get_business` on the customer agent, every entry flagged
+  bookable so the model never offers a time for a cup of coffee.
+- **`customerTools()` gained the `satisfies` guard** the owner set got in Phase 10, and it
+  immediately found the same class of drift: `reschedule_booking` was declared from the
+  beginning and never built. Removed rather than invented; a customer moving a booking is
+  served today by cancel plus rebook, or by escalation. Worth building deliberately later.
+- **`/app/products`** is the seventh destination in the shell. The component search found
+  no fit and the gap is recorded in `CREDITS.md` as the sourcing rule requires.
+- Acceptance: a cafe can be described, given a menu with photos, and that menu appears on
+  its own address. Proved so far in `db/test.mjs` and the pure suites; the live run needs
+  the Supabase keys, and generation needs billing enabled.
+
 ### Explicit room left, not built now
 
 Four items moved INTO scope and are now phases 7 and 8: payment

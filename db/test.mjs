@@ -1205,6 +1205,19 @@ eq('and the file keeps its extension', photoKey.endsWith('.webp'), true)
 eq('two uploads for the same product get different keys',
   photoKey === storageKey(B_SALON, 'e2000000-0000-4000-8000-000000000001', 'webp'), false)
 
+console.log('\nthe shop site shows what the shop sells')
+// getStorefront is a query rather than a pure function, so what is asserted here
+// is the contract it now depends on: the view answers for a shop with NO
+// services, which is the whole cafe case, and it carries the photo key the
+// theme turns into a URL.
+const cafeSite = await db.query(
+  `select kind, name, photo_path, category from v_catalog where business_id = '${B_CAFE}' and active`)
+eq('a cafe site has rows to render', cafeSite.rows.length > 0, true)
+eq('and every one of them is a product', cafeSite.rows.every((r) => r.kind === 'product'), true)
+// A menu must read correctly for a shop that uploaded nothing, so a null photo
+// is a normal row and never a broken image.
+eq('a product with no photo is still a row', cafeSite.rows.every((r) => 'photo_path' in r), true)
+
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
 process.exit(fail === 0 ? 0 : 1)
