@@ -7,6 +7,7 @@ import { RightRail } from '@/components/app/right-rail.tsx'
 import { ShopSignals } from '@/components/app/shop-signals.tsx'
 import { Takings } from '@/components/app/takings.tsx'
 import { setupComplete } from '@/lib/queries/setup-progress.ts'
+import { sellsFor } from '@/lib/types.ts'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,7 +66,10 @@ export default async function OwnerCommandCentre() {
           </div>
 
           <div className="order-2 xl:order-none xl:col-start-1 xl:row-start-1">
-            <AskMoni sampleCode={snapshot.today.bookings[0]?.code ?? null} />
+            <AskMoni
+              sampleCode={snapshot.today.bookings[0]?.code ?? null}
+              sells={sellsFor(snapshot.business.businessType)}
+            />
           </div>
 
           <div className="order-3 xl:order-none xl:col-start-1 xl:row-start-2">

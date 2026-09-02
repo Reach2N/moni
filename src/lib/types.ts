@@ -525,6 +525,9 @@ export const OWNER_TOOLS = [
   'adjust_prices',
   'create_resource',
   'create_resources_bulk', // "I have 40 rooms": one call, not forty
+  'create_product',
+  'create_products_bulk', // "here is my menu": one call, not fifteen
+  'update_product',
   'set_hours',
   'add_closure',
   // PLAN
@@ -532,6 +535,7 @@ export const OWNER_TOOLS = [
   'get_week_plan',
   'get_money_owed',
   'get_service_performance',
+  'search_catalogue',      // services and products together, by name
   // OPERATE
   'mark_booking',          // completed / no_show / cancelled
   'record_manual_payment', // cash and walk-ins

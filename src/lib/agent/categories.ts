@@ -28,6 +28,8 @@ export const ASK_CATEGORIES = [
       'ដំឡើងតម្លៃលាបសក់ ៥០០០៛',
       'ខ្ញុំមានបន្ទប់ ១០១ ដល់ ១២០',
       'បិទថ្ងៃអាទិត្យ',
+      'បន្ថែមម៉ឺនុយ៖ កាហ្វេទឹកកក ៥០០០៛ តែជូរ ៤០០០៛',
+      'ដំឡើងតម្លៃកាហ្វេទៅ ៦០០០៛',
     ],
   },
   {
@@ -51,6 +53,19 @@ export const ASK_CATEGORIES = [
     ],
   },
 ] as const
+
+/**
+ * The organize pair, chosen by what the shop actually sells.
+ *
+ * A cafe owner shown "add a children's haircut" is being taught the wrong verb
+ * for her shop, which is the same failure as the seeded booking codes below: a
+ * starting point that does not fit is worse than an empty box.
+ */
+export function organizeExamples(sells: 'time' | 'goods' | 'both'): readonly [string, string] {
+  const organize = ASK_CATEGORIES[1].examples
+  if (sells === 'time') return [organize[1], organize[3]]
+  return [organize[4], organize[5]]
+}
 
 /**
  * The two operate chips used to read `MN7Q1A បានមកហើយ` and `MN9X5C មិនបានមក`.

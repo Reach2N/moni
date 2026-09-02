@@ -7,6 +7,8 @@ import { expandResourceRange, formatMoney, type CurrencyCode, type OwnerTool } f
 import { cambodiaDate, cambodiaDayBounds } from '../time/cambodia.ts'
 import { confirmPayment } from '../payments/confirm.ts'
 import { getPaymentSettings, PaymentAccountError, setPaymentAccount } from '../payments/account.ts'
+import { createProduct, createProductsBulk, ProductError, updateProduct } from '../products/write.ts'
+import { listCatalogue } from '../queries/catalogue.ts'
 import { generateShopSiteDraft, publishShopSite } from '../storefront/generate.ts'
 import { getStorefrontRow } from '../queries/storefront.ts'
 import { loadSetupProgress } from '../queries/setup.ts'
@@ -221,6 +223,82 @@ export function ownerTools(businessId: string) {
       },
     }),
 
+    create_product: tool({
+      description:
+        'ORGANIZE. Add one thing the shop SELLS rather than does: a drink, a dish, a part, a bottle of shampoo. Use create_service instead for work that takes time and gets booked, like a haircut.',
+      inputSchema: z.object({
+        name: z.string().describe("in the owner's own words, Khmer is fine"),
+        name_en: z.string().nullable().optional(),
+        price_minor: z.number().int().min(0).describe('minor units. 5000 means 5,000 riel. Use 0 when she has not said a price'),
+        currency: z.enum(['KHR', 'USD']).default('KHR'),
+        category: z.string().nullable().optional().describe('the menu grouping in her words, such as ភេសជ្ជៈ, or null'),
+        stock: z.number().int().min(0).nullable().optional().describe('leave null unless she actually counts this item'),
+      }),
+      execute: async ({ name, name_en, price_minor, currency, category, stock }) => {
+        try {
+          const product = await createProduct(businessId, { name, name_en, price_minor, currency, category, stock })
+          return { added: product.name, id: product.id }
+        } catch (error) {
+          if (error instanceof ProductError) return { error: error.message }
+          throw error
+        }
+      },
+    }),
+
+    create_products_bulk: tool({
+      description:
+        'ORGANIZE. Add a whole menu or price list at once. Use this whenever the owner lists several things in one message, so a fifteen item menu is one call and not fifteen.',
+      inputSchema: z.object({
+        items: z
+          .array(
+            z.object({
+              name: z.string(),
+              price_minor: z.number().int().min(0),
+              category: z.string().nullable().optional(),
+            }),
+          )
+          .min(1)
+          .max(100),
+        currency: z.enum(['KHR', 'USD']).default('KHR'),
+      }),
+      execute: async ({ items, currency }) => {
+        try {
+          const added = await createProductsBulk(businessId, items.map((item) => ({ ...item, currency })))
+          return { added: added.length, names: added.map((row) => row.name) }
+        } catch (error) {
+          if (error instanceof ProductError) return { error: error.message }
+          throw error
+        }
+      },
+    }),
+
+    update_product: tool({
+      description:
+        'ORGANIZE. Change a product price, name, category or stock, or take it off the menu with active false. Find its id with search_catalogue first.',
+      inputSchema: z.object({
+        product_id: z.string().uuid(),
+        name: z.string().nullable().optional(),
+        price_minor: z.number().int().min(0).nullable().optional(),
+        category: z.string().nullable().optional(),
+        stock: z.number().int().min(0).nullable().optional(),
+        active: z.boolean().nullable().optional(),
+      }),
+      execute: async ({ product_id, name, price_minor, category, stock, active }) => {
+        const patch: Parameters<typeof updateProduct>[2] = {}
+        if (name != null) patch.name = name
+        if (price_minor != null) patch.price_minor = price_minor
+        if (category !== undefined) patch.category = category
+        if (stock !== undefined) patch.stock = stock
+        if (active != null) patch.active = active
+        try {
+          return await updateProduct(businessId, product_id, patch)
+        } catch (error) {
+          if (error instanceof ProductError) return { error: error.message }
+          throw error
+        }
+      },
+    }),
+
     set_hours: tool({
       description:
         'ORGANIZE. Set the weekly opening hours. Give every day the shop is OPEN. Any day left out is treated as closed.',
@@ -398,6 +476,26 @@ export function ownerTools(businessId: string) {
             }))
             .sort((a, b) => b.bookings - a.bookings),
           note: 'per_hour is what the shop earns for each hour of chair time, which is the number that matters when a day is full',
+        }
+      },
+    }),
+
+    search_catalogue: tool({
+      description:
+        'PLAN. Find what the shop sells, services and products together, by name. Use it before changing something so you have its id, and to answer "do we sell X".',
+      inputSchema: z.object({ query: z.string().trim().max(80).describe('part of a name, or empty for everything') }),
+      execute: async ({ query }) => {
+        const items = await listCatalogue(businessId, { search: query })
+        return {
+          found: items.length,
+          items: items.map((item) => ({
+            id: item.id,
+            kind: item.kind,
+            name: item.name,
+            price: formatMoney(item.price_minor, item.currency as CurrencyCode),
+            category: item.category,
+            stock: item.stock,
+          })),
         }
       },
     }),

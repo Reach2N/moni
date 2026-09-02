@@ -17,8 +17,9 @@ import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsx'
-import { ASK_CATEGORIES, operateExamples } from '@/lib/agent/categories.ts'
+import { ASK_CATEGORIES, organizeExamples, operateExamples } from '@/lib/agent/categories.ts'
 import { RECEIPT_EVENT, type MoniReceiptEvent } from '@/lib/moni-events.ts'
+import type { Sells } from '@/lib/types.ts'
 import { toKhmerDigits } from './dashboard-format.ts'
 import { Panel, PanelHeader } from './panel.tsx'
 import {
@@ -50,10 +51,10 @@ const CATEGORY_LOADING: Record<CategoryId, string> = {
  * belonging to THIS shop, because the pair it replaced was built from the seed
  * fixtures: see `operateExamples` in lib/agent/categories.ts.
  */
-function categoryExamples(bookingCode: string | null): Record<CategoryId, readonly string[]> {
+function categoryExamples(bookingCode: string | null, sells: Sells): Record<CategoryId, readonly string[]> {
   return {
     setup: [ASK_CATEGORIES[0].examples[0], ASK_CATEGORIES[0].examples[2]],
-    organize: [ASK_CATEGORIES[1].examples[1], ASK_CATEGORIES[1].examples[3]],
+    organize: organizeExamples(sells),
     plan: [ASK_CATEGORIES[2].examples[0], ASK_CATEGORIES[2].examples[2]],
     operate: operateExamples(bookingCode),
   }
@@ -256,7 +257,7 @@ function wait(duration: number) {
  * Clerk session, so this component no longer names one: a component that can
  * name a tenant is a component that can be made to name the wrong one.
  */
-export function AskMoni({ sampleCode = null }: { sampleCode?: string | null }) {
+export function AskMoni({ sampleCode = null, sells = 'both' }: { sampleCode?: string | null; sells?: Sells }) {
   const router = useRouter()
   const reduceMotion = useReducedMotion()
   const [category, setCategory] = useState<CategoryId>('plan')
@@ -269,7 +270,7 @@ export function AskMoni({ sampleCode = null }: { sampleCode?: string | null }) {
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null)
 
   const busy = state === 'working' || state === 'steps'
-  const examples = useMemo(() => categoryExamples(sampleCode), [sampleCode])
+  const examples = useMemo(() => categoryExamples(sampleCode, sells), [sampleCode, sells])
   const empty = text.trim().length === 0
   const firstExample = examples[category][0] ?? ''
   const traceSteps: OwnerToolTraceStep[] = steps.map((step, index) => ({
