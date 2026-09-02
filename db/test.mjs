@@ -1532,6 +1532,16 @@ eq('past the range is refused', isSeed(2147483648), false)
 eq('a string is refused', isSeed('12345'), false)
 eq('NaN is refused', isSeed(NaN), false)
 
+console.log('\nthe owner learns what is missing before her customers do')
+// She should find out on her own products screen, not by looking at her
+// published site and noticing the pattern tiles.
+// This is expected to pass today: photo_path already exists. The point of
+// pinning it here is that a later schema edit which drops or renames that
+// column fails this assertion loudly, instead of silently emptying the
+// owner's products-page prompt.
+const missing = await one(db, `select count(*) c from products where business_id = '${B_CAFE}' and active and photo_path is null`)
+eq('the count of photoless items is answerable in one query', Number.isInteger(Number(missing.c)), true)
+
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
 process.exit(fail === 0 ? 0 : 1)
