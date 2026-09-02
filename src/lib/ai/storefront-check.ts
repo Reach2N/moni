@@ -5,7 +5,7 @@
  * `db/test.mjs` can prove it. These are the rules that keep a real business's
  * public page honest, and a rule nothing tests is a comment.
  */
-import type { StorefrontContent } from '../types.ts'
+import { WARMTHS, VOICES, DENSITIES, type StorefrontContent } from '../types.ts'
 
 export type StorefrontWarning = { field: string; issue: string }
 
@@ -36,6 +36,19 @@ export function sanityCheck(content: StorefrontContent, shopName: string): Store
     if (/\b(best|number one|award|5 star|five star|guarantee)\b/i.test(value)) {
       warnings.push({ field, issue: 'makes a claim the owner did not make' })
     }
+  }
+
+  // A vibe is the one field here that becomes colour rather than words, so a
+  // missing or invented one is caught with the same seriousness as an invented
+  // claim: both reach a real shop's public site.
+  const vibe = (content as { vibe?: { warmth?: string; voice?: string; density?: string } }).vibe
+  const vibeOk =
+    !!vibe &&
+    (WARMTHS as readonly string[]).includes(vibe.warmth ?? '') &&
+    (VOICES as readonly string[]).includes(vibe.voice ?? '') &&
+    (DENSITIES as readonly string[]).includes(vibe.density ?? '')
+  if (!vibeOk) {
+    warnings.push({ field: 'vibe', issue: 'no usable vibe was chosen, so the site will fall back to the quiet default' })
   }
 
   const unique = new Set(content.highlights.map((line) => line.trim().toLowerCase()))

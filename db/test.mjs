@@ -724,7 +724,8 @@ eq('and the host is matched case insensitively', shopSlugFromHost('Sokha-Beauty.
 
 console.log('\ngenerated site copy')
 const goodCopy = {
-  theme: 'salon', headline: 'កាត់សក់នៅតាកែវ', subhead: 'បើករាល់ថ្ងៃ លើកលែងថ្ងៃអាទិត្យ',
+  theme: 'salon', vibe: { warmth: 'warm', voice: 'crafted', density: 'standard' },
+  headline: 'កាត់សក់នៅតាកែវ', subhead: 'បើករាល់ថ្ងៃ លើកលែងថ្ងៃអាទិត្យ',
   about: 'ហាងកាត់សក់តូចមួយនៅតាកែវ មានបុគ្គលិកពីរនាក់។ យើងទទួលកក់ម៉ោងតាម Telegram។',
   highlights: ['បុគ្គលិកពីរនាក់', 'កក់តាម Telegram'], callToAction: 'កក់ម៉ោង', notice: null,
 }
@@ -1344,6 +1345,18 @@ eq('all four are distinct', new Set(cands).size, 4)
 eq('and none is the seed she already has', cands.includes(777), false)
 eq('every candidate is a valid 31 bit seed', cands.every((s) => Number.isInteger(s) && s >= 0 && s <= 2147483647), true)
 eq('the shuffle is reproducible from its input', JSON.stringify(candidateSeeds(777, 4)), JSON.stringify(cands))
+
+console.log('\nthe vibe comes from the owner\'s own words')
+// sanityCheck is what stands between a generation and a real shop's site. It
+// already catches markup, a price in prose and an invented claim. A vibe that
+// is missing or nonsense is the same kind of defect and gets caught the same
+// way, before the owner can publish it.
+const noVibe = sanityCheck({ theme: 'counter', headline: 'Good coffee', subhead: 'Open early every day', about: 'A small cafe run by one family since the shop opened.', highlights: ['Open Saturday', 'Two staff'], callToAction: 'Order', notice: null }, 'Sok Cafe')
+eq('a generation with no vibe is flagged', noVibe.some((w) => w.field === 'vibe'), true)
+const badVibe = sanityCheck({ theme: 'counter', vibe: { warmth: 'purple', voice: 'plain', density: 'airy' }, headline: 'Good coffee', subhead: 'Open early every day', about: 'A small cafe run by one family since the shop opened.', highlights: ['Open Saturday', 'Two staff'], callToAction: 'Order', notice: null }, 'Sok Cafe')
+eq('a vibe outside the taxonomy is flagged', badVibe.some((w) => w.field === 'vibe'), true)
+const goodVibe = sanityCheck({ theme: 'counter', vibe: { warmth: 'warm', voice: 'plain', density: 'airy' }, headline: 'Good coffee', subhead: 'Open early every day', about: 'A small cafe run by one family since the shop opened.', highlights: ['Open Saturday', 'Two staff'], callToAction: 'Order', notice: null }, 'Sok Cafe')
+eq('a stated vibe passes', goodVibe.some((w) => w.field === 'vibe'), false)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

@@ -12,7 +12,7 @@
  */
 import { Output, generateText } from 'ai'
 import { z } from 'zod'
-import { THEMES, type StorefrontContent, type ThemeId } from '@/lib/types.ts'
+import { THEMES, WARMTHS, VOICES, DENSITIES, type StorefrontContent, type ThemeId } from '@/lib/types.ts'
 import { costMicroUsd, withFallback } from './models.ts'
 import { sanityCheck, type StorefrontWarning } from './storefront-check.ts'
 
@@ -20,6 +20,13 @@ const THEME_IDS = THEMES.map((theme) => theme.id) as [ThemeId, ...ThemeId[]]
 
 export const StorefrontSchema = z.object({
   theme: z.enum(THEME_IDS).describe('closest match for how this shop actually works'),
+  vibe: z
+    .object({
+      warmth: z.enum(WARMTHS).describe('warm for wood, food, family. cool for clinical, technical, modern. neutral if the description says neither'),
+      voice: z.enum(VOICES).describe('plain for a quiet practical shop, crafted for one that takes pride in how it looks, bright for one aimed at a young crowd'),
+      density: z.enum(DENSITIES).describe('airy for a short menu or a calm place, compact for a long menu or a busy one, standard otherwise'),
+    })
+    .describe("how the shop feels, read from the owner's own words and never guessed from the business type alone"),
   headline: z.string().min(3).max(70).describe("the shop's promise in one line, in the owner's language"),
   subhead: z.string().min(10).max(160),
   about: z.string().min(20).max(600).describe('two or three sentences, from the description only'),
@@ -40,7 +47,9 @@ Rules:
 - notice is null unless the owner stated something time bound, like a closure.
 - Never write an em dash. Use a comma or a full stop.
 
-Choose the theme by how the business runs: salon for services on a chair, stay for rooms by the night, workshop for jobs left and collected, counter for walk in ordering.`
+Choose the theme by how the business runs: salon for services on a chair, stay for rooms by the night, workshop for jobs left and collected, counter for walk in ordering.
+
+Also choose a vibe. It is read from what the owner actually wrote, not from the kind of business: a plain, practical description gets a plain voice even if the shop is a beauty salon. If her words give you nothing to go on, answer neutral, plain, standard rather than inventing a mood she never expressed.`
 
 /** Re-exported from a module with no AI SDK import, so db/test.mjs can prove it. */
 export { sanityCheck }
