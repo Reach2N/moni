@@ -66,16 +66,17 @@ theme layer, introduces no new palette, and does not edit `foundation.css`.
 
 ## The setup spine
 
-A four-row checklist, rendered by a prop-driven Task Rows variant. It appears at the top of
-`/app/onboarding` and again on `/app`, and it stops rendering permanently once all four
+A five-row checklist, rendered by a prop-driven Task Rows variant. It appears at the top of
+`/app/onboarding` and again on `/app`, and it stops rendering permanently once all five
 rows are complete.
 
 | Row | Khmer label | Complete when | Source |
 | --- | --- | --- | --- |
 | 1. Describe | ពិពណ៌នាហាង | `businesses.raw_description` is non-null | `getBusinessById(businessId)` |
 | 2. Catalogue | បញ្ជីសេវា | at least one active service | `hasCatalogue(businessId)` |
-| 3. Channel | ភ្ជាប់ Telegram | a `channel_connections` row has `status = 'connected'` | `getChannelConnections(businessId)` |
-| 4. First customer | អតិថិជនដំបូង | at least one booking that reached confirmed or completed, or one paid standalone sale | **not yet written**, see below |
+| 3. Money | ទទួលប្រាក់តាម KHQR | `businesses.khqr_account_id` is non-null: the shop's own Bakong account is set on `/app/money` | `loadSetupProgress` reads the column |
+| 4. Channel | ភ្ជាប់ Telegram | a `channel_connections` row has `status = 'connected'` | `getChannelConnections(businessId)` |
+| 5. First customer | អតិថិជនដំបូង | at least one booking that reached confirmed or completed, or one paid standalone sale | **not yet written**, see below |
 
 Rows 1 to 3 are already served by existing queries in `src/lib/queries/business.ts`. No new
 data code is needed for them.
@@ -230,9 +231,17 @@ Review the captures for:
 - Khmer labels are readable with `line-height: 1.75` and no tracking.
 - The marketing captures are unchanged, which is the evidence the fork held.
 
+## The money row, added 2 September 2026
+
+Row 3 sits before the channel on purpose: a shop that answers on Telegram but has no
+account to be paid into has a customer at the counter with nowhere to send money. It is
+complete when the owner has pasted her own Bakong account on `/app/money`, and the owner
+agent reads the same rule through `report_setup_status`. The design is
+`docs/superpowers/specs/2026-09-02-universal-app-design.md`.
+
 ## Current implementation state
 
-`/app/onboarding` renders the four-row setup spine through
+`/app/onboarding` renders the five-row setup spine through
 `src/components/agent/setup-tasks.tsx`, a prop-driven fork of Beautiful UI's Task
 Rows, fed by `loadSetupProgress()` over the pure rules in
 `src/lib/queries/setup-progress.ts`. `ShopSetup` keeps its original state machine

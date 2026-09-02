@@ -7,6 +7,19 @@
  */
 export const ASK_CATEGORIES = [
   {
+    // First, because a new shop's first question is "what now". The rows of
+    // the setup spine are the answer, and the agent reads the same rules.
+    id: 'setup',
+    km: 'ចាប់ផ្តើម',
+    en: 'Set up',
+    examples: [
+      'នៅសល់អ្វីខ្លះមុនហាងដំណើរការ?',
+      'គណនី Bakong របស់ខ្ញុំគឺ sokha@wing',
+      'សរសេរគេហទំព័រហាងឱ្យខ្ញុំ',
+      'ផ្សាយគេហទំព័រហាង',
+    ],
+  },
+  {
     id: 'organize',
     km: 'រៀបចំ',
     en: 'Organize',

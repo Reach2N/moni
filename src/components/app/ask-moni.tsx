@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   CalendarRange,
   Bot,
+  ListChecks,
   TriangleAlert,
   Settings2,
   Store,
@@ -31,12 +32,14 @@ type ApiStep = { tool: string; args: unknown; result: unknown }
 type WorkState = 'idle' | 'working' | 'steps' | 'receipt' | 'error'
 
 const CATEGORY_ICON = {
+  setup: ListChecks,
   organize: Settings2,
   plan: CalendarRange,
   operate: Store,
 } satisfies Record<CategoryId, typeof Settings2>
 
 const CATEGORY_LOADING: Record<CategoryId, string> = {
+  setup: 'Moni កំពុងពិនិត្យអ្វីដែលហាងត្រូវការ…',
   organize: 'Moni កំពុងរៀបចំហាងតាមសំណើនេះ…',
   plan: 'Moni កំពុងគ្រោងផែនការពីទិន្នន័យហាង…',
   operate: 'Moni កំពុងធ្វើការងារនេះក្នុងហាង…',
@@ -49,8 +52,9 @@ const CATEGORY_LOADING: Record<CategoryId, string> = {
  */
 function categoryExamples(bookingCode: string | null): Record<CategoryId, readonly string[]> {
   return {
-    organize: [ASK_CATEGORIES[0].examples[1], ASK_CATEGORIES[0].examples[3]],
-    plan: [ASK_CATEGORIES[1].examples[0], ASK_CATEGORIES[1].examples[2]],
+    setup: [ASK_CATEGORIES[0].examples[0], ASK_CATEGORIES[0].examples[2]],
+    organize: [ASK_CATEGORIES[1].examples[1], ASK_CATEGORIES[1].examples[3]],
+    plan: [ASK_CATEGORIES[2].examples[0], ASK_CATEGORIES[2].examples[2]],
     operate: operateExamples(bookingCode),
   }
 }
@@ -188,6 +192,56 @@ function ownerStep(step: ApiStep): OwnerStep {
         details: [],
         failed: false,
       }
+    case 'confirm_payment': {
+      const code = String(result.code ?? '')
+      if (result.outcome === 'confirmed') {
+        return {
+          title: `បានបញ្ជាក់ប្រាក់ ${toKhmerDigits(String(result.amount ?? ''))} សម្រាប់ ${code}`,
+          details: [result.customer_told ? 'បានប្រាប់អតិថិជនរួច' : 'មិនអាចប្រាប់អតិថិជនបានទេ'],
+          failed: false,
+          bookingCode: code,
+        }
+      }
+      if (result.outcome === 'already_paid') {
+        return { title: `${code} បានបញ្ជាក់រួចហើយ`, details: [], failed: false, bookingCode: code }
+      }
+      return { title: `រកមិនឃើញការទូទាត់សម្រាប់ ${code}`, details: [], failed: true }
+    }
+    case 'report_setup_status': {
+      const rows = Array.isArray(result.steps) ? result.steps.map(record) : []
+      const STATE: Record<string, string> = { done: 'រួច', pending: 'មិនទាន់', failed: 'ដាច់' }
+      return {
+        title: result.complete ? 'ហាងរួចរាល់ដំណើរការ' : 'នៅសល់ជំហានរៀបចំ',
+        details: rows.map((row) => `${String(row.step ?? '')}: ${STATE[String(row.state ?? '')] ?? String(row.state ?? '')}`),
+        failed: false,
+      }
+    }
+    case 'set_payment_account': {
+      const saved = record(result.saved)
+      return {
+        title: `បានកំណត់គណនី Bakong ${String(saved.accountId ?? '')}`,
+        details: [`ឈ្មោះលើ QR: ${String(saved.merchantName ?? '')}`],
+        failed: false,
+      }
+    }
+    case 'generate_shop_site': {
+      const warnings = Array.isArray(result.warnings) ? result.warnings.map(record) : []
+      return {
+        title: 'បានសរសេរសេចក្តីព្រាងគេហទំព័រ',
+        details: [
+          `ចំណងជើង: ${String(result.headline ?? '')}`,
+          ...warnings.slice(0, 3).map((warning) => `ត្រូវពិនិត្យ: ${String(warning.issue ?? '')}`),
+          'មិនទាន់ផ្សាយ។ ពិនិត្យនៅ គេហទំព័រហាង',
+        ],
+        failed: false,
+      }
+    }
+    case 'publish_shop_site':
+      return {
+        title: 'បានផ្សាយគេហទំព័រហាង',
+        details: [String(result.address ?? result.path ?? '')].filter(Boolean),
+        failed: false,
+      }
     default:
       return { title: 'Moni បានពិនិត្យ និងធ្វើការងារ', details: [], failed: false }
   }
@@ -300,7 +354,7 @@ export function AskMoni({ sampleCode = null }: { sampleCode?: string | null }) {
       />
 
       <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryId)} className="gap-0">
-        <TabsList variant="line" aria-label="ប្រភេទការងារ" className="relative grid h-11 w-full grid-cols-3 gap-0 rounded-none border-b border-hairline p-0">
+        <TabsList variant="line" aria-label="ប្រភេទការងារ" className="relative grid h-11 w-full grid-cols-4 gap-0 rounded-none border-b border-hairline p-0">
           {ASK_CATEGORIES.map((item) => {
             const Icon = CATEGORY_ICON[item.id]
             return (

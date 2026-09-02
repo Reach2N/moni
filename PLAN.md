@@ -525,6 +525,45 @@ Small, cheap, and painful if discovered late. Detail in ARCHITECTURE.md section 
 - Acceptance: a reminder arrives one hour before a booking; a synthetic runaway
   conversation is cut off by the cost cap rather than by the bill.
 
+### Phase 10: One universal app, the shop's own money, and an agent that runs setup
+
+Design: `docs/superpowers/specs/2026-09-02-universal-app-design.md`. Shipped 2 September
+2026, 26 new assertions in `npm run db:test` (289 passing).
+
+- **Money is the shop's.** `businesses` gains `khqr_account_id`, `khqr_merchant_name` and
+  `khqr_merchant_city` (`types.ts` first, migration `20260902120000_shop_payment_account`).
+  `src/lib/payments/shop-khqr.ts` is the rail: the KHQR is built offline into the shop's
+  own Bakong account, both currencies, and `railsFor(currency, account)` puts it ahead of
+  the platform CutLuy token, which stays only as a demo and webhook safety net.
+  Verification is the owner's own banking app: the rail is `pollBased: false`, the cron
+  poller skips it, and `confirm_payment` (an owner tool, an inbox button, and
+  `POST /api/payments/confirm`) is the one place a row goes pending to paid, idempotent,
+  confirming the booking and telling the customer in the same step.
+- **The QR reaches the customer.** Until now `create_payment` stored a payload nobody
+  delivered. Telegram now gets the code as a photo (`sendPhoto`, uploaded bytes), Messenger
+  as an image attachment by URL (`/api/pay/{code}?format=png`, text fallback off a laptop),
+  and the web chat draws `/api/pay/{code}` inline. The customer prompt says how to talk
+  about paying and never to call a payment received without proof.
+- **`/app/money`**: paste the account, scan your own test card (`/api/money/test-card`,
+  1,000 riel or 25 cents, reference TEST, never a payment row). The setup spine gains a
+  money row before the channel row, so setup cannot complete for a shop that cannot be
+  paid.
+- **The agent runs setup.** A SETUP group on the owner agent: `report_setup_status`,
+  `set_payment_account`, `generate_shop_site`, `publish_shop_site`, sharing
+  `src/lib/storefront/generate.ts` with `/api/storefront`. `ownerTools()` is typed
+  `satisfies Record<OwnerTool, Tool>` (guardrail G3), which is what caught three tools
+  declared and never built. The token rule stands: the agent sends her to `/app/channels`
+  and never asks for a BotFather token in chat.
+- **One shell.** `AppShell` wraps every owner screen: a six-entry rail on a desk (home,
+  inbox, calendar, site, channels, money), a three-tab bar plus a "more" sheet on a phone,
+  active state from the route. The "back to dashboard" links are gone with the reason for
+  them.
+- Acceptance: an owner pastes her Bakong id, scans her own test card and sees her account
+  name in her banking app; a Telegram customer receives a QR as a picture; the owner
+  confirms from the thread and the customer is told. The pure and structural halves are
+  proved in `db/test.mjs` and `scripts/setup-progress-test.mjs`; the phone run needs the
+  keys listed in section 7.
+
 ### Explicit room left, not built now
 
 Four items moved INTO scope and are now phases 7 and 8: payment

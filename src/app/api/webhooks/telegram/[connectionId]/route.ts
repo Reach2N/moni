@@ -5,6 +5,7 @@ import { isDatabaseConflict, throwIfDbError } from '@/lib/db-result.ts'
 import type { Json } from '@/lib/database.types.ts'
 import { decryptSecret, secretsMatch } from '@/lib/crypto/secrets.ts'
 import { extractIncoming, sendReply } from '@/lib/channels/telegram.ts'
+import { deliverPaymentCard, paymentCodesIn } from '@/lib/channels/deliver.ts'
 import { handleCustomerMessage, scopedExternalId } from '@/lib/agent/customer-loop.ts'
 import { inboundMessageLimiter } from '@/lib/ops/rate-limit.ts'
 import { getBusinessById } from '@/lib/queries/business.ts'
@@ -139,6 +140,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ connect
 
     if (turn.text) {
       await sendReply(decryptSecret(connection.token_ciphertext), incoming.chatId, turn.text)
+    }
+
+    // The QR as a picture, after the words. A failure here is logged, not
+    // thrown: the booking and the reply already happened, and a non-2xx would
+    // only make Telegram redeliver a turn that must not run twice.
+    for (const code of paymentCodesIn(turn.toolCalls)) {
+      try {
+        const card = await deliverPaymentCard({ businessId: business.id, customerId: turn.customerId, channel: 'telegram', code })
+        if (!card.delivered) console.warn(`[telegram] QR for ${code} not delivered: ${card.reason}`)
+      } catch (error) {
+        console.error(`[telegram] QR for ${code} failed:`, error instanceof Error ? error.message : error)
+      }
     }
 
     await settle('processed')

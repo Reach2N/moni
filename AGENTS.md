@@ -1,21 +1,21 @@
 ---
 project: Moni
 status: active
-current_surface: marketing-homepage
-current_phase: homepage-first
+current_surface: owner-app
+current_phase: universal-app
 current_theme: light-only
-current_task_mode: documentation-only
+current_task_mode: implementation
 ---
 
 # Moni agent instructions
 
 This is the active instruction file for coding agents working in the repository. Read it
-before changing code. The current work is defining the public marketing homepage at `/`.
-The current task mode is **documentation-only** for this repository request: do not modify
-`src/`, CSS, components, routes, package files, tests, or screenshots. Do not install packages
-or make frontend changes. This restriction remains in force unless the user explicitly changes
-the request. Do not start dashboard, storefront, Messenger, payments, or other later-phase
-work.
+before changing code. The current work is the gated owner app as one universal app, per
+`docs/superpowers/specs/2026-09-02-universal-app-design.md` and PLAN.md Phase 10: the
+shop's own Bakong account as the payment rail, the owner agent's SETUP tools, and one
+shell around every owner screen. The homepage sections below remain the frozen contract
+for `/`; do not modify `src/components/marketing/**`, `src/app/(marketing)/**`, or the two
+scripted primitives while working on the owner app.
 
 ## Authority and document map
 

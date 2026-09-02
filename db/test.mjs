@@ -28,6 +28,8 @@ import { createRateLimiter } from '../src/lib/ops/rate-limit.ts'
 import { shopSlugFromHost } from '../src/lib/hosting/subdomain.ts'
 import { sanityCheck } from '../src/lib/ai/storefront-check.ts'
 import { buildKhqrPayload, crc16, amountField, khqrMd5 } from '../src/lib/khqr/payload.ts'
+import { shopKhqrRail, isPollable } from '../src/lib/payments/shop-khqr.ts'
+import { KHQR_ACCOUNT_ID, paymentAccountFor } from '../src/lib/types.ts'
 import { createOrder, allocateInvoiceNumber, OrderError } from '../src/lib/orders/create.ts'
 import { KHQR, CURRENCY, TAG } from 'ts-khqr'
 import {
@@ -800,6 +802,57 @@ eq('the CRC is CCITT-FALSE, not one of the other five CRC-16s', crc16('123456789
 eq('KHR has no decimals, so 15000 riel is 15000', amountField(15000, 'KHR'), '15000')
 eq('USD has two, so 1500 minor is 15', amountField(1500, 'USD'), '15')
 eq('and 1550 minor is 15.5, not 15.50', amountField(1550, 'USD'), '15.5')
+
+console.log('\nthe shop\'s own Bakong account')
+// The money must be the shop's. The rail charges into the three khqr_* columns
+// the owner set on /app/money, and nothing else; a QR that pays Moni is a demo,
+// not a product. The columns exist, the fallbacks hold, and the payload lands
+// in the account the owner typed.
+const accountCols = await db.query(
+  `select column_name from information_schema.columns
+    where table_name = 'businesses' and column_name like 'khqr_%' order by column_name`)
+eq('businesses carries the three khqr_* columns', accountCols.rows.map((r) => r.column_name).join(','),
+  'khqr_account_id,khqr_merchant_city,khqr_merchant_name')
+eq('a shop with no account has no rail', paymentAccountFor({ name: 'Sokha', province: 'Takeo', khqr_account_id: null, khqr_merchant_name: null, khqr_merchant_city: null }), null)
+const resolved = paymentAccountFor({ name: 'Sokha Beauty', province: 'Takeo', khqr_account_id: ' SOKHA@WING ', khqr_merchant_name: null, khqr_merchant_city: null })
+eq('the account id is lowercased and trimmed, as Bakong ids are', resolved.accountId, 'sokha@wing')
+eq('the merchant name falls back to the shop name', resolved.merchantName, 'Sokha Beauty')
+eq('the city falls back to the province', resolved.merchantCity, 'Takeo')
+eq('and to Phnom Penh when there is no province', paymentAccountFor({ name: 'X', province: null, khqr_account_id: 'x@aba', khqr_merchant_name: null, khqr_merchant_city: null }).merchantCity, 'Phnom Penh')
+eq('a 30 character shop name is cut at the EMVCo field limit', paymentAccountFor({ name: 'A'.repeat(30), province: null, khqr_account_id: 'x@aba', khqr_merchant_name: null, khqr_merchant_city: null }).merchantName.length, 25)
+eq('name@bank is an account id', KHQR_ACCOUNT_ID.test('sokha_beauty@wing'), true)
+eq('a bare word is not', KHQR_ACCOUNT_ID.test('sokha'), false)
+eq('nor is a phone number', KHQR_ACCOUNT_ID.test('012345678'), false)
+eq('nor is a paste with a space in it', KHQR_ACCOUNT_ID.test('sokha @wing'), false)
+
+const shopRail = shopKhqrRail(resolved)
+eq('the shop rail settles riel', shopRail.settlesCurrencies.includes('KHR'), true)
+eq('and dollars', shopRail.settlesCurrencies.includes('USD'), true)
+eq('and cannot be polled, because nobody outside the shop can see the shop account', shopRail.pollBased, false)
+eq('so the cron poller skips it', isPollable(shopRail.id), false)
+eq('while CutLuy is still polled', isPollable('cutluy'), true)
+const shopCharge = await shopRail.createCharge({ amount_minor: 15000, currency: 'KHR', reference: 'MN4K2P', idempotency_key: 'k' })
+eq('the QR carries the shop account in tag 29', shopCharge.qr_payload.includes('2914' + '0010sokha@wing'), true)
+eq('and the merchant name the owner will recognise', shopCharge.qr_payload.includes('5912Sokha Beauty'), true)
+eq('and the booking code as the bill number', shopCharge.qr_payload.includes('62100106MN4K2P'), true)
+eq('and a valid CRC', crc16(shopCharge.qr_payload.slice(0, -4)), shopCharge.qr_payload.slice(-4))
+eq('its handle is the md5 of the string, the Bakong convention, so a relay can be added later', shopCharge.provider_ref, khqrMd5(shopCharge.qr_payload))
+const shopCheck = await shopRail.checkCharge(shopCharge.provider_ref, 15000, 'KHR')
+eq('asked whether it was paid, it says pending and never paid', shopCheck.status, 'pending')
+
+// The owner's confirmation, as the SQL confirm.ts runs. A second tap must change
+// nothing, and a row cannot be paid without a time.
+await db.exec(`insert into payments (id, business_id, booking_id, amount_minor, currency, provider, provider_account, status, idempotency_key)
+  values ('e1000000-0000-4000-8000-000000000001', '${B_SALON}', '90000000-0000-4000-8000-000000000003', 15000, 'KHR', 'khqr', 'sokha@wing', 'pending', 'confirm-test')`)
+const firstConfirm = await db.query(`update payments set status = 'paid', paid_at = now(), provider_txn_id = 'owner-confirmed'
+  where id = 'e1000000-0000-4000-8000-000000000001' and business_id = '${B_SALON}' and status = 'pending' returning id`)
+eq('the owner confirming moves exactly one pending row', firstConfirm.rows.length, 1)
+const secondConfirm = await db.query(`update payments set status = 'paid', paid_at = now()
+  where id = 'e1000000-0000-4000-8000-000000000001' and business_id = '${B_SALON}' and status = 'pending' returning id`)
+eq('and a second tap moves nothing', secondConfirm.rows.length, 0)
+const confirmedRow = await one(db, `select provider_account, provider_txn_id from payments where id = 'e1000000-0000-4000-8000-000000000001'`)
+eq('the row remembers which account the money went to', confirmedRow.provider_account, 'sokha@wing')
+eq('and that a person, not a provider, said it arrived', confirmedRow.provider_txn_id, 'owner-confirmed')
 
 console.log('\nstock and invoice numbers, in one transaction')
 // PGlite is Postgres, so the REAL createOrder() runs here against a real engine

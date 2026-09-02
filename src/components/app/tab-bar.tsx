@@ -1,85 +1,117 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { BellRing, Bot, CalendarDays, Inbox } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { LayoutGrid, X } from 'lucide-react'
+import { Button } from '@/components/ui/button.tsx'
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet.tsx'
 import { cn } from '@/lib/utils.ts'
+import { APP_DESTINATIONS, isActive } from './desktop-nav.tsx'
 import { PanelCount } from './panel.tsx'
 
 /**
- * Two of these are sections of this page and two are their own routes since
- * Phase 5. A tab with an `href` leaves; a tab without one scrolls. The observer
- * below already filters out sections that are not in the document, so the two
- * that left need no special case.
- */
-const TABS = [
-  { id: 'needs-now', label: 'ត្រូវធ្វើ', Icon: BellRing, href: null },
-  { id: 'moni', label: 'Moni', Icon: Bot, href: null },
-  { id: 'today', label: 'ប្រតិទិន', Icon: CalendarDays, href: '/app/calendar' },
-  { id: 'inbox', label: 'សារ', Icon: Inbox, href: '/app/inbox' },
-] as const
-
-/**
- * The pinned bottom nav.
+ * The pinned bottom nav on a phone: the same six destinations as the desktop
+ * rail, three in the bar and three behind "more", because six Khmer labels do
+ * not fit a 360px bar at a readable size and a nav that truncates its own words
+ * is worse than a sheet.
  *
- * The active tab used to be local state set on click, so it claimed the owner was
- * on "Moni" the moment the page loaded and stayed wrong for the whole session
- * once she scrolled by hand. These are anchors into one document, so the honest
- * source of truth is which section is actually on screen, and `aria-current` now
- * says the same thing the seal bar says.
+ * Active state is the route, from `usePathname`, never local state: the earlier
+ * bar tracked anchors inside one page and claimed the owner was on "Moni" the
+ * moment the page loaded. The "more" sheet is the installed shadcn Sheet, the
+ * same one the header tools already use, so no new component was invented.
  */
-export function TabBar({ inboxCount, urgent }: { inboxCount: number; urgent: number }) {
-  const [active, setActive] = useState<(typeof TABS)[number]['id']>('needs-now')
+const IN_BAR = APP_DESTINATIONS.slice(0, 3)
+const IN_SHEET = APP_DESTINATIONS.slice(3)
 
-  useEffect(() => {
-    const sections = TABS.map((tab) => document.getElementById(tab.id)).filter(
-      (element): element is HTMLElement => element !== null,
-    )
-    if (sections.length === 0) return
-
-    // The top third of the viewport is what the reader is actually looking at:
-    // a section that has only just entered from the bottom has not been read yet.
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting)
-        if (visible.length === 0) return
-        const top = visible.toSorted((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
-        if (top) setActive(top.target.id as (typeof TABS)[number]['id'])
-      },
-      { rootMargin: '-56px 0px -66% 0px', threshold: 0 },
-    )
-    for (const section of sections) observer.observe(section)
-    return () => observer.disconnect()
-  }, [])
+export function TabBar({ inboxCount, urgent = 0 }: { inboxCount: number; urgent?: number }) {
+  const pathname = usePathname()
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreActive = IN_SHEET.some((item) => isActive(pathname, item.href))
 
   return (
     <nav
       aria-label="ការធ្វើដំណើររហ័ស"
       className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-rule/70 bg-paper pb-[env(safe-area-inset-bottom)] xl:hidden"
     >
-      {TABS.map(({ id, label, Icon, href }) => {
-        const count = id === 'inbox' ? inboxCount : id === 'needs-now' ? urgent : 0
-        const Tag = href ? Link : 'a'
+      {IN_BAR.map(({ href, label, Icon }) => {
+        const active = isActive(pathname, href)
+        const count = href === '/app/inbox' ? inboxCount : href === '/app' ? urgent : 0
         return (
-          <Tag
-            key={id}
-            href={href ?? `#${id}`}
-            onClick={() => setActive(id)}
-            aria-current={!href && id === active ? 'true' : undefined}
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? 'page' : undefined}
             className={cn(
               'relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1',
-              !href && id === active ? 'text-ink' : 'text-rule',
+              active ? 'text-ink' : 'text-rule',
             )}
           >
-            {!href && id === active ? <span aria-hidden className="absolute inset-x-4 top-0 h-0.5 bg-seal" /> : null}
+            {active ? <span aria-hidden className="absolute inset-x-4 top-0 h-0.5 bg-seal" /> : null}
             <span className="relative">
-              <Icon className="size-5" strokeWidth={id === active ? 2 : 1.5} aria-hidden />
+              <Icon className="size-5" strokeWidth={active ? 2 : 1.5} aria-hidden />
               {count > 0 ? <PanelCount value={count} className="absolute -top-1 -right-3.5" /> : null}
             </span>
-            <span className={cn('km truncate text-xs', !href && id === active && 'font-semibold')}>{label}</span>
-          </Tag>
+            <span className={cn('km truncate text-xs', active && 'font-semibold')}>{label}</span>
+          </Link>
         )
       })}
+
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetTrigger asChild>
+          <button
+            type="button"
+            aria-current={moreActive ? 'page' : undefined}
+            className={cn(
+              'relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1',
+              moreActive ? 'text-ink' : 'text-rule',
+            )}
+          >
+            {moreActive ? <span aria-hidden className="absolute inset-x-4 top-0 h-0.5 bg-seal" /> : null}
+            <LayoutGrid className="size-5" strokeWidth={moreActive ? 2 : 1.5} aria-hidden />
+            <span className={cn('km truncate text-xs', moreActive && 'font-semibold')}>ច្រើនទៀត</span>
+          </button>
+        </SheetTrigger>
+        <SheetContent side="bottom" showCloseButton={false} className="gap-0 bg-paper p-0 shadow-none transition-none">
+          <SheetHeader className="flex-row items-start justify-between gap-4 border-b border-hairline px-4 py-3">
+            <div className="min-w-0">
+              <SheetTitle className="km text-base font-semibold text-ink">ហាងរបស់អ្នក</SheetTitle>
+              <SheetDescription className="km mt-0.5 text-sm text-rule">គេហទំព័រ បណ្តាញ និងកន្លែងទទួលប្រាក់</SheetDescription>
+            </div>
+            <SheetClose asChild>
+              <Button type="button" variant="ghost" size="icon-lg" className="size-11 shrink-0 rounded-none" aria-label="បិទ">
+                <X aria-hidden />
+              </Button>
+            </SheetClose>
+          </SheetHeader>
+          <ul className="divide-y divide-hairline pb-[env(safe-area-inset-bottom)]">
+            {IN_SHEET.map(({ href, label, Icon }) => {
+              const active = isActive(pathname, href)
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    onClick={() => setMoreOpen(false)}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn('km flex min-h-14 items-center gap-3 px-4 text-base', active ? 'font-semibold text-ink' : 'text-ink')}
+                  >
+                    <Icon className="size-5 shrink-0 text-rule" strokeWidth={1.75} aria-hidden />
+                    {label}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </SheetContent>
+      </Sheet>
     </nav>
   )
 }

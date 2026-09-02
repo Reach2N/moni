@@ -166,6 +166,9 @@ export type Database = {
           default_currency: string
           hours: Json
           id: string
+          khqr_account_id: string | null
+          khqr_merchant_city: string | null
+          khqr_merchant_name: string | null
           locale: string
           name: string
           owner_user_id: string | null
@@ -191,6 +194,9 @@ export type Database = {
           default_currency?: string
           hours?: Json
           id?: string
+          khqr_account_id?: string | null
+          khqr_merchant_city?: string | null
+          khqr_merchant_name?: string | null
           locale?: string
           name: string
           owner_user_id?: string | null
@@ -216,6 +222,9 @@ export type Database = {
           default_currency?: string
           hours?: Json
           id?: string
+          khqr_account_id?: string | null
+          khqr_merchant_city?: string | null
+          khqr_merchant_name?: string | null
           locale?: string
           name?: string
           owner_user_id?: string | null

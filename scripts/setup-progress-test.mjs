@@ -26,6 +26,7 @@ function input(overrides = {}) {
     hasDescription: false,
     hasCatalogue: false,
     serviceCount: 0,
+    hasPaymentAccount: false,
     channels: [],
     hasFirstTransaction: false,
     ...overrides,
@@ -34,11 +35,23 @@ function input(overrides = {}) {
 
 const byKey = (steps) => Object.fromEntries(steps.map((s) => [s.key, s]))
 
-check('a brand new shop shows four rows, all pending', () => {
+check('a brand new shop shows five rows, all pending', () => {
   const steps = deriveSetupProgress(input())
-  assert.equal(steps.length, 4)
-  assert.deepEqual(steps.map((s) => s.key), ['describe', 'catalogue', 'channel', 'customer'])
+  assert.equal(steps.length, 5)
+  assert.deepEqual(steps.map((s) => s.key), ['describe', 'catalogue', 'money', 'channel', 'customer'])
   assert.ok(steps.every((s) => s.state === 'pending'))
+})
+
+check('a shop with its own Bakong account marks the money row done, and nothing else', () => {
+  const steps = byKey(deriveSetupProgress(input({ hasPaymentAccount: true })))
+  assert.equal(steps.money.state, 'done')
+  assert.equal(steps.money.href, '/app/money')
+  assert.equal(steps.channel.state, 'pending')
+})
+
+check('the money row comes before the channel row, because a shop that answers but cannot be paid is a shop with a customer stuck at the counter', () => {
+  const keys = deriveSetupProgress(input()).map((s) => s.key)
+  assert.ok(keys.indexOf('money') < keys.indexOf('channel'))
 })
 
 check('a described shop marks only the first row done', () => {
@@ -121,13 +134,22 @@ check('no em dash reaches any label', () => {
   }
 })
 
-check('setup is complete only when all four are done', () => {
+check('setup is complete only when all five are done', () => {
   const partial = deriveSetupProgress(input({ hasDescription: true, hasCatalogue: true }))
   assert.equal(setupComplete(partial), false)
+  const unpaid = deriveSetupProgress(input({
+    hasDescription: true,
+    hasCatalogue: true,
+    serviceCount: 2,
+    channels: [{ channel: 'telegram', status: 'connected', lastError: null }],
+    hasFirstTransaction: true,
+  }))
+  assert.equal(setupComplete(unpaid), false, 'a shop with no way to be paid is not set up')
   const all = deriveSetupProgress(input({
     hasDescription: true,
     hasCatalogue: true,
     serviceCount: 2,
+    hasPaymentAccount: true,
     channels: [{ channel: 'telegram', status: 'connected', lastError: null }],
     hasFirstTransaction: true,
   }))

@@ -5,10 +5,20 @@ import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
 import type { Json } from '../database.types.ts'
 import { listSlots } from './slots.ts'
-import { formatMoney, type CurrencyCode } from '../types.ts'
+import { formatMoney, paymentAccountFor, type CurrencyCode } from '../types.ts'
 import { cambodiaDate } from '../time/cambodia.ts'
 import { idempotencyKey, QR_TTL_SECONDS } from '../payments.ts'
 import { railsFor } from '../payments/rails.ts'
+
+/** The shop's own Bakong account, read fresh per charge so a change on /app/money applies to the next QR. */
+async function shopPaymentAccount(businessId: string) {
+  const result = await db
+    .from('businesses')
+    .select('name, province, khqr_account_id, khqr_merchant_name, khqr_merchant_city')
+    .eq('id', businessId)
+    .single()
+  return paymentAccountFor(requireDbData('load shop payment account', result))
+}
 
 const isJsonObject = (value: Json): value is { [key: string]: Json | undefined } =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -247,7 +257,8 @@ export function customerTools(businessId: string, customerId: string, conversati
             : booking.price_minor
         if (amount <= 0) return { error: 'there is nothing to pay for that booking' }
 
-        const rails = railsFor(currency)
+        const account = await shopPaymentAccount(businessId)
+        const rails = railsFor(currency, account)
         if (rails.length === 0) {
           // Honest failure. A shop with no Bakong account cannot take a QR, and
           // inventing one would take a real customer's money to nobody.
@@ -292,6 +303,9 @@ export function customerTools(businessId: string, customerId: string, conversati
             amount_minor: amount,
             currency,
             provider: rail.id,
+            // Which account the money goes to, on the row, so a dispute months
+            // later can be answered without guessing what the owner had set.
+            provider_account: rail.id === 'khqr' ? account?.accountId ?? null : null,
             qr_payload: charge.qr_payload,
             provider_ref: charge.provider_ref,
             status: 'pending',
@@ -307,6 +321,12 @@ export function customerTools(businessId: string, customerId: string, conversati
           amount: formatMoney(amount, currency),
           expires_at: charge.expires_at,
           expires_in_seconds: QR_TTL_SECONDS,
+          // The card itself is sent to the customer as an image by the channel,
+          // so the model never has to describe a QR in words.
+          qr_card_sent: true,
+          confirmation: rail.pollBased
+            ? 'automatic'
+            : 'the shop confirms receipt; do not tell the customer it is paid until check_payment or the shop says so',
         }
       },
     }),
@@ -337,8 +357,15 @@ export function customerTools(businessId: string, customerId: string, conversati
         if (!payment.provider_ref) return { status: payment.status }
 
         const currency = payment.currency as CurrencyCode
-        const rail = railsFor(currency).find((candidate) => candidate.id === payment.provider)
+        const rail = railsFor(currency, await shopPaymentAccount(businessId)).find(
+          (candidate) => candidate.id === payment.provider,
+        )
         if (!rail) return { status: payment.status, note: 'that rail is not configured on this deployment' }
+        if (!rail.pollBased) {
+          // Nobody outside the shop can see the shop's bank account. Tell the
+          // customer the shop will confirm, and never that it is paid.
+          return { status: payment.status, note: 'paid directly to the shop; the shop confirms receipt, usually within minutes' }
+        }
 
         const result = await rail.checkCharge(payment.provider_ref, payment.amount_minor, currency)
 

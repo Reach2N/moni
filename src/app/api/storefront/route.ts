@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireMemberApi } from '@/lib/auth/member.ts'
 import { ApiRequestError, assertSameOriginBrowserPost, readJsonBody, validationPayload } from '@/lib/http/post.ts'
-import { db } from '@/lib/db.ts'
-import { requireDbData, throwIfDbError } from '@/lib/db-result.ts'
-import { generateStorefront, sanityCheck, StorefrontSchema } from '@/lib/ai/storefront.ts'
-import { getStorefrontRow, publishStorefront, saveStorefrontDraft } from '@/lib/queries/storefront.ts'
+import { sanityCheck, StorefrontSchema } from '@/lib/ai/storefront.ts'
+import { getStorefrontRow, saveStorefrontDraft } from '@/lib/queries/storefront.ts'
+import { generateShopSiteDraft, publishShopSite } from '@/lib/storefront/generate.ts'
 import type { StorefrontContent } from '@/lib/types.ts'
 
 export const runtime = 'nodejs'
@@ -35,7 +34,9 @@ export async function GET() {
  *
  * Publishing is always the OWNER's. The model writes a draft of validated
  * strings; nothing it produced reaches a customer until a person pressed a
- * button, which is the whole safety argument for generated sites.
+ * button, which is the whole safety argument for generated sites. Generation
+ * and publication live in `src/lib/storefront/generate.ts`, shared with the
+ * owner agent's SETUP tools, so both doors leave the same audit row.
  */
 export async function POST(req: Request) {
   try {
@@ -44,7 +45,9 @@ export async function POST(req: Request) {
     const body = Body.parse(await readJsonBody(req, 16_000))
 
     if (body.action === 'publish') {
-      return NextResponse.json({ storefront: await publishStorefront(member.businessId) })
+      const result = await publishShopSite(member.businessId, 'owner via site')
+      if (!result.published) throw new ApiRequestError(400, 'there is no draft to publish')
+      return NextResponse.json({ storefront: result.storefront })
     }
 
     if (body.action === 'save') {
@@ -58,53 +61,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const businessResult = await db
-      .from('businesses')
-      .select('name, business_type, raw_description, ai_instructions, hours')
-      .eq('id', member.businessId)
-      .single()
-    const business = requireDbData('load business for storefront', businessResult)
-
-    const servicesResult = await db
-      .from('services')
-      .select('name, name_en, duration_min, unit')
-      .eq('business_id', member.businessId)
-      .eq('active', true)
-      .order('sort_order')
-    throwIfDbError('load services for storefront', servicesResult.error)
-
-    const generated = await generateStorefront({
-      shopName: business.name,
-      businessType: business.business_type,
-      rawDescription: business.raw_description,
-      aiInstructions: business.ai_instructions,
-      services: (servicesResult.data ?? []).map((service) => ({
-        name: service.name,
-        nameEn: service.name_en,
-        durationMin: service.duration_min,
-        unit: service.unit,
-      })),
-      hours: (business.hours as Array<{ dow: number; open: string; close: string }>) ?? [],
-    })
-
-    const storefront = await saveStorefrontDraft(member.businessId, generated.content, generated.model)
-
-    await db.from('events').insert({
-      business_id: member.businessId,
-      actor: 'owner',
-      actor_label: `owner via site (${generated.model})`,
-      action: 'storefront.generated',
-      entity_type: 'business',
-      entity_id: member.businessId,
-      after: { theme: generated.content.theme, warnings: generated.warnings.length },
-    })
-
-    return NextResponse.json({
-      storefront,
-      warnings: generated.warnings,
-      model: generated.model,
-      cost_micro_usd: generated.cost_micro_usd,
-    })
+    return NextResponse.json(await generateShopSiteDraft(member.businessId, 'owner via site'))
   } catch (error) {
     if (error instanceof ApiRequestError) {
       return NextResponse.json({ error: error.message }, { status: error.status })

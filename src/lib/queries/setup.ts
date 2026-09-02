@@ -5,14 +5,14 @@ import { getChannelConnections, hasFirstTransaction } from './business.ts'
 import { deriveSetupProgress, type SetupStep } from './setup-progress.ts'
 
 /**
- * The four answers the setup spine needs, in one round of parallel reads.
+ * The five answers the setup spine needs, in one round of parallel reads.
  *
  * `businessId` is an argument, like every query in this directory: RLS has zero
  * policies, so a query that forgets its tenant has nothing to catch it.
  */
 export async function loadSetupProgress(businessId: string): Promise<SetupStep[]> {
   const [described, services, channels, served] = await Promise.all([
-    db.from('businesses').select('raw_description').eq('id', businessId).single(),
+    db.from('businesses').select('raw_description, khqr_account_id').eq('id', businessId).single(),
     db
       .from('services')
       .select('id', { count: 'exact', head: true })
@@ -29,6 +29,7 @@ export async function loadSetupProgress(businessId: string): Promise<SetupStep[]
     hasDescription: Boolean(described.data?.raw_description),
     hasCatalogue: serviceCount > 0,
     serviceCount,
+    hasPaymentAccount: Boolean(described.data?.khqr_account_id),
     channels,
     hasFirstTransaction: served,
   })

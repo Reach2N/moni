@@ -2,6 +2,7 @@ import 'server-only'
 import { db } from '../db.ts'
 import { throwIfDbError, requireDbData } from '../db-result.ts'
 import { sortInbox } from './inbox-order.ts'
+import { pendingPaymentsFor, type PendingPayment } from '../payments/confirm.ts'
 
 /**
  * The central omnichannel inbox: every conversation from every channel in one
@@ -25,6 +26,8 @@ export type Transcript = {
   status: string
   needsOwnerReason: string | null
   customerName: string
+  /** QRs this customer was sent and has not been confirmed for. The owner settles them from the thread. */
+  pendingPayments: PendingPayment[]
   messages: Array<{
     id: string
     role: string
@@ -82,11 +85,12 @@ export async function getInbox(businessId: string, limit = 60): Promise<InboxRow
 export async function getTranscript(businessId: string, conversationId: string): Promise<Transcript> {
   const conversationResult = await db
     .from('conversations')
-    .select('id, channel, status, needs_owner_reason, customers(display_name)')
+    .select('id, channel, status, needs_owner_reason, customer_id, customers(display_name)')
     .eq('business_id', businessId)
     .eq('id', conversationId)
     .single()
   const conversation = requireDbData('load conversation', conversationResult)
+  const pendingPayments = await pendingPaymentsFor(businessId, conversation.customer_id)
 
   const messagesResult = await db
     .from('messages')
@@ -103,6 +107,7 @@ export async function getTranscript(businessId: string, conversationId: string):
     status: conversation.status,
     needsOwnerReason: conversation.needs_owner_reason,
     customerName: conversation.customers?.display_name ?? 'អតិថិជន',
+    pendingPayments,
     messages: (messagesResult.data ?? []).map((message) => ({
       id: String(message.id),
       role: message.role,

@@ -1,9 +1,19 @@
 import 'server-only'
 import { cutluyAdapter, manualAdapter, type PaymentProviderAdapter } from '../payments.ts'
-import type { CurrencyCode } from '../types.ts'
+import type { CurrencyCode, PaymentAccount } from '../types.ts'
+import { shopKhqrRail } from './shop-khqr.ts'
 
 /**
- * The rails, actually wired. There is one: CutLuy.
+ * The rails, actually wired. Two, and the order is the product:
+ *
+ *   1. The shop's OWN Bakong account (`shopKhqrRail`), whenever the owner has
+ *      set one on /app/money. Generated offline, both currencies, paid straight
+ *      to the shop, confirmed by the owner. This is what "Moni takes payments
+ *      for local businesses" has to mean: the money is the shop's.
+ *   2. CutLuy, when this deployment carries a platform token. It settles into
+ *      MONI's account, so on its own it is a demo rail, not a product. It stays
+ *      because its webhook is real, verified, and the safety net for any shop
+ *      that later opens a CutLuy account of its own.
  *
  * CutLuy is Bakong, packaged. It issues a genuine Bakong KHQR (verified against
  * a live response on 30 August 2026: tag 30 carrying `abaakhppxxx@abaa`, and a
@@ -12,15 +22,11 @@ import type { CurrencyCode } from '../types.ts'
  * part that is otherwise painful: issuing, and telling us it was paid, with no
  * merchant relationship with NBC and no relay of our own.
  *
- * The direct Bakong rail is GONE, and this comment is its headstone. It built
- * the KHQR offline from a BAKONG_ACCOUNT and verified through a Cambodian relay,
- * because NBC blocks check-transaction from servers outside Cambodia and Vercel
- * is not in Cambodia. Five environment variables and a relay we do not run, to
- * do what CutLuy already does. Keeping it meant two code paths for one behaviour
- * and five credentials nobody would ever set.
- *
- * CutLuy settles USD, and since 30 August 2026 this product prices in USD, so
- * one rail covers everything.
+ * The direct Bakong rail was removed on 30 August 2026 because it charged into
+ * ONE platform BAKONG_ACCOUNT from the environment and verified through a relay
+ * nobody ran. It is back on 2 September in the only form that makes sense: the
+ * generation half, per shop, into the shop's own account, with the owner as the
+ * verifier. See `shop-khqr.ts` for why that is honest rather than lazy.
  */
 function cutluyRail(): PaymentProviderAdapter | null {
   const token = process.env.CUTLUY_TOKEN?.trim()
@@ -33,17 +39,21 @@ function cutluyRail(): PaymentProviderAdapter | null {
 }
 
 /**
- * Configured rails that settle this currency, in preference order.
+ * Rails that settle this currency for THIS shop, in preference order.
  *
- * Still takes a currency, and still asks the adapter what it settles, even with
- * one rail: that is the seam a second rail arrives through, and a shop priced in
- * something no rail can charge should get an empty list rather than a QR that
- * pays nobody. An empty list is a real answer, not an unhandled case.
+ * `account` is the shop's own Bakong account (`paymentAccountFor(business)`),
+ * or null when the owner has not set one. A shop priced in something no rail can
+ * charge gets an empty list rather than a QR that pays nobody. An empty list is
+ * a real answer, not an unhandled case: `create_payment` turns it into "please
+ * pay at the shop".
  */
-export function railsFor(currency: CurrencyCode): PaymentProviderAdapter[] {
+export function railsFor(currency: CurrencyCode, account: PaymentAccount | null): PaymentProviderAdapter[] {
+  const candidates: PaymentProviderAdapter[] = []
+  if (account) candidates.push(shopKhqrRail(account))
   const cutluy = cutluyRail()
-  if (!cutluy) return []
-  return cutluy.settlesCurrencies.includes(currency) ? [cutluy] : []
+  if (cutluy) candidates.push(cutluy)
+  return candidates.filter((rail) => rail.settlesCurrencies.includes(currency))
 }
 
 export { manualAdapter }
+export { isPollable, SHOP_KHQR_PROVIDER } from './shop-khqr.ts'

@@ -1,6 +1,6 @@
 # Moni: one universal app, shop-owned payments, and an agent that runs setup
 
-Status: draft. Scope: the gated owner app and the agent tool surface. It does not touch
+Status: implemented 2 September 2026 (PLAN.md Phase 10). Scope: the gated owner app and the agent tool surface. It does not touch
 the marketing homepage (`docs/HOMEPAGE.md`) or the customer storefront renderer.
 
 Date: 2026-09-02. Author: design pass, following the brainstorming skill.
@@ -69,10 +69,10 @@ per shop, and it belongs beside `businesses.phone` and `businesses.address`. Use
 and accepts a migration.
 
 ```ts
-// types.ts
-business_payment_account_id  string | null   // "sokha@wing"
-business_payment_name       string | null   // merchant name on the QR, defaults to shop name
-business_payment_city       string | null   // defaults to the shop's province
+// types.ts (as built: the businesses table already says "business", so the prefix names the rail)
+khqr_account_id     string | null   // "sokha@wing"
+khqr_merchant_name  string | null   // merchant name on the QR, defaults to shop name
+khqr_merchant_city  string | null   // defaults to the shop's province, then Phnom Penh
 ```
 
 `db/schema.sql` mirrors these three with the same nullability, inside the `businesses`
@@ -185,6 +185,23 @@ Customer /api/chat or a webhook
 Money never flows through Moni's account when the shop configured its own Bakong account.
 The platform CutLuy token remains the fallback for a deployment that configures it and for
 a payment the shop has not configured an account for.
+
+### Found while building: the QR never reached a customer
+
+`create_payment` stored a payload and returned it to the model, and no channel delivered
+it: Telegram's `sendReply` sent text only, and the customer prompt said nothing about
+paying. Scope A therefore also ships delivery. `deliverPaymentCard()` in
+`src/lib/channels/deliver.ts` sends the code as a photo on Telegram (uploaded bytes, so a
+tunnel works), as an image attachment by URL on Messenger (`/api/pay/{code}?format=png`,
+with a text fallback when the deployment is not public HTTPS), and the web chat draws
+`/api/pay/{code}` inline. Both webhooks call it for every `create_payment` in the turn,
+after the text reply, best effort and logged, never thrown.
+
+### Found while building: declared tools that did not exist
+
+`OWNER_TOOLS` declared `archive_service`, `update_resource` and `set_business_profile`, none
+of which `ownerTools()` built, and omitted four that it did. `ownerTools()` now ends with
+`satisfies Record<OwnerTool, Tool>` (guardrail G3) and the list matches the code.
 
 ## Error handling
 

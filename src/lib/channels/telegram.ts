@@ -10,7 +10,7 @@
  * The two pure functions here (token shape, update extraction) carry no network
  * and are proved in `db/test.mjs`.
  */
-import { Api, GrammyError } from 'grammy'
+import { Api, GrammyError, InputFile } from 'grammy'
 import type { Update } from 'grammy/types'
 
 export class ChannelError extends Error {
@@ -118,6 +118,23 @@ export async function disconnectWebhook(token: string) {
     await api(token).deleteWebhook({ drop_pending_updates: true })
   } catch (cause) {
     throw channelError(cause, 'the Telegram webhook could not be removed')
+  }
+}
+
+/** Telegram caps a photo caption at 1024 characters. */
+const TELEGRAM_MAX_CAPTION = 1_024
+
+/**
+ * A picture with a caption: the KHQR a customer scans. Uploaded as bytes rather
+ * than fetched by URL, so a laptop behind a tunnel and a preview deployment
+ * behind Vercel's auth wall both work, and the QR never has to be public.
+ */
+export async function sendPhoto(token: string, chatId: number, png: Buffer, caption: string) {
+  const text = caption.length > TELEGRAM_MAX_CAPTION ? `${caption.slice(0, TELEGRAM_MAX_CAPTION - 1)}…` : caption
+  try {
+    await api(token).sendPhoto(chatId, new InputFile(new Uint8Array(png), 'khqr.png'), { caption: text })
+  } catch (cause) {
+    throw channelError(cause, 'the payment QR could not be delivered to Telegram')
   }
 }
 

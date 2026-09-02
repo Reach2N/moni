@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button.tsx'
 
 type Turn =
   | { role: 'customer'; text: string }
-  | { role: 'moni'; text: string | null; checks: string[]; handedOver: boolean }
+  | { role: 'moni'; text: string | null; checks: string[]; handedOver: boolean; qrCode: string | null }
 
 const VISITOR_KEY = 'moni.visitor'
 
@@ -70,9 +70,16 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
         ? body.tool_calls.map((call: { tool?: string }) => CUSTOMER_STEP[call.tool ?? '']).filter(Boolean)
         : []
       const handed = Boolean(body.handed_over)
+      // A create_payment call names a booking code, and /api/pay/{code} is the
+      // card a real customer would be sent. The browser is the one channel that
+      // can show it inline, so the owner sees exactly what a customer sees.
+      const paid = Array.isArray(body.tool_calls)
+        ? (body.tool_calls as { tool?: string; args?: { code?: unknown } }[]).find((call) => call.tool === 'create_payment')
+        : undefined
+      const qrCode = typeof paid?.args?.code === 'string' ? paid.args.code.toUpperCase() : null
       setTurns((current) => [
         ...current,
-        { role: 'moni', text: typeof body.text === 'string' ? body.text : null, checks, handedOver: handed },
+        { role: 'moni', text: typeof body.text === 'string' ? body.text : null, checks, handedOver: handed, qrCode },
       ])
       setHandedOver(handed)
       onChanged?.()
@@ -119,6 +126,16 @@ export function ChatPanel({ onChanged }: { onChanged?: () => void }) {
                     </ul>
                   ) : null}
                   {turn.text ? <p className="km whitespace-pre-wrap text-base text-ink">{turn.text}</p> : null}
+                  {turn.qrCode ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- an SVG document from our own route, redrawn per payment and never optimised
+                    <img
+                      src={`/api/pay/${turn.qrCode}`}
+                      alt={`KHQR សម្រាប់ការណាត់ ${turn.qrCode}`}
+                      width={300}
+                      height={450}
+                      className="mt-2 h-auto w-full max-w-[18rem] border border-hairline"
+                    />
+                  ) : null}
                   {turn.handedOver ? (
                     <p className="km mt-2 flex items-start gap-2 border-t border-hairline pt-2 text-sm text-rule">
                       <HandHelping className="mt-1 size-4 shrink-0" strokeWidth={1.75} aria-hidden />

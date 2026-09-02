@@ -123,6 +123,27 @@ export async function unsubscribePage(pageToken: string) {
 /** Messenger caps a text message at 2000 characters. */
 export const MESSENGER_MAX_MESSAGE = 2_000
 
+/**
+ * An image by URL. Meta fetches it, so the address must be public HTTPS: the
+ * caller checks that and falls back to text when it is not (a laptop cannot
+ * hand Meta a localhost URL and expect a picture to arrive).
+ */
+export async function sendMessengerImage(pageToken: string, recipientId: string, url: string) {
+  const response = await fetch(`${GRAPH}/me/messages?access_token=${encodeURIComponent(pageToken)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { id: recipientId },
+      messaging_type: 'RESPONSE',
+      message: { attachment: { type: 'image', payload: { url, is_reusable: false } } },
+    }),
+  })
+  if (!response.ok) {
+    const failure = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
+    throw new MessengerError(502, failure?.error?.message ?? 'the payment QR could not be delivered to Messenger')
+  }
+}
+
 export async function sendMessengerReply(pageToken: string, recipientId: string, text: string) {
   const body = text.length > MESSENGER_MAX_MESSAGE ? `${text.slice(0, MESSENGER_MAX_MESSAGE - 1)}…` : text
   const response = await fetch(`${GRAPH}/me/messages?access_token=${encodeURIComponent(pageToken)}`, {

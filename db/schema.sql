@@ -38,6 +38,9 @@ create table if not exists businesses (
   phone              text,
   address            text,
   province           text,
+  khqr_account_id    text,
+  khqr_merchant_name text,
+  khqr_merchant_city text,
   timezone           text not null default 'Asia/Phnom_Penh',
   default_currency   text not null default 'USD',
   locale             text not null default 'km',
@@ -58,6 +61,9 @@ comment on column businesses.hours is 'Weekly opening hours: [{"dow":1,"open":"0
 comment on column businesses.business_type is 'Taxonomy id from BUSINESS_TYPES in types.ts (salon, clinic, hotel, ...). Deliberately unconstrained text so new verticals need no migration.';
 comment on column businesses.attributes is 'Vertical-specific fields that do not deserve a column. Keeps the table shape frozen.';
 comment on column businesses.clerk_user_id is 'Clerk user id (text like user_2abc), the tenant key. Deliberately NOT unique: the chain plan allows several businesses per owner.';
+comment on column businesses.khqr_account_id is 'The shop''s OWN Bakong account ("sokha@wing"). KHQR payments are generated offline into it, so money lands with the shop, never with Moni. NULL means the shop cannot take QR payments yet.';
+comment on column businesses.khqr_merchant_name is 'Merchant name printed on the QR (max 25 chars per EMVCo). NULL falls back to the shop name.';
+comment on column businesses.khqr_merchant_city is 'Merchant city on the QR. NULL falls back to the province, then Phnom Penh.';
 comment on column businesses.ai_instructions is 'Owner''s standing instructions for the assistant ("never discount", "always offer the promo"). Appended to the system prompt. Separate from raw_description, which is never overwritten.';
 create index if not exists businesses_clerk_user
   on businesses (clerk_user_id) where clerk_user_id is not null;

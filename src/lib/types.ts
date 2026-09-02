@@ -203,6 +203,16 @@ export type Business = {
   phone: string | null
   address: string | null
   province: string | null
+  /**
+   * The shop's OWN Bakong account, e.g. "sokha@wing". A KHQR is generated offline
+   * into it, so a customer's money lands with the shop and never with Moni. Null
+   * means the shop cannot take QR payments yet, and the agent says so.
+   */
+  khqr_account_id: string | null
+  /** Merchant name printed on the QR. Falls back to the shop name. */
+  khqr_merchant_name: string | null
+  /** Merchant city on the QR. Falls back to the province, then Phnom Penh. */
+  khqr_merchant_city: string | null
   timezone: string
   default_currency: CurrencyCode
   locale: 'km' | 'en'
@@ -221,6 +231,44 @@ export type Business = {
 
 /** dow: 0=Sunday. A day absent from the array means closed that day. */
 export type OpeningHours = Array<{ dow: 0 | 1 | 2 | 3 | 4 | 5 | 6; open: string; close: string }>
+
+/**
+ * What the KHQR builder needs to charge into a shop's own account. Resolved from
+ * the three `khqr_*` columns by `paymentAccountFor()`, which applies the
+ * fallbacks in one place so a QR never carries an empty merchant name.
+ */
+export type PaymentAccount = {
+  accountId: string
+  merchantName: string
+  merchantCity: string
+}
+
+/**
+ * A Bakong account id is "<name>@<bank>", lowercase, as printed in the owner's
+ * own banking app. Loose on purpose: banks differ in what they allow before the
+ * "@", and a rejected paste is worse than an unusual but real account.
+ */
+export const KHQR_ACCOUNT_ID = /^[a-z0-9][a-z0-9._-]{1,31}@[a-z0-9_-]{2,32}$/
+
+/** KHQR merchant fields are EMVCo TLV values with a two digit length: 25 is the spec's cap. */
+export const KHQR_MERCHANT_FIELD_MAX = 25
+
+export function paymentAccountFor(business: {
+  name: string
+  province: string | null
+  khqr_account_id: string | null
+  khqr_merchant_name: string | null
+  khqr_merchant_city: string | null
+}): PaymentAccount | null {
+  const accountId = business.khqr_account_id?.trim().toLowerCase()
+  if (!accountId) return null
+  const trim = (value: string) => value.trim().slice(0, KHQR_MERCHANT_FIELD_MAX)
+  return {
+    accountId,
+    merchantName: trim(business.khqr_merchant_name?.trim() || business.name),
+    merchantCity: trim(business.khqr_merchant_city?.trim() || business.province || 'Phnom Penh'),
+  }
+}
 
 export type Service = {
   id: string
@@ -412,19 +460,36 @@ export const CUSTOMER_TOOLS = [
 export type CustomerTool = (typeof CUSTOMER_TOOLS)[number]
 
 /** Available only to the agent talking to the OWNER in the dashboard. */
+/**
+ * Four groups, which the UI mirrors: ORGANIZE the catalogue, PLAN the day,
+ * OPERATE what happened, and SET UP the shop itself. `ownerTools()` is typed
+ * `satisfies Record<OwnerTool, Tool>`, so a name declared here and never
+ * implemented, or implemented and never declared, is a compile error.
+ */
 export const OWNER_TOOLS = [
+  // ORGANIZE
   'create_service',
   'update_service',
-  'archive_service',
+  'adjust_prices',
   'create_resource',
   'create_resources_bulk', // "I have 40 rooms": one call, not forty
-  'update_resource',
   'set_hours',
   'add_closure',
-  'set_business_profile',
+  // PLAN
+  'get_day_plan',
+  'get_week_plan',
+  'get_money_owed',
+  'get_service_performance',
+  // OPERATE
   'mark_booking',          // completed / no_show / cancelled
   'record_manual_payment', // cash and walk-ins
+  'confirm_payment',       // the owner saw the riel arrive in her own bank app
   'export_customers',
+  // SETUP
+  'report_setup_status',
+  'set_payment_account',
+  'generate_shop_site',
+  'publish_shop_site',
 ] as const
 export type OwnerTool = (typeof OWNER_TOOLS)[number]
 

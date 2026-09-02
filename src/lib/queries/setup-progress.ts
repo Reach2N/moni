@@ -3,7 +3,7 @@
  * happen, in the words the owner would use.
  *
  * This file holds the whole judgement (CLAUDE.md rule 9) and the component that
- * renders it holds none of it. It is a pure function of four answers, which is
+ * renders it holds none of it. It is a pure function of five answers, which is
  * what lets `scripts/setup-progress-test.mjs` assert the states no seed data can
  * ever show: a shop on its first second, and a channel that dropped.
  *
@@ -12,7 +12,7 @@
  */
 import { toKhmerDigits } from '../format/khmer.ts'
 
-export type SetupStepKey = 'describe' | 'catalogue' | 'channel' | 'customer'
+export type SetupStepKey = 'describe' | 'catalogue' | 'money' | 'channel' | 'customer'
 
 /**
  * `failed` exists because a channel that connected and then dropped is not the
@@ -38,6 +38,8 @@ export type SetupProgressInput = {
   hasDescription: boolean
   hasCatalogue: boolean
   serviceCount: number
+  /** `businesses.khqr_account_id` is set: the shop can be paid into its own account. */
+  hasPaymentAccount: boolean
   channels: readonly { channel: string; status: string; lastError: string | null }[]
   hasFirstTransaction: boolean
 }
@@ -81,6 +83,16 @@ export function deriveSetupProgress(input: SetupProgressInput): SetupStep[] {
       state: input.hasCatalogue ? 'done' : 'pending',
       error: null,
       href: '/app/onboarding',
+    },
+    {
+      // Before the channel on purpose. A shop that answers on Telegram but
+      // cannot be paid has a customer at the counter with nowhere to send money.
+      key: 'money',
+      label: 'ទទួលប្រាក់តាម KHQR',
+      amount: input.hasPaymentAccount ? 'រួចរាល់' : 'មិនទាន់កំណត់',
+      state: input.hasPaymentAccount ? 'done' : 'pending',
+      error: null,
+      href: '/app/money',
     },
     {
       key: 'channel',

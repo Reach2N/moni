@@ -5,6 +5,7 @@ import type { Json } from '@/lib/database.types.ts'
 import { decryptSecret, secretsMatch } from '@/lib/crypto/secrets.ts'
 import { extractMessengerMessages, sendMessengerReply, verifySignature } from '@/lib/channels/messenger.ts'
 import { handleCustomerMessage, scopedExternalId } from '@/lib/agent/customer-loop.ts'
+import { deliverPaymentCard, paymentCodesIn } from '@/lib/channels/deliver.ts'
 import { getBusinessById } from '@/lib/queries/business.ts'
 
 export const runtime = 'nodejs'
@@ -110,6 +111,14 @@ export async function POST(req: Request) {
         })
         if (turn.text) {
           await sendMessengerReply(decryptSecret(connection.token_ciphertext), message.senderId, turn.text)
+        }
+        for (const code of paymentCodesIn(turn.toolCalls)) {
+          try {
+            const card = await deliverPaymentCard({ businessId: business.id, customerId: turn.customerId, channel: 'messenger', code })
+            if (!card.delivered) console.warn(`[messenger] QR for ${code} not delivered: ${card.reason}`)
+          } catch (error) {
+            console.error(`[messenger] QR for ${code} failed:`, error instanceof Error ? error.message : error)
+          }
         }
         await db
           .from('webhook_events')

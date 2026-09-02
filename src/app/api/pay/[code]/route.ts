@@ -1,6 +1,7 @@
 import { db } from '@/lib/db.ts'
 import { throwIfDbError } from '@/lib/db-result.ts'
 import { renderKhqrCard } from '@/lib/khqr/qr-card.ts'
+import { renderKhqrPng } from '@/lib/khqr/qr-png.ts'
 import type { CurrencyCode } from '@/lib/types.ts'
 
 export const runtime = 'nodejs'
@@ -15,9 +16,13 @@ export const runtime = 'nodejs'
  * no customer records.
  *
  * A lapsed payment stops rendering rather than serving a QR that pays nobody.
+ *
+ * `?format=png` returns the bare code as a PNG. Messenger fetches attachments
+ * by URL and refuses SVG, so this is the address the channel hands Meta.
  */
-export async function GET(_req: Request, { params }: { params: Promise<{ code: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
+  const wantsPng = new URL(req.url).searchParams.get('format') === 'png'
   if (!/^[A-Z0-9]{4,12}$/i.test(code)) return new Response('not found', { status: 404 })
 
   const bookingResult = await db
@@ -42,6 +47,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ code: s
   if (!payment?.qr_payload) return new Response('not found', { status: 404 })
   if (payment.expires_at && new Date(payment.expires_at) < new Date()) {
     return new Response('this payment has expired', { status: 410 })
+  }
+
+  if (wantsPng) {
+    const png = await renderKhqrPng(payment.qr_payload)
+    return new Response(new Uint8Array(png), {
+      headers: { 'content-type': 'image/png', 'cache-control': 'no-store' },
+    })
   }
 
   const currency = payment.currency as CurrencyCode

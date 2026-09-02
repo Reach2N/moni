@@ -2,8 +2,9 @@
 
 This directory separates active implementation instructions from historical research.
 
-Owner onboarding is under active implementation per `ONBOARDING.md`. Homepage files and the
-scripted marketing primitives stay frozen during that pass.
+The owner app is under active implementation as one universal app, per
+`superpowers/specs/2026-09-02-universal-app-design.md` and PLAN.md Phase 10, building on
+`ONBOARDING.md`. Homepage files and the scripted marketing primitives stay frozen.
 
 ## Active documents
 
@@ -13,7 +14,8 @@ scripted marketing primitives stay frozen during that pass.
 | [`../PLAN.md`](../PLAN.md) | Product and sequencing | MVP, phases, and acceptance checks |
 | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | Target architecture | Data model, security, API seams, and adoption decisions |
 | [`HOMEPAGE.md`](HOMEPAGE.md) | Public `/` homepage | Light-only visual, content, interaction, and screenshot contract |
-| [`ONBOARDING.md`](ONBOARDING.md) | Gated `/app/onboarding` | Owner setup flow, the four-row setup spine, and Beautiful UI component selection |
+| [`ONBOARDING.md`](ONBOARDING.md) | Gated `/app/onboarding` | Owner setup flow, the five-row setup spine, and Beautiful UI component selection |
+| [`superpowers/specs/2026-09-02-universal-app-design.md`](superpowers/specs/2026-09-02-universal-app-design.md) | Gated owner app | The shop's own payment account, the agent's SETUP tools, one shell |
 
 `CLAUDE.md` contains verified toolchain gotchas and remains relevant when the active agent
 loads it. It is subordinate to `AGENTS.md` for current scope and frontend decisions.

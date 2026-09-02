@@ -3,8 +3,8 @@ import { timingSafeEqual } from 'node:crypto'
 import { db } from '@/lib/db.ts'
 import { dueReminders, keepAlive, pendingPayments, recordReminder } from '@/lib/queries/ops.ts'
 import { deliverToCustomer } from '@/lib/channels/deliver.ts'
-import { railsFor } from '@/lib/payments/rails.ts'
-import { formatMoney, type CurrencyCode } from '@/lib/types.ts'
+import { isPollable, railsFor } from '@/lib/payments/rails.ts'
+import type { CurrencyCode } from '@/lib/types.ts'
 import { cambodiaClock } from '@/lib/time/cambodia.ts'
 
 export const runtime = 'nodejs'
@@ -64,8 +64,10 @@ async function runPaymentPolling() {
   const pending = await pendingPayments()
   let settled = 0
   for (const payment of pending) {
+    // A shop's own Bakong account cannot be asked from here; the owner confirms.
+    if (!isPollable(payment.provider)) continue
     const currency = payment.currency as CurrencyCode
-    const rail = railsFor(currency).find((candidate) => candidate.id === payment.provider)
+    const rail = railsFor(currency, null).find((candidate) => candidate.id === payment.provider)
     if (!rail || !payment.provider_ref) continue
 
     const result = await rail.checkCharge(payment.provider_ref, payment.amount_minor, currency)

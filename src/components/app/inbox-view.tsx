@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CircleAlert, LoaderCircle, Send, UserRound } from 'lucide-react'
+import { BadgeCheck, CircleAlert, LoaderCircle, Send, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 import type { InboxRow, Transcript } from '@/lib/queries/inbox.ts'
@@ -82,6 +82,35 @@ export function InboxView({ rows, initialTranscript }: { rows: InboxRow[]; initi
       startTransition(() => router.refresh())
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'មិនអាចផ្ញើបានទេ។')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  /**
+   * The owner saw the riel land in her own banking app. One tap here is the
+   * whole verification for a QR paid into the shop's account; the server
+   * refuses a second tap on the same code, so the button cannot double-confirm.
+   */
+  async function confirmPaid(code: string) {
+    if (!openId) return
+    setSending(true)
+    setNotice('')
+    try {
+      const response = await fetch('/api/payments/confirm', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code }),
+      })
+      const body = await response.json()
+      if (!response.ok || body.error) throw new Error(body.error ?? 'confirm failed')
+      if (body.outcome === 'already_paid') setNotice(`${code} បានបញ្ជាក់រួចហើយ។`)
+      else if (body.outcome === 'not_found') setNotice(`រកមិនឃើញការទូទាត់សម្រាប់ ${code} ទេ។`)
+      else if (!body.customer_told) setNotice('បានកត់ថាទទួលប្រាក់ ប៉ុន្តែមិនអាចផ្ញើប្រាប់អតិថិជនបានទេ។')
+      await load(openId)
+      startTransition(() => router.refresh())
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'មិនអាចបញ្ជាក់បានទេ។')
     } finally {
       setSending(false)
     }
@@ -173,6 +202,31 @@ export function InboxView({ rows, initialTranscript }: { rows: InboxRow[]; initi
             </ol>
           )}
         </div>
+
+        {transcript && transcript.pendingPayments.length > 0 ? (
+          <ul className="divide-y divide-hairline border-t border-hairline">
+            {transcript.pendingPayments.map((payment) => (
+              <li key={payment.code} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                <span className="km min-w-0 flex-1 text-sm text-ink">
+                  រង់ចាំប្រាក់ <span className="tnum font-semibold">{payment.amount}</span> សម្រាប់ {payment.code}
+                  {payment.provider === 'khqr' ? (
+                    <span className="km block text-xs text-rule">ចូលគណនី Bakong របស់ហាងផ្ទាល់។ ពិនិត្យកម្មវិធីធនាគាររបស់អ្នក រួចបញ្ជាក់។</span>
+                  ) : null}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void confirmPaid(payment.code)}
+                  disabled={sending}
+                  className="km min-h-11 rounded-none"
+                >
+                  <BadgeCheck data-icon="inline-start" aria-hidden />
+                  បានទទួលប្រាក់ហើយ
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         <div className="border-t border-hairline px-3 py-3">
           {transcript?.status === 'needs_owner' ? (

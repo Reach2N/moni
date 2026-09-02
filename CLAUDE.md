@@ -11,8 +11,10 @@ product scope and build order, `ARCHITECTURE.md` for architectural decisions, an
 `docs/HOMEPAGE.md` for the active homepage UI contract. The former feature, UI, product,
 and Invitation design documents are archived under `docs/archive/`.
 
-The active implementation pass is owner onboarding, per `docs/ONBOARDING.md` and
-`docs/superpowers/plans/2026-08-31-onboarding-beautiful-ui.md`. Homepage files stay
+The active implementation pass is the owner app as one universal app, per
+`docs/superpowers/specs/2026-09-02-universal-app-design.md` (PLAN.md Phase 10): the
+shop's own Bakong account as the payment rail, the agent's SETUP tools, and one shell
+around every owner screen. It builds on `docs/ONBOARDING.md`. Homepage files stay
 frozen: `src/components/marketing/**`, `src/app/(marketing)/**`, and the two scripted
 primitives `src/components/primitives/TaskRows.tsx` and
 `src/components/primitives/ThinkingState.tsx` are not modified by this pass.
@@ -275,14 +277,19 @@ docs/archive/        historical research, never an implementation source
   used as `new Api(token)` only, never `Bot`: `Api` needs no init, so one webhook serves
   every tenant without a `getMe` per message. And `/api/webhooks/*` must stay OFF the Clerk
   proxy matcher, or every inbound customer message 500s on a missing session.
-- KHQR payments: **route by currency, not by preference.**
-  - KHR goes through local offline KHQR generation from `BAKONG_ACCOUNT`, verified through
-    the relay at `BAKONG_RELAY_API_URL`. Riel is the default for local shops, so this is
-    the primary rail.
-  - USD goes through **CutLuy** (`https://cutluy.com`, `POST /v1/payments`, check with
-    `GET /v1/payments/:id`). CutLuy **settles USD only**, so it cannot serve a riel shop.
-  - Bakong's own check-transaction blocks calls from servers outside Cambodia and Vercel is
-    not in Cambodia. Generation is offline and unaffected. Only the check needs the relay.
+- KHQR payments: **the money is the shop's** (decided 2 September 2026, replacing the
+  earlier "route by currency" rule and the 30 August platform-CutLuy-only state).
+  - The owner pastes her own Bakong account on `/app/money`; it lives in the three
+    `businesses.khqr_*` columns. `src/lib/payments/shop-khqr.ts` builds the KHQR offline
+    into that account, KHR and USD, and `railsFor(currency, account)` prefers it.
+  - No relay. Bakong's check-transaction blocks servers outside Cambodia and Vercel is not
+    in Cambodia, so the rail is `pollBased: false` and the owner's own banking app is the
+    verifier: `confirm_payment` (owner tool, inbox button, `POST /api/payments/confirm`)
+    moves a row pending to paid, once, and confirms the booking.
+  - **CutLuy** (`https://cutluy.com`, USD only) stays as the platform token's rail: a demo
+    and a webhook safety net, never the product, because it settles into Moni's account.
+  - The QR goes to the customer as a picture: Telegram `sendPhoto` with uploaded bytes,
+    Messenger by URL (`/api/pay/{code}?format=png`, needs public HTTPS), web chat inline.
 - `src/lib/payments.ts` is **ported from working production code** at
   `/Users/mense/tiktok-bot-private/store/src/lib/payments/`. Comments marked PORTED carry a
   bug that was already paid for once. Do not simplify them away.

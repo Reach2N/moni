@@ -1,5 +1,4 @@
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { AppShell } from '@/components/app/app-shell.tsx'
 import { InboxView } from '@/components/app/inbox-view.tsx'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +11,13 @@ export default async function InboxPage() {
     import('@/lib/queries/inbox.ts'),
   ])
   const member = await requireMember()
+  const [{ getBusinessById }, { loadShellCounts }] = await Promise.all([
+    import('@/lib/queries/business.ts'),
+    import('@/lib/queries/shell.ts'),
+  ])
+  // The shell wants the plate and the inbox badge on every screen; the page's
+  // own data is loaded beside them, not before them.
+  const [business, counts] = await Promise.all([getBusinessById(member.businessId), loadShellCounts(member.businessId)])
   const rows = await getInbox(member.businessId)
   // Render the first thread on the server so the inbox opens on a conversation
   // rather than a spinner. Escalations sort first, so this is the one that needs
@@ -19,18 +25,16 @@ export default async function InboxPage() {
   const first = rows[0] ? await getTranscript(member.businessId, rows[0].id) : null
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Link href="/app" className="km inline-flex min-h-11 items-center gap-2 text-sm text-rule">
-        <ArrowLeft className="size-4" strokeWidth={1.75} aria-hidden />
-        ត្រឡប់ទៅផ្ទាំងគ្រប់គ្រង
-      </Link>
-      <h1 className="km mt-2 text-xl font-semibold text-ink">សារអតិថិជន</h1>
-      <p className="km mt-1 text-sm text-rule">
-        គ្រប់បណ្តាញនៅកន្លែងតែមួយ។ អ្នកអានអ្វីដែល Moni បានសន្យាជំនួសអ្នក ហើយឆ្លើយដោយខ្លួនឯងបានគ្រប់ពេល។
-      </p>
-      <div className="mt-6">
-        <InboxView rows={rows} initialTranscript={first} />
+    <AppShell shop={{ name: business.name, place: business.province ?? business.address }} inboxCount={counts.inboxCount}>
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        <h1 className="km text-xl font-semibold text-ink">សារអតិថិជន</h1>
+        <p className="km mt-1 text-sm text-rule">
+          គ្រប់បណ្តាញនៅកន្លែងតែមួយ។ អ្នកអានអ្វីដែល Moni បានសន្យាជំនួសអ្នក ហើយឆ្លើយដោយខ្លួនឯងបានគ្រប់ពេល។
+        </p>
+        <div className="mt-6">
+          <InboxView rows={rows} initialTranscript={first} />
+        </div>
       </div>
-    </main>
+    </AppShell>
   )
 }

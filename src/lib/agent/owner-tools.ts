@@ -1,21 +1,32 @@
 import 'server-only'
-import { tool } from 'ai'
+import { tool, type Tool } from 'ai'
 import { z } from 'zod'
 import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
-import { expandResourceRange, formatMoney, type CurrencyCode } from '../types.ts'
+import { expandResourceRange, formatMoney, type CurrencyCode, type OwnerTool } from '../types.ts'
 import { cambodiaDate, cambodiaDayBounds } from '../time/cambodia.ts'
+import { confirmPayment } from '../payments/confirm.ts'
+import { getPaymentSettings, PaymentAccountError, setPaymentAccount } from '../payments/account.ts'
+import { generateShopSiteDraft, publishShopSite } from '../storefront/generate.ts'
+import { getStorefrontRow } from '../queries/storefront.ts'
+import { loadSetupProgress } from '../queries/setup.ts'
+import { setupComplete } from '../queries/setup-progress.ts'
 
 /**
  * The OWNER tool set. This is the product: the owner says what she wants in plain
  * language and Moni organizes, plans and operates the shop. The customer-facing set
  * can only read the catalogue and book; only these can change the business.
  *
- * Three categories, which the UI mirrors so a non technical owner knows what she
+ * Four categories, which the UI mirrors so a non technical owner knows what she
  * can even ask for:
  *   ORGANIZE  the catalogue and the capacity: services, staff and rooms, hours, closures
  *   PLAN      what today and this week look like, where the gaps and the risks are
  *   OPERATE   act on what happened: mark done, mark no show, record cash, chase money
+ *   SETUP     get the shop live: what is left, where the money goes, the public page
+ *
+ * `satisfies Record<OwnerTool, Tool>` at the bottom: a tool declared in
+ * `OWNER_TOOLS` and not built here, or built and not declared, is a compile error
+ * rather than a drift nobody notices (ARCHITECTURE.md guardrail G3).
  */
 const KH = '+07:00'
 const localDay = cambodiaDate
@@ -24,6 +35,85 @@ const hhmm = (s: string) =>
 
 export function ownerTools(businessId: string) {
   return {
+    // ────────────────────────────────────────────────────────────────── SETUP
+    report_setup_status: tool({
+      description:
+        'SETUP. What is left before this shop is live: described, catalogue, receiving money, Telegram, first customer, and whether the public page is drafted or published. Call it for "what do I still have to do", "is my shop ready", "what next".',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const [steps, site, money] = await Promise.all([
+          loadSetupProgress(businessId),
+          getStorefrontRow(businessId),
+          getPaymentSettings(businessId),
+        ])
+        return {
+          complete: setupComplete(steps),
+          steps: steps.map((step) => ({ step: step.label, state: step.state, detail: step.amount, error: step.error, screen: step.href })),
+          site: { drafted: Boolean(site?.draft), published: Boolean(site?.published), screen: '/app/site' },
+          money: money.account ? { account: money.account.accountId, screen: '/app/money' } : { account: null, screen: '/app/money' },
+          note: 'Telegram is connected on /app/channels by pasting a BotFather token there. Never ask the owner to paste a token into this chat.',
+        }
+      },
+    }),
+
+    set_payment_account: tool({
+      description:
+        'SETUP. Save the shop\'s OWN Bakong account so customers pay it directly by KHQR. The owner copies it from her banking app, e.g. "sokha@wing". Use when she says "my Bakong is ...", "pay me at ...", "set up QR payments".',
+      inputSchema: z.object({
+        account_id: z.string().trim().describe('name@bank, exactly as her banking app shows it'),
+        merchant_name: z.string().trim().max(80).nullable().optional().describe('the name to print on the QR, or null for the shop name'),
+        merchant_city: z.string().trim().max(80).nullable().optional().describe('or null for the province'),
+      }),
+      execute: async ({ account_id, merchant_name, merchant_city }) => {
+        try {
+          const settings = await setPaymentAccount(
+            businessId,
+            { accountId: account_id, merchantName: merchant_name, merchantCity: merchant_city },
+            'owner via moni',
+          )
+          return {
+            saved: settings.account,
+            next: 'She can scan her own test card on /app/money to see her account name come up in her banking app.',
+          }
+        } catch (error) {
+          if (error instanceof PaymentAccountError) return { error: error.message }
+          throw error
+        }
+      },
+    }),
+
+    generate_shop_site: tool({
+      description:
+        'SETUP. Write (or rewrite) the draft of the shop\'s public web page from what the owner already told us. Nothing goes public: she reviews the draft on /app/site and publishes. Use for "make me a website", "write my page".',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const generated = await generateShopSiteDraft(businessId, 'owner via moni')
+        const draft = generated.storefront.draft as { theme?: string; headline?: string; subhead?: string } | null
+        return {
+          drafted: true,
+          theme: draft?.theme ?? null,
+          headline: draft?.headline ?? null,
+          subhead: draft?.subhead ?? null,
+          warnings: generated.warnings,
+          review_on: '/app/site',
+          note: 'Not public yet. Read the headline back to her and say she publishes on /app/site or by asking you to publish.',
+        }
+      },
+    }),
+
+    publish_shop_site: tool({
+      description:
+        'SETUP. Publish the drafted page to the shop\'s own address. Only when the owner explicitly asks to publish or go live. Refuses when nothing is drafted.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const result = await publishShopSite(businessId, 'owner via moni')
+        if (!result.published) return { error: 'there is no draft yet, generate the page first' }
+        const slug = await db.from('businesses').select('slug').eq('id', businessId).single()
+        const path = slug.data ? `/s/${slug.data.slug}` : null
+        return { published: true, published_at: result.storefront.published_at, path, address: slug.data ? `${slug.data.slug}.moni.cam` : null }
+      },
+    }),
+
     // ─────────────────────────────────────────────────────────────── ORGANIZE
     create_service: tool({
       description: 'ORGANIZE. Add a service with its price and how long it takes.',
@@ -366,6 +456,13 @@ export function ownerTools(businessId: string) {
       },
     }),
 
+    confirm_payment: tool({
+      description:
+        'OPERATE. The owner saw a KHQR payment arrive in her own banking app. Marks that booking\'s pending QR as paid and confirms the booking. Use when she says a code was paid, "MN7Q1A paid", "the money for 4K2P came in". Refuses nothing twice: an already paid code is reported, not re-marked.',
+      inputSchema: z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{4,12}$/).describe('booking code') }),
+      execute: async ({ code }) => confirmPayment({ businessId, code, actorLabel: 'owner via moni' }),
+    }),
+
     export_customers: tool({
       description: "OPERATE. The customer list. It is the owner's own asset and she can take it whenever she wants.",
       inputSchema: z.object({}),
@@ -375,5 +472,5 @@ export function ownerTools(businessId: string) {
         return { count: (result.data ?? []).length, customers: result.data ?? [] }
       },
     }),
-  }
+  } satisfies Record<OwnerTool, Tool>
 }
