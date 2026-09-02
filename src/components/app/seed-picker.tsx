@@ -33,7 +33,11 @@ export function SeedPicker({
   const [shuffleFrom, setShuffleFrom] = useState(seed)
   const [busy, setBusy] = useState<number | null>(null)
   const [error, setError] = useState('')
-  const candidates = [seed, ...candidateSeeds(shuffleFrom, 3)]
+  // candidateSeeds excludes shuffleFrom, not seed: after a reroll those two
+  // differ, so a rolled candidate can collide with the seed already chosen.
+  // Ask for one extra and drop it, so a collision still leaves three real
+  // alternates rather than shipping four tiles where two both read as chosen.
+  const candidates = [seed, ...candidateSeeds(shuffleFrom, 4).filter((candidate) => candidate !== seed).slice(0, 3)]
 
   async function choose(next: number) {
     setBusy(next)
@@ -72,7 +76,7 @@ export function SeedPicker({
       </div>
       <p className="km mt-1 text-xs text-rule">ជ្រើសរើសមួយ។ ពាក្យនៅដដែល ប្តូរតែពណ៌ និងរូបរាង។</p>
 
-      <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <ul role="radiogroup" aria-label="រូបរាងហាង" className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {candidates.map((candidate) => {
           const style = styleFor(candidate, vibe, theme)
           const chosen = candidate === seed
@@ -80,10 +84,11 @@ export function SeedPicker({
             <li key={candidate}>
               <button
                 type="button"
+                role="radio"
                 onClick={() => choose(candidate)}
                 disabled={busy !== null}
-                aria-pressed={chosen}
-                className="w-full overflow-hidden border border-rule/70 text-left disabled:opacity-60 aria-pressed:border-seal/70 aria-pressed:ring-2 aria-pressed:ring-seal/40"
+                aria-checked={chosen}
+                className="w-full overflow-hidden border border-rule/70 text-left disabled:opacity-60 aria-checked:border-seal/70 aria-checked:ring-2 aria-checked:ring-seal/40"
                 style={style.vars as CSSProperties}
               >
                 <span className="block aspect-[4/5] p-3" style={{ background: 'var(--sf-surface)' }}>
