@@ -76,8 +76,9 @@ export async function generateStorefront(input: {
     .filter(Boolean)
     .join('\n')
 
-  const { result, ref } = await withFallback('parse', (model) =>
+  const { result, ref } = await withFallback('parse', (model, _ref, abortSignal) =>
     generateText({
+      abortSignal,
       model,
       system: SYSTEM,
       prompt: brief,

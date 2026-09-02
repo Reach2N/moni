@@ -82,8 +82,9 @@ export type Transcript = {
 export async function transcribeVoiceNote(audio: Uint8Array, mediaType: string | null): Promise<Transcript> {
   const type = assertVoiceNote(mediaType, audio.byteLength)
 
-  const { result, ref } = await withFallback('transcribe', (model) =>
+  const { result, ref } = await withFallback('transcribe', (model, _ref, abortSignal) =>
     generateText({
+      abortSignal,
       model,
       system: SYSTEM,
       messages: [

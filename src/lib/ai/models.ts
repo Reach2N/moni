@@ -191,6 +191,47 @@ export function resetModelAvailability(): void {
   unavailableUntil.clear()
 }
 
+/**
+ * How long a job may take, and how long any ONE model gets inside it.
+ *
+ * Measured on 2 September 2026: a parse of "i want to create a coffee shop"
+ * hung on direct google:gemini-3.7-flash for over two and a half minutes with
+ * no error and no answer. Nothing anywhere had a deadline. `generateText` was
+ * given no abortSignal, `withFallback` waited forever, the browser's fetch
+ * waited forever, and the route's `maxDuration` is a Vercel platform limit that
+ * does nothing at all under `next dev`. So the owner watched a spinner with the
+ * product's one important screen behind it, and no log line said why.
+ *
+ * A provider that refuses is a good day: the message says so and the chain
+ * moves on. A provider that accepts the connection and never answers is the bad
+ * one, and only a clock can catch it.
+ *
+ * Two numbers, because they answer different questions. `perAttempt` is how
+ * long one model may stall before we give up on IT. `total` is how long the
+ * whole chain may take before we give up on the REQUEST, and it is set under
+ * each route's `maxDuration` so the chain concludes on its own terms rather
+ * than being killed mid-flight by the platform, which produces a 504 carrying
+ * nothing anyone can act on.
+ */
+const BUDGET: Record<Task, { total: number; perAttempt: number }> = {
+  // POST /api/parse, maxDuration 30
+  parse: { total: 26_000, perAttempt: 12_000 },
+  // POST /api/ask and /api/chat and the channel webhooks, maxDuration 60
+  chat: { total: 50_000, perAttempt: 20_000 },
+  // POST /api/transcribe, maxDuration 60. Audio uploads are bigger, so one
+  // attempt gets longer and fewer of them fit.
+  transcribe: { total: 50_000, perAttempt: 30_000 },
+  classify: { total: 20_000, perAttempt: 10_000 },
+}
+
+/** `MONI_TIMEOUT_PARSE_MS=8000` overrides one attempt, for a demo on bad wifi. */
+function budgetFor(task: Task): { total: number; perAttempt: number } {
+  const base = BUDGET[task]
+  const override = Number(process.env[`MONI_TIMEOUT_${task.toUpperCase()}_MS`]?.trim())
+  if (!Number.isFinite(override) || override <= 0) return base
+  return { total: Math.max(override, base.total), perAttempt: override }
+}
+
 /** Every configured candidate for a job, in preference order. */
 export function modelsFor(task: Task): Array<{ ref: ModelRef; model: LanguageModel }> {
   const configured = refsFor(task).filter((ref) => hasKeyFor(providerOf(ref)))
@@ -264,10 +305,12 @@ function retryAfterMs(msg: string): number | null {
 
 export async function withFallback<T>(
   task: Task,
-  run: (model: LanguageModel, ref: string) => Promise<T>,
+  run: (model: LanguageModel, ref: string, signal: AbortSignal) => Promise<T>,
 ): Promise<{ result: T; ref: string }> {
   const candidates = modelsFor(task)
   const exhaustedProviders = new Set<string>()
+  const budget = budgetFor(task)
+  const startedAt = Date.now()
   let last: unknown
 
   for (let i = 0; i < candidates.length; i++) {
@@ -275,10 +318,52 @@ export async function withFallback<T>(
     const provider = providerOf(ref as ModelRef)
     if (exhaustedProviders.has(provider)) continue
 
+    // What is left of the request's whole budget, capped at one attempt's share.
+    // Stopping here beats starting a call we already know we cannot wait for.
+    const remaining = budget.total - (Date.now() - startedAt)
+    if (remaining <= 1_000) {
+      console.warn(`[ai] ${task} ran out of time after ${((Date.now() - startedAt) / 1000).toFixed(1)}s, ${candidates.length - i} model(s) untried`)
+      break
+    }
+    const allowance = Math.min(budget.perAttempt, remaining)
+
+    // In development every attempt is announced, because the failure this
+    // catches is silence: a stalled provider used to print nothing at all while
+    // the owner watched a spinner. Left out of production, where this would
+    // double the log volume of every customer message.
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`[ai] ${task}: asking ${ref}, up to ${(allowance / 1000).toFixed(0)}s`)
+    }
+
+    const controller = new AbortController()
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, allowance)
+    const attemptStarted = Date.now()
+
     try {
-      return { result: await run(model, ref), ref }
+      const result = await run(model, ref, controller.signal)
+      const took = Date.now() - attemptStarted
+      if (took > 3_000) console.warn(`[ai] ${ref} answered in ${(took / 1000).toFixed(1)}s`)
+      return { result, ref }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+
+      // Our own clock fired. Checked before anything reads the message, because
+      // an abort surfaces from the AI SDK as prose that varies by provider and
+      // says nothing about who cancelled it. A stall is not a refusal, so the
+      // mark is a short window: the model is probably fine again in minutes,
+      // and remembering it forever would route away from the best model for a
+      // bad thirty seconds.
+      if (timedOut) {
+        markUnavailable(ref, Date.now() + 5 * 60_000)
+        last = new Error(`${ref} did not answer within ${(allowance / 1000).toFixed(0)}s`)
+        console.warn(`[ai] ${ref} did not answer within ${(allowance / 1000).toFixed(0)}s, trying the next model`)
+        continue
+      }
+
       if (!isRetryable(msg)) throw err
       last = err
 
@@ -311,16 +396,26 @@ export async function withFallback<T>(
           console.warn(`[ai] ${provider} is over quota, switching provider`)
           continue
         }
-        // nothing else configured: wait out the window once rather than fail
+        // Nothing else configured: wait out the window once rather than fail,
+        // but only if the wait AND a second attempt still fit the request's
+        // budget. Sleeping 40 seconds inside a route the platform kills at 30
+        // spends the user's whole request to arrive nowhere.
         const wait = retryAfterMs(msg)
-        if (wait) {
+        const left = budget.total - (Date.now() - startedAt)
+        if (wait && wait + 5_000 < left) {
           console.warn(`[ai] ${provider} over quota and no other provider, waiting ${wait}ms`)
           await new Promise((r) => setTimeout(r, wait))
+          const retryController = new AbortController()
+          const retryTimer = setTimeout(() => retryController.abort(), Math.max(1_000, budget.total - (Date.now() - startedAt)))
           try {
-            return { result: await run(model, ref), ref }
+            return { result: await run(model, ref, retryController.signal), ref }
           } catch (again) {
             last = again
+          } finally {
+            clearTimeout(retryTimer)
           }
+        } else if (wait) {
+          console.warn(`[ai] ${provider} over quota, and its ${wait}ms window is longer than this request has left`)
         }
         break
       }
@@ -333,6 +428,8 @@ export async function withFallback<T>(
         continue
       }
       console.warn(`[ai] ${ref} failed, trying next: ${msg.slice(0, 160)}`)
+    } finally {
+      clearTimeout(timer)
     }
   }
   throw last instanceof Error ? last : new Error(`all models failed for "${task}"`)

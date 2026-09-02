@@ -160,5 +160,91 @@ await check('an unconfigured provider is still filtered out', async () => {
   }
 })
 
+// ── deadlines ─────────────────────────────────────────────────────────────
+// Measured on 2 September 2026: a parse hung on a direct Gemini candidate for
+// over two and a half minutes, no error and no answer, because nothing in the
+// stack had a clock. A provider that REFUSES is the easy case, the message says
+// so. A provider that accepts the connection and never speaks is the one that
+// puts a spinner in front of a shop owner forever, and only a deadline catches
+// it. The timeouts here are tiny so the suite stays fast; the shipped budgets
+// are in BUDGET in models.ts.
+process.env.MONI_TIMEOUT_PARSE_MS = '150'
+
+/** Like `run`, but a ref may HANG instead of throwing. */
+async function runWithStalls(stalls, throwFor = () => null) {
+  const tried = []
+  const result = await withFallback('parse', async (_model, ref, signal) => {
+    tried.push(ref)
+    const message = throwFor(ref)
+    if (message) throw new Error(message)
+    if (!stalls.includes(ref)) return `answered by ${ref}`
+    // What a stalled provider looks like from here: a promise that settles only
+    // when somebody cancels it. If the router forgets to pass its signal, this
+    // never resolves and the test hangs, which is the correct failure.
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('aborted by caller')), { once: true })
+    })
+  })
+  return { tried, ...result }
+}
+
+await check('a model that never answers is abandoned, and the next one answers', async () => {
+  const { tried, ref } = await runWithStalls(['google/one'])
+  assert.deepEqual(tried, ['google/one', 'google:two'])
+  assert.equal(ref, 'google:two')
+})
+
+await check('the router hands its abort signal to the caller, or nothing could cancel a stall', async () => {
+  let received
+  await withFallback('parse', async (_model, ref, signal) => {
+    received = signal
+    return ref
+  })
+  assert.ok(received instanceof AbortSignal, 'no AbortSignal reached the run callback')
+  assert.equal(received.aborted, false)
+})
+
+await check('a stall is remembered, so the next request does not wait on it again', async () => {
+  await runWithStalls(['google/one'])
+  const second = await runWithStalls(['google/one'])
+  assert.deepEqual(second.tried, ['google:two'], 'the stalled ref was waited on twice')
+})
+
+await check('a stall is forgotten eventually, unlike a plan refusal', async () => {
+  // Both drop the ref for the process, and the difference is the deadline: an
+  // entitlement refusal is a billing fact (Infinity), a stall is a bad moment
+  // (minutes). Asserted through the public surface: after a stall the ref is
+  // still a configured candidate, it is simply not tried right now.
+  await runWithStalls(['google/one'])
+  assert.ok(
+    modelsFor('parse').every((c) => c.ref !== 'google/one'),
+    'a just-stalled ref should be skipped',
+  )
+})
+
+await check('every model stalling still ends the request rather than hanging', async () => {
+  await assert.rejects(
+    runWithStalls(['google/one', 'google:two', 'google:three', 'anthropic:four']),
+    /did not answer/,
+    'a chain of stalls must reject, and say that nothing answered',
+  )
+})
+
+await check('the whole chain stops when the request budget is spent, before trying more models', async () => {
+  // One attempt is allowed 150ms and the whole request 26s in production; here
+  // the total is forced down so the budget, not the candidate list, is what
+  // ends the walk.
+  process.env.MONI_TIMEOUT_PARSE_MS = '200'
+  try {
+    const started = Date.now()
+    await assert.rejects(runWithStalls(['google/one', 'google:two', 'google:three', 'anthropic:four']))
+    // Four candidates at 200ms each is 800ms if every one is waited on. The
+    // point of the assertion is the ceiling, not the exact figure.
+    assert.ok(Date.now() - started < 3_000, 'the chain took far longer than its own budget')
+  } finally {
+    process.env.MONI_TIMEOUT_PARSE_MS = '150'
+  }
+})
+
 console.log(`\n${failures.length === 0 ? '\x1b[32m' : '\x1b[31m'}${failures.length} failed\x1b[0m\n`)
 process.exit(failures.length === 0 ? 0 : 1)

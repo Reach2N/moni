@@ -237,8 +237,9 @@ export async function handleCustomerMessage({
     content: message.body,
   }))
 
-  const { result, ref } = await withFallback('chat', (model) =>
+  const { result, ref } = await withFallback('chat', (model, _ref, abortSignal) =>
     generateText({
+      abortSignal,
       model,
       system: `${CUSTOMER_SYSTEM}${instructionsBlock(business.ai_instructions)}\n\n${contextLine(business.name, business.timezone)}`,
       messages,

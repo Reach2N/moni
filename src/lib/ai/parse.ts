@@ -21,7 +21,9 @@ const ParsedService = z.object({
     .number()
     .int()
     .min(0)
-    .describe('integer MINOR units. KHR has no decimals so 15000 riel is 15000. USD has 2 so $15 is 1500'),
+    .describe(
+      'integer MINOR units. KHR has no decimals so 15000 riel is 15000. USD has 2 so $15 is 1500. Use 0 when the owner named the service but stated no price',
+    ),
   currency: z.enum(CURRENCY_CODES),
   duration_min: z.number().int().positive().describe('minutes. "one and a half hours" is 90'),
   buffer_min: z.number().int().min(0).describe('cleanup or turnaround time after, 0 if not stated'),
@@ -85,16 +87,23 @@ Hours:
 - Leave a closed day out of the array entirely rather than setting equal times.
 - If no hours are given at all, return an empty array. Do not invent them.
 
+Services that were named but not priced, and this is the common case:
+- Naming a thing the shop sells or does IS naming a service. "I sell coffee and bread" names two services. "We do haircuts and colouring" names two.
+- Emit those services with price_minor 0. Zero means the owner did not say a price, and the review screen asks them for it.
+- This is not inventing a price. It is recording the service that was actually named and leaving the price blank. Dropping the service instead loses what the owner told you.
+- Still give it a sensible duration and unit, the same as any other service.
+
 What to do when the owner has not said much yet:
 - An owner may only state an intent, such as "I want to open a coffee shop". That is a valid input, not an error.
-- Return an EMPTY services array when no service was named. An empty array is the correct answer. Never fill it to look complete.
+- Tell the two apart carefully. "I want to open a coffee shop" names no service, so return an empty array. "I sell coffee" names coffee, so return one service at price_minor 0.
+- Return an EMPTY services array only when nothing the shop sells or does was named at all. Never fill it to look complete.
 - Return an empty hours array the same way when no opening times were given.
 - Set name only if the owner named the shop. An owner's personal name is not a shop name, so leave it null.
 - default_currency is KHR unless the owner clearly prices in dollars.
 - business_type is still your best guess from whatever was said.
 
 Never use an em dash in any text you output. Use a comma or a full stop.
-Do not invent services, prices or opening hours that were not stated or clearly implied.`
+Do not invent services or opening hours that were not stated or clearly implied. Never invent a price either: a service whose price was not stated gets price_minor 0, never a guess.`
 
 /** Re-exported from a module with no AI SDK import, so a client component can run it. */
 export { sanityCheck }
@@ -114,7 +123,7 @@ export async function parseShop(text: string): Promise<ParseResult> {
   if (trimmed.length < 8) throw new Error('too short to parse')
   if (trimmed.length > 8000) throw new Error('too long, keep it under 8000 characters')
 
-  const { result, ref } = await withFallback('parse', (model) =>
+  const { result, ref } = await withFallback('parse', (model, _ref, abortSignal) =>
     generateText({
       model,
       system: SYSTEM,
@@ -122,6 +131,9 @@ export async function parseShop(text: string): Promise<ParseResult> {
       output: Output.object({ schema: ParsedShop }),
       temperature: 0,
       maxRetries: 1,
+      // The router's clock, handed to the SDK so a stalled provider's socket is
+      // actually cancelled rather than left running while we move on.
+      abortSignal,
     }),
   )
 

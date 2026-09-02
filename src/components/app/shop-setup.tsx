@@ -159,6 +159,13 @@ export function ShopSetup({
     ])
     try {
       const response = await fetch('/api/parse', {
+        // The last line of defence against a spinner that never stops. The
+        // router already gives up on a stalled model and the route has its own
+        // platform limit, but neither protects a browser from a connection that
+        // simply hangs, and this screen is the product's first impression. Set
+        // above the route's own budget so a server that IS working is never cut
+        // off by the client: a timeout here means nothing is coming.
+        signal: AbortSignal.timeout(35_000),
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ text: description }),
@@ -184,10 +191,17 @@ export function ShopSetup({
       setState('review')
     } catch (failure) {
       const actionable = failure instanceof ParseFailure && failure.actionable
+      // A timeout is its own answer and deserves its own sentence. "Moni could
+      // not read your shop" is wrong when the truth is that nothing came back,
+      // and the owner's next move is different: wait and press again, rather
+      // than rewrite what she typed.
+      const timedOut = failure instanceof DOMException && failure.name === 'TimeoutError'
       setError(
-        actionable
-          ? (failure as ParseFailure).message
-          : 'Moni មិនអាចអានព័ត៌មានហាងបាន។ ទិន្នន័យហាងមិនបានប្តូរទេ។',
+        timedOut
+          ? 'Moni មិនបានឆ្លើយតបទាន់ពេល។ ទិន្នន័យហាងមិនបានប្តូរទេ។ សូមសាកម្តងទៀត។'
+          : actionable
+            ? (failure as ParseFailure).message
+            : 'Moni មិនអាចអានព័ត៌មានហាងបាន។ ទិន្នន័យហាងមិនបានប្តូរទេ។',
       )
       setState('error')
     }

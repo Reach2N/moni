@@ -38,8 +38,9 @@ export async function POST(req: Request) {
     const business = { id: member.businessId, name: member.name }
     const messages = [...body.history, { role: 'user' as const, content: body.text }]
 
-    const { result, ref } = await withFallback('chat', (model) =>
+    const { result, ref } = await withFallback('chat', (model, _ref, abortSignal) =>
       generateText({
+        abortSignal,
         model,
         system: `${OWNER_SYSTEM}\n\n${ownerContext(business.name)}`,
         messages,
