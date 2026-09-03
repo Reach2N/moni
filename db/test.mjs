@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHmac } from 'node:crypto'
 import { PGlite } from '@electric-sql/pglite'
-import { formatMoney, BILLABLE_BOOKING_STATUSES, BUSINESS_TYPES, sellsFor } from '../src/lib/types.ts'
+import { formatMoney, BILLABLE_BOOKING_STATUSES, BUSINESS_TYPES, sellsFor, catalogKindFor, BOOKING_UNITS } from '../src/lib/types.ts'
 import { amountsMatch, idempotencyKey, shouldFallback, QR_TTL_SECONDS } from '../src/lib/payments.ts'
 import { btree_gist } from '@electric-sql/pglite/contrib/btree_gist'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
@@ -1607,6 +1607,41 @@ console.log('\nthe owner learns what is missing before her customers do')
 // owner's products-page prompt.
 const missing = await one(db, `select count(*) c from products where business_id = '${B_CAFE}' and active and photo_path is null`)
 eq('the count of photoless items is answerable in one query', Number.isInteger(Number(missing.c)), true)
+
+console.log('\nwhat a shop sells decides which table a row lives in')
+// The bug this closes: setup/persist.ts wrote EVERY parsed row to services, so
+// a cafe's cappuccino was filed as a service, could never hold a photo, and
+// could never be ordered. The rule needs no column: `sells` already lives on
+// the business type and `unit` already rides on every parsed row.
+eq('a cafe walk-in row is a product', catalogKindFor('cafe', 'walk_in'), 'product')
+eq('a cafe session row is still a service', catalogKindFor('cafe', 'session'), 'service')
+// A time-selling business is never talked into products by a stray unit. A
+// salon that somehow parsed a walk-in row is still selling time.
+eq('a salon walk-in row stays a service', catalogKindFor('salon', 'walk_in'), 'service')
+eq('a salon session row is a service', catalogKindFor('salon', 'session'), 'service')
+// A restaurant sells both: the table booking is time, the dish is a thing.
+eq('a restaurant table booking is a service', catalogKindFor('restaurant', 'session'), 'service')
+eq('a restaurant dish is a product', catalogKindFor('restaurant', 'walk_in'), 'product')
+// An unknown business type falls back to `both`, so the unit decides.
+eq('an unknown type still routes by unit', catalogKindFor('not_a_real_type', 'walk_in'), 'product')
+// Every type crossed with every unit must return a real kind, never undefined.
+let unrouted = 0
+for (const type of BUSINESS_TYPES) {
+  for (const unit of BOOKING_UNITS) {
+    const kind = catalogKindFor(type.id, unit)
+    if (kind !== 'product' && kind !== 'service') unrouted++
+  }
+}
+eq(`every one of ${BUSINESS_TYPES.length * BOOKING_UNITS.length} type and unit pairs routes`, unrouted, 0)
+// A time-selling type can never produce a product, on any unit at all.
+const timeTypes = BUSINESS_TYPES.filter((t) => t.sells === 'time')
+let timeLeak = 0
+for (const type of timeTypes) {
+  for (const unit of BOOKING_UNITS) {
+    if (catalogKindFor(type.id, unit) === 'product') timeLeak++
+  }
+}
+eq(`none of the ${timeTypes.length} time-selling types leaks a product`, timeLeak, 0)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

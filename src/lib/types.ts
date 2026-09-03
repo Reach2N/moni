@@ -219,6 +219,27 @@ export type PaymentKind = (typeof PAYMENT_KINDS)[number]
 export const CATALOG_KINDS = ['service', 'product'] as const
 export type CatalogKind = (typeof CATALOG_KINDS)[number]
 
+/**
+ * Which table a parsed catalogue row belongs in.
+ *
+ * This is the rule `src/lib/setup/persist.ts` was missing, and the reason a
+ * cafe's menu was filed as a list of services: a service cannot hold a photo,
+ * `v_catalog` reports its photo_path as null by construction, and `createOrder`
+ * only ever looks at `products`, so a cafe could neither show a picture nor take
+ * an order.
+ *
+ * No column and no migration: `sells` already lives on the business type and
+ * `unit` already rides on every parsed row. The difference between the two
+ * tables is whether the thing occupies somebody's time, and `walk_in` is
+ * precisely the unit that says it does not.
+ */
+export function catalogKindFor(businessTypeId: string, unit: BookingUnit): CatalogKind {
+  // A business that sells time sells time, whatever a stray unit says. Reading
+  // it the other way round would let one odd parse turn a salon into a shop.
+  if (sellsFor(businessTypeId) === 'time') return 'service'
+  return unit === 'walk_in' ? 'product' : 'service'
+}
+
 // ─────────────────────────────────────────────────────────── row types
 // These mirror db/schema.sql 1:1. Timestamps are ISO strings over the wire.
 
