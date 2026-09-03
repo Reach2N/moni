@@ -44,6 +44,13 @@ export type ProductValues = {
   sort_order: number
 }
 
+/**
+ * What a re-parse is allowed to write over an existing product. `active` is
+ * missing from the type, not merely left unset at the call site, so that
+ * putting it back is a type error rather than a quiet regression.
+ */
+export type ProductUpdateValues = Omit<ProductValues, 'active'>
+
 export type CataloguePlan = {
   services: {
     updates: Array<{ id: string; values: ServiceValues }>
@@ -51,7 +58,7 @@ export type CataloguePlan = {
     deactivate: string[]
   }
   products: {
-    updates: Array<{ id: string; values: ProductValues }>
+    updates: Array<{ id: string; values: ProductUpdateValues }>
     inserts: ProductValues[]
     // Always empty. See the comment above the `products` plan below: setup
     // never deactivates a product, so nothing is ever computed for this list.
@@ -143,21 +150,27 @@ export function planCatalogue(
     // and photo_alt are absent from `values` entirely, not set to null: on an
     // insert that means the columns take their own NULL default, and on an
     // update it means a photo, stock count or category the owner already set
-    // from the product editor survives a re-parse untouched.
-    const values: ProductValues = {
+    // from the product editor survives a re-parse untouched. `active` is
+    // omitted the same way, and for the mirror of the same reason setup
+    // refuses to retire a product: a description cannot rebuild an uploaded
+    // photograph, so it may not resurrect an item the owner archived either.
+    // An archive is her decision about her own inventory, and saving a shop
+    // description is not a vote on it.
+    const values: ProductUpdateValues = {
       name: row.name,
       name_en: row.name_en,
       description: row.description,
       price_minor: row.price_minor,
       currency: row.currency,
-      active: true,
       sort_order: sortOrder,
     }
     const existing = productByName.get(normalizeServiceName(row.name))
     if (existing) {
       productUpdates.push({ id: existing.id, values })
     } else {
-      productInserts.push(values)
+      // A row this parse has just introduced has no history to respect, so it
+      // lands live.
+      productInserts.push({ ...values, active: true })
     }
   })
 

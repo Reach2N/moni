@@ -1883,6 +1883,23 @@ eq('a re-parse that drops a product from the description queues no deactivation'
 eq('and queues no update either: an unmentioned product is left alone entirely',
   survivorPlan.products.updates.length, 0)
 
+console.log('\nsetup will not retire a product, and must not resurrect one either')
+// The mirror of the finding above, and the same principle read backwards.
+// `active: true` was hardcoded on the product update, so re-saving a shop
+// description silently un-archived an item the owner had deliberately
+// archived. "Hers to do, visible and reversible" is worth nothing if the next
+// description save undoes it, so the update carries no `active` at all and
+// only an insert sets one.
+const archivedPlan = planCatalogue(
+  'cafe',
+  [row({ name: 'Cappuccino', unit: 'walk_in', price_minor: 4000 })],
+  [],
+  [{ id: 'prod-1', name: 'Cappuccino', active: false }],
+)
+eq('an archived product still matches by name', archivedPlan.products.updates.length, 1)
+eq('and the update does not carry active at all',
+  Object.prototype.hasOwnProperty.call(archivedPlan.products.updates[0].values, 'active'), false)
+
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
 process.exit(fail === 0 ? 0 : 1)

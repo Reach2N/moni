@@ -779,9 +779,11 @@ Plan: `docs/superpowers/plans/2026-09-03-catalogue-routing.md`. Shipped 3 Septem
   guesthouse untouched because both are time-selling types, and the write run then refused
   and changed nothing because `DATABASE_URL` is not set. So new shops route correctly from
   the moment `persist.ts` shipped, and the tile feature remains inert on live data until
-  that variable exists and the backfill is run for real. `/app/site` and `/app/products` are
-  behind Clerk with no test credentials here, so the tiles have still never been seen on a
-  real shop's page.
+  that variable exists and the backfill is run for real. That unrun backfill, not the sign-in
+  wall, is why the tiles have still never been seen on a real shop's page: `/s/[slug]` is
+  public and needs no credentials, it just has no product rows to draw yet. `/app/site` and
+  `/app/products` are behind Clerk with no test credentials here, so the owner-facing halves
+  of the feature are unseen too.
 
 ### Explicit room left, not built now
 
