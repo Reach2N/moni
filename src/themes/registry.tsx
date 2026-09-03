@@ -133,6 +133,11 @@ function SalonStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: n
 
       <h2 className="km mt-10 text-sm font-semibold tracking-wide text-label-2">អំពីយើង</h2>
       <p className="km mt-2 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
+      {data.content.highlights.length > 0 ? (
+        <ul className="km mt-4 flex flex-col gap-1 text-sm text-label-2">
+          {data.content.highlights.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      ) : null}
 
       <h2 className="km mt-10 text-sm font-semibold tracking-wide text-label-2">ម៉ោងបើក</h2>
       <div className="mt-2"><Hours data={data} /></div>

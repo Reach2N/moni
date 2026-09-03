@@ -76,3 +76,28 @@ export function isOnlyHeadlineIsShopName(warnings: readonly StorefrontWarning[])
     warnings[0].issue === 'is only the shop name, which says nothing'
   )
 }
+
+/**
+ * Whether generateStorefront's one retry should replace the first draft.
+ *
+ * Fixing the headline is not the only thing that can change between two
+ * generations of the same prompt: a second roll of the dice can just as
+ * easily invent a claim or write a price into prose, and comparing headlines
+ * alone would prefer that draft anyway because it looks past its own new
+ * defect. A lie on a real business's public page is the one failure this
+ * product cannot recover from, a weak headline is not, so the retry only
+ * wins if it actually fixed the headline AND introduced no warning the first
+ * draft did not already have. Anything else, keep the first draft.
+ */
+export function preferRetry(
+  first: { headline: string; warnings: readonly StorefrontWarning[] },
+  second: { headline: string; warnings: readonly StorefrontWarning[] },
+  shopName: string,
+): boolean {
+  const stillJustTheName = second.headline.trim().toLowerCase() === shopName.trim().toLowerCase()
+  if (stillJustTheName) return false
+  const key = (warning: StorefrontWarning) => `${warning.field}:${warning.issue}`
+  const firstKeys = new Set(first.warnings.map(key))
+  const introducedNewWarning = second.warnings.some((warning) => !firstKeys.has(key(warning)))
+  return !introducedNewWarning
+}

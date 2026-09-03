@@ -14,7 +14,7 @@ import { Output, generateText } from 'ai'
 import { z } from 'zod'
 import { THEMES, WARMTHS, VOICES, DENSITIES, type StorefrontContent, type ThemeId } from '@/lib/types.ts'
 import { costMicroUsd, withFallback } from './models.ts'
-import { isOnlyHeadlineIsShopName, sanityCheck, type StorefrontWarning } from './storefront-check.ts'
+import { isOnlyHeadlineIsShopName, preferRetry, sanityCheck, type StorefrontWarning } from './storefront-check.ts'
 
 const THEME_IDS = THEMES.map((theme) => theme.id) as [ThemeId, ...ThemeId[]]
 
@@ -118,7 +118,20 @@ export async function generateStorefront(input: {
   // than either, so a second miss keeps the first draft and lets the warning
   // stand rather than trying again.
   const retryPrompt = `${brief}\n\nYour previous headline was just the shop's name, "${input.shopName}", which says nothing on its own. Write a real headline instead: one line that promises something specific about this shop, using only the facts above.`
-  const second = await runOnce(retryPrompt)
-  const stillJustTheName = second.content.headline.trim().toLowerCase() === input.shopName.trim().toLowerCase()
-  return stillJustTheName ? first : second
+  try {
+    const second = await runOnce(retryPrompt)
+    const useRetry = preferRetry(
+      { headline: first.content.headline, warnings: first.warnings },
+      { headline: second.content.headline, warnings: second.warnings },
+      input.shopName,
+    )
+    return useRetry ? second : first
+  } catch {
+    // The retry is a bonus on a draft that already exists and already passed
+    // generation once. If the network or every fallback model fails on this
+    // second call, the owner must not lose the first draft over it: the same
+    // reasoning that bounds this to one retry in the first place, a weak
+    // headline beats no page at all.
+    return first
+  }
 }

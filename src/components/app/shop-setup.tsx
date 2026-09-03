@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 import type { ParseResponse } from '@/lib/parse-types.ts'
 import { sanityCheck } from '@/lib/ai/sanity.ts'
-import { catalogueCounts } from '@/lib/setup/catalogue-count.ts'
+import { catalogueCounts, catalogueZeroKind } from '@/lib/setup/catalogue-count.ts'
 import { moneyKm, toKhmerDigits } from './dashboard-format.ts'
 
 const SAMPLE =
@@ -286,7 +286,13 @@ export function ShopSetup({
       catalogueCount.products > 0 ? `${toKhmerDigits(catalogueCount.products)} មុខទំនិញ` : null,
     ]
       .filter(Boolean)
-      .join(' និង ') || `${toKhmerDigits(0)} សេវា`
+      .join(' និង ') ||
+    // Nothing parsed yet, so there is no row to read a kind off. A cafe with
+    // an empty parse is a product-selling shop with no menu, not a services
+    // shop with no roster, so the zero case is honest too.
+    (catalogueZeroKind(parsed?.shop.business_type ?? 'other') === 'service'
+      ? `${toKhmerDigits(0)} សេវា`
+      : `${toKhmerDigits(0)} មុខទំនិញ`)
   const blockers: string[] = []
   if (reviewServices.length === 0) {
     blockers.push('បន្ថែមសេវាយ៉ាងតិចមួយ មុនពេលរក្សាទុក')

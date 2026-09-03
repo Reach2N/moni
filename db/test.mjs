@@ -28,8 +28,8 @@ import { sortInbox } from '../src/lib/queries/inbox-order.ts'
 import { checkBudget, formatSpend, DEFAULT_CONVERSATION_CAP_MICRO_USD, DEFAULT_MONTH_CEILING_MICRO_USD } from '../src/lib/ops/budget.ts'
 import { createRateLimiter } from '../src/lib/ops/rate-limit.ts'
 import { shopSlugFromHost } from '../src/lib/hosting/subdomain.ts'
-import { sanityCheck, isOnlyHeadlineIsShopName } from '../src/lib/ai/storefront-check.ts'
-import { catalogueCounts } from '../src/lib/setup/catalogue-count.ts'
+import { sanityCheck, isOnlyHeadlineIsShopName, preferRetry } from '../src/lib/ai/storefront-check.ts'
+import { catalogueCounts, catalogueZeroKind } from '../src/lib/setup/catalogue-count.ts'
 import { buildKhqrPayload, crc16, amountField, khqrMd5 } from '../src/lib/khqr/payload.ts'
 import { assertUploadable, storageKey, MediaError, MAX_IMAGE_BYTES } from '../src/lib/media/validate.ts'
 import { shopKhqrRail, isPollable } from '../src/lib/payments/shop-khqr.ts'
@@ -777,6 +777,32 @@ eq('a second warning alongside it cancels the retry',
   ), false)
 eq('a different single warning is not this one', isOnlyHeadlineIsShopName(sanityCheck(withMarkup, 'Sokha Beauty')), false)
 
+// preferRetry decides whether the second draft replaces the first. Comparing
+// headlines alone would prefer a retry that fixed the headline but invented a
+// claim or wrote a price into prose, trading a cosmetic flaw for a lie on a
+// real business's page, which this product cannot recover from.
+const firstDraft = { headline: 'Sokha Beauty', warnings: [{ field: 'headline', issue: 'is only the shop name, which says nothing' }] }
+eq('a retry that fixes the headline and adds no new warning wins',
+  preferRetry(firstDraft, { headline: 'កាត់សក់នៅតាកែវ', warnings: [] }, 'Sokha Beauty'), true)
+eq('a retry that still repeats the shop name loses, even with no other warning',
+  preferRetry(firstDraft, { headline: 'Sokha Beauty', warnings: [] }, 'Sokha Beauty'), false)
+eq('a retry that fixes the headline but invents a claim loses to the cosmetic flaw',
+  preferRetry(firstDraft, { headline: 'ការកាត់សក់ល្អបំផុត', warnings: [{ field: 'headline', issue: 'makes a claim the owner did not make' }] }, 'Sokha Beauty'),
+  false)
+eq('a retry that fixes the headline but writes a price into prose also loses',
+  preferRetry(firstDraft, { headline: 'កាត់សក់ 15000៛', warnings: [{ field: 'headline', issue: 'states a price, which must come from the catalogue instead' }] }, 'Sokha Beauty'),
+  false)
+// A warning the retry shares with the first draft is not a NEW warning, so it
+// does not by itself block the retry (this case cannot occur for the actual
+// trigger, whose first draft has exactly the headline warning, but the
+// function is general and this pins that "new" means new).
+eq('a warning already present in the first draft does not count as new',
+  preferRetry(
+    { headline: 'Sokha Beauty', warnings: [{ field: 'headline', issue: 'is only the shop name, which says nothing' }, { field: 'about', issue: 'contains an em dash' }] },
+    { headline: 'ការកាត់សក់ថាកែវ', warnings: [{ field: 'about', issue: 'contains an em dash' }] },
+    'Sokha Beauty',
+  ), true)
+
 await expectOk(db, 'a shop gets exactly one site, keyed by its own id',
   `insert into storefronts (id, theme, draft) values ('${B_SALON}', 'salon', '${JSON.stringify(goodCopy)}'::jsonb)`)
 await expectFail(db, 'and cannot have a second',
@@ -1350,27 +1376,62 @@ eq(`all ${emitted.length} seeded tokens are read by a file that renders`, unread
 console.log('\nthe page renders what it was given, and draws nothing for what it was not')
 // No JSX renderer runs in this harness (registry.tsx and page.tsx are read as
 // text above too, for the same reason), so what is provable here is the
-// source shape: the exact substitutions this fix makes, pinned so neither
-// regresses silently.
+// source shape. A token-presence check like `slice.includes('hasHours ?')`
+// proves a NAME occurs somewhere in the file, not what renders: inverting the
+// ternary to `hasHours ? 'mt-8' : 'mt-8 border-t border-separator pt-6'`
+// draws the border only when there are NO hours, this bug in its purest form,
+// and that check still passes. Every assertion below instead extracts the
+// actual branch structure and checks which side carries which content, so an
+// inversion changes the answer.
 const registrySource = readFileSync(join(here, '../src/themes/registry.tsx'), 'utf8')
-const counterStart = registrySource.indexOf('function CounterStorefront')
+const salonStart = registrySource.indexOf('function SalonStorefront')
+const stayStart = registrySource.indexOf('function StayStorefront')
 const workshopStart = registrySource.indexOf('function WorkshopStorefront')
+const counterStart = registrySource.indexOf('function CounterStorefront')
 const registryEnd = registrySource.indexOf('export const THEME_REGISTRY')
-const counterSlice = registrySource.slice(counterStart, registryEnd)
+const salonSlice = registrySource.slice(salonStart, stayStart)
+const staySlice = registrySource.slice(stayStart, workshopStart)
 const workshopSlice = registrySource.slice(workshopStart, counterStart)
-const staySlice = registrySource.slice(registrySource.indexOf('function StayStorefront'), workshopStart)
-// counter is the theme a cafe gets, and it was the one theme of the four that
-// never rendered the highlights the model wrote: sanityCheck validates them
-// and the page dropped them on the floor, which is a large part of why a
-// cafe's page read as thin.
-eq('the counter theme renders the highlights the model wrote', counterSlice.includes('data.content.highlights'), true)
-eq('and an empty highlights array draws nothing there', counterSlice.includes('highlights.length > 0'), true)
-// Hours returns null for a shop with no recorded hours. The border that used
-// to wrap it unconditionally drew a rule around that empty space, which is
-// the empty band a real owner saw on her own page.
-eq('the hours divider is conditional on hours actually existing', counterSlice.includes('hasHours ?'), true)
-eq('an empty highlights array draws nothing in the stay theme either', staySlice.includes('highlights.length > 0'), true)
-eq('nor in the workshop theme, where the list itself carries the border', workshopSlice.includes('highlights.length > 0'), true)
+const counterSlice = registrySource.slice(counterStart, registryEnd)
+
+// True only when `<tag` sits inside the branch that runs WHEN the guard is
+// true, i.e. between `highlights.length > 0 ? (` and its matching `) : null}`.
+// Swapping which branch holds the list (or holding neither) fails this even
+// though the substrings `highlights.length > 0`, the tag and `null` all still
+// occur somewhere in the slice.
+function highlightsRenderInTrueBranch(slice, tag) {
+  const match = /highlights\.length > 0 \? \(([\s\S]*?)\) : null\}/.exec(slice)
+  return !!match && new RegExp(`<${tag}\\b`).test(match[1])
+}
+// counter is the theme a cafe gets, and it, along with salon, was one of the
+// two themes of the four that never rendered the highlights the model wrote:
+// sanityCheck validates them and the page dropped them on the floor, which is
+// a large part of why those pages read as thin.
+eq('the counter theme renders the highlights the model wrote in its true branch',
+  highlightsRenderInTrueBranch(counterSlice, 'ul'), true)
+eq('the salon theme renders them too: the brief said it was the only theme missing them, and that was wrong',
+  highlightsRenderInTrueBranch(salonSlice, 'ul'), true)
+eq('the stay theme renders them in its true branch', highlightsRenderInTrueBranch(staySlice, 'ul'), true)
+eq('the workshop theme renders its numbered list in its true branch too', highlightsRenderInTrueBranch(workshopSlice, 'ol'), true)
+// The false branch (`highlights.length === 0`) must be `null` and nothing
+// else, in all four: an empty list draws nothing, not an empty bordered box.
+for (const [name, slice] of [['salon', salonSlice], ['stay', staySlice], ['workshop', workshopSlice], ['counter', counterSlice]]) {
+  eq(`and ${name}'s false branch draws nothing`, /highlights\.length > 0 \? \([\s\S]*?\) : null\}/.test(slice), true)
+}
+
+// True only when the branch RETURNED when hasHours is true carries the
+// border, and the other branch does not. This is the exact assertion the
+// reviewer's inverted ternary (`hasHours ? 'mt-8' : 'mt-8 border-t ...'`)
+// fails, where the old `includes('hasHours ?')` check did not.
+function ternaryBranches(slice, conditionName) {
+  const match = new RegExp(`${conditionName} \\? '([^']*)' : '([^']*)'`).exec(slice)
+  return match ? { whenTrue: match[1], whenFalse: match[2] } : null
+}
+const hoursTernary = ternaryBranches(counterSlice, 'hasHours')
+eq('the hours divider is present when there ARE hours to show',
+  !!hoursTernary && hoursTernary.whenTrue.includes('border-t border-separator'), true)
+eq('and absent when there are none, not the other way round',
+  !!hoursTernary && !hoursTernary.whenFalse.includes('border-t'), true)
 
 const storefrontPageSource = readFileSync(join(here, '../src/app/s/[slug]/page.tsx'), 'utf8')
 // The shop's address and phone are the two facts a customer needs to reach it
@@ -1717,6 +1778,13 @@ eq('a shop that sells both kinds gets both counted',
   JSON.stringify({ services: 1, products: 1 }))
 eq('an empty parse counts as nothing of either kind',
   JSON.stringify(catalogueCounts('cafe', [])), JSON.stringify({ services: 0, products: 0 }))
+// With zero rows there is no unit to route by, so the zero-case label falls
+// back to the business type's own sells: a cafe with an empty parse is still
+// a product-selling shop, not a services shop with an empty roster.
+eq('a cafe with nothing parsed yet is still told about products', catalogueZeroKind('cafe'), 'product')
+eq('a salon with nothing parsed yet is told about services', catalogueZeroKind('salon'), 'service')
+eq('a shop that sells both leads with products for the zero case, same as product-list.tsx', catalogueZeroKind('phone_repair'), 'product')
+eq('an unknown business type defaults to both, so it leads with products too', catalogueZeroKind('not_a_real_type'), 'product')
 
 console.log('\na cafe\'s menu is filed where a menu belongs')
 // Before this, persist.ts wrote every row to services and the word "product"

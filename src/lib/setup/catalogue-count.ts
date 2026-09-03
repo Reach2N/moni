@@ -1,4 +1,4 @@
-import { catalogKindFor, type BookingUnit } from '../types.ts'
+import { catalogKindFor, sellsFor, type BookingUnit } from '../types.ts'
 
 /**
  * How many of a parsed catalogue's rows will land in `services` versus
@@ -23,4 +23,17 @@ export function catalogueCounts(
     else services += 1
   }
   return { services, products }
+}
+
+/**
+ * Which noun a shop with nothing parsed yet should be told about. With zero
+ * rows there is no unit to read a kind off, so this falls back to the same
+ * signal `product-list.tsx` uses to decide which kind leads for a business
+ * that sells both: a time-only business (a salon with an empty parse) has no
+ * roster, but a goods-or-both business (a cafe with an empty parse) has no
+ * menu, and telling every zero case "services" told a cafe owner she was
+ * missing a roster she never intended to have.
+ */
+export function catalogueZeroKind(businessTypeId: string): 'service' | 'product' {
+  return sellsFor(businessTypeId) === 'time' ? 'service' : 'product'
 }
