@@ -676,8 +676,9 @@ Design: `docs/superpowers/specs/2026-09-02-seeded-storefront-design.md`. Plan:
   `products`, which made the tile feature above correct but unreachable for every shop
   that came through onboarding, and which would have blocked Phase 13's checkout too
   because `createOrder` operates on `products` only. Phase 12.5 fixed the write path, so
-  do not go looking for this bug again. What blocks Phase 13 now is `DATABASE_URL`, which
-  is not a code problem at all: see section 7.
+  do not go looking for this bug again. What blocked Phase 13 next was `DATABASE_URL`,
+  which is not a code problem at all: Phase 13 is built and cannot run without it. See the
+  Phase 13 section and section 7.
 - Acceptance, as verified in this environment: `npm run db:test`, `npm run test:signals`,
   `npx tsc --noEmit` and `npm run build` all pass. `npm run shoot` captures the one shop
   published in the live database, `sansethireach`, cleanly at both widths, and its menu
@@ -789,8 +790,9 @@ Plan: `docs/superpowers/plans/2026-09-03-catalogue-routing.md`. Shipped 3 Septem
 
 Design: `docs/superpowers/specs/2026-09-03-calendar-library-design.md`. Plan:
 `docs/superpowers/plans/2026-09-03-calendar-library.md`. Shipped 3 September 2026, 8 new
-assertions in `npm run db:test` (467 passing, a total that also carries the Phase 13 work
-landing in parallel).
+assertions in `npm run db:test` (467 passing when this section was written). Phase 13 was
+landing in parallel and has since taken the total to 551: see the Phase 13 section for the
+current figure.
 
 - **A resource is a colour now, not a column.** `src/components/app/calendar-lanes.tsx`
   was a hand-built CSS grid, one column per chair or room, one row per half hour, and it
@@ -855,9 +857,9 @@ landing in parallel).
   this phase is named for, and CLAUDE.md's sourcing rule forbids redrawing a library
   component in any case. The channel still travels on every row and is still shown in the
   inbox.
-- Acceptance, as verified in this environment: `npm run db:test` 467 passing 0 failing,
-  `npm run test:signals` all passing, `npx tsc --noEmit` clean, `npm run build` succeeding,
-  and `npm run shoot` unchanged from its Phase 12.5 baseline. `shoot` does not reach this
+- Acceptance, as verified in this environment on the day this shipped: `npm run db:test`
+  467 passing 0 failing, `npm run test:signals` all passing, `npx tsc --noEmit` clean,
+  `npm run build` succeeding, and `npm run shoot` unchanged from its Phase 12.5 baseline. `shoot` does not reach this
   screen: its three `/app` captures are the Clerk sign-in page, because the script signs in
   to nothing. **`/app/calendar` itself has never been seen signed in**,
   because it is behind Clerk and there are no test credentials here. It was rendered
@@ -869,6 +871,76 @@ landing in parallel).
   normal`, the today marker is `#059669`, corner rounding is 0, and there is no horizontal
   overflow at 1440 or at 390. What it did not prove: anything about real rows, the live
   stream against a real business id, or the page inside the app shell.
+
+### Phase 13: The shop site takes the order and the money
+
+Design: `docs/superpowers/specs/2026-09-02-storefront-checkout-design.md`. Built 3
+September 2026 alongside Phase 12.6, taking `npm run db:test` from 467 to 540, and a fix
+wave the same day to 551.
+
+- **A published shop site was a brochure.** Its only action was a Telegram link or a
+  `tel:` href, so a customer who had already decided what she wanted had to leave the
+  page, open another app and start a conversation to buy a coffee. Every part of the rail
+  was already built: `createOrder` with its stock decrement and gapless invoice number,
+  `railsFor()` preferring the shop's own Bakong account, `confirmPayment` as the one place
+  a person moves money to paid. None of it was connected to the page.
+- **The public route is a new sibling, never a widened owner route.**
+  `POST /api/shop/[slug]/order` derives the tenant from the slug in its own path, so there
+  is no body field a caller could set to reach another shop, and an unpublished shop is a
+  404 on the page and a 404 here from the same lookup. It runs the same
+  `assertSameOriginBrowserPost` every other browser POST does, rate limits per IP and per
+  slug, and wraps `createOrder` in `withTransaction` with `channel: 'web'`. Prices, names
+  and the total are read from the catalogue INSIDE that transaction, so a client cannot
+  name its own price.
+- **The order QR gets its own route segment**, `/api/pay/order/[code]`, rather than a
+  branch inside `/api/pay/[code]`. Booking codes and order codes come from two generators
+  over one alphabet: a branch would serve one shop's QR for another shop's code, silently,
+  at the moment money moves. For the same reason a code matching both a booking and an
+  order is an explicit `ambiguous` outcome in `confirmTarget`, never a guess.
+- **`payments.order_id`**, types first and `db/schema.sql` after, migration
+  `20260903000100_order_payments`. `on delete set null` because a deleted order must not
+  take the record of money with it, and no CHECK forcing one of `booking_id` or `order_id`
+  because a cash sale with neither is already a legitimate row. `v_month_usage` needed no
+  change: an order payment has a null `booking_id`, so a paid one already meters as a
+  standalone sale. That is correct by coincidence, so it has an assertion rather than a
+  shrug.
+- **Stock comes back.** `createOrder` takes stock at order time, which is right for a
+  Telegram order an agent is shepherding and wrong for a public page where anybody can
+  place a hundred unpaid orders. `runExpiredOrders` joins the cron tick, cancels a pending
+  web order whose newest payment has lapsed, and restores what it took. Scoped to
+  `channel = 'web'` on purpose: a Telegram order must not be cancelled underneath the
+  agent handling it.
+- **The owner confirms, as she does for every other KHQR payment.** Bakong's
+  check-transaction blocks servers outside Cambodia, the rail is `pollBased: false`, and
+  her banking app is the verifier. `pendingPaymentsFor` widened so an order payment
+  reaches the inbox with its lines on the row, which before this it could not: the site
+  raised a QR the owner had no button for.
+- **The migration was applied to the live project over MCP and
+  `src/lib/database.types.ts` regenerated**, which is why `src/lib/database.pending.ts`,
+  the overlay written the same day to name the one column ahead of the live schema,
+  deleted itself. That is a SCHEMA change and nothing more. It is not evidence that any
+  code path in this phase has run against the live database.
+- **What has never run, and must not be read as verified.** `DATABASE_URL` is not set in
+  this environment (see section 7), and `src/lib/orders/connection.ts` is the only direct
+  Postgres connection in the codebase. So:
+  - **no order has ever been written live.** `createOrder` needs a real transaction,
+    which PostgREST cannot express, so the entire checkout is unrunnable here. Every
+    assertion about orders, stock, invoice numbering and expiry is against PGlite in
+    `db/test.mjs`, which is the same engine and not the same data.
+  - **`runExpiredOrders` has never fired against a real tick.** There is no external cron
+    account yet (section 7) and no live order to expire, so its only exercise is
+    `expireWebOrders` called directly by the harness.
+  - **the catalogue backfill has still not been run.** `db/backfill-catalogue.mjs` refused
+    its write run and changed nothing for the same missing variable, so shops onboarded
+    before Phase 12.5 still hold menu rows in `services`, where `createOrder` cannot reach
+    them. A cafe in that state has a cart that can add nothing.
+  - **the checkout has never been opened in a browser against a live shop.** `npm run
+    shoot` captures `/s/[slug]`, not the cart, the order page or the QR.
+- Acceptance, as verified in this environment: `npm run db:test` 551 passing 0 failing,
+  `npm run test:signals` all passing, `npx tsc --noEmit` clean, `npm run build`
+  succeeding. Everything above the "what has never run" bullet is code that exists and is
+  covered by assertions; nothing in this phase has been observed end to end against the
+  live project.
 
 ### Explicit room left, not built now
 
@@ -923,8 +995,9 @@ reserved, with seams that must not be casually implemented or deleted:
   `npx clerk@latest init` claims to create one non-interactively with no account,
   which is worth trying first. Two keys land in `.env.local`:
   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
-- Put **`DATABASE_URL`** in `.env.local`. It is not there today, and it is the one thing
-  now blocking Phase 13. Two callers need a real transaction, which PostgREST cannot
+- Put **`DATABASE_URL`** in `.env.local`. It is not there today. Phase 13 is BUILT and
+  cannot run without it: no order has been written live, and `runExpiredOrders` has never
+  fired against a real tick. Two callers need a real transaction, which PostgREST cannot
   express:
   - `src/lib/orders/connection.ts`, the single direct Postgres connection in the codebase,
     which backs `createOrder` and gapless invoice numbering. Without it none of Phase 13's
