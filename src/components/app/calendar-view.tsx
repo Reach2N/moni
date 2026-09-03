@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { CircleDot } from 'lucide-react'
-import { Temporal } from 'temporal-polyfill'
+// Installs `globalThis.Temporal` and the Temporal-aware `Intl.DateTimeFormat`.
+// Not optional and not a convenience: schedule-x 4 reads the GLOBAL `Temporal`
+// to validate every event it is handed, so a named import of the same polyfill
+// passes an object the library rejects with "Event start time needs to be a
+// Temporal.ZonedDateTime". The side-effect import and the global are the same
+// module instance, which is what makes its `instanceof` check agree.
+import 'temporal-polyfill/global'
 import { createViewDay, createViewMonthGrid, createViewWeek } from '@schedule-x/calendar'
 import type { CalendarEventExternal } from '@schedule-x/calendar'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
@@ -66,7 +72,10 @@ function hydrate(event: CalendarEvent): CalendarEventExternal {
 function WeekGridHour({ gridStep }: { gridStep: { hour: number; minute: number } }) {
   const hour = String(gridStep.hour).padStart(2, '0')
   const minute = String(gridStep.minute).padStart(2, '0')
-  return <span className="tnum text-[0.6875rem] text-rule">{toKhmerDigits(`${hour}:${minute}`)}</span>
+  // The library's own class, not a redraw of it: `.sx__week-grid__hour-text` is
+  // what lifts the label into the axis gutter. A plain span sits inline instead
+  // and prints the hour straight across the first column of the grid.
+  return <span className="sx__week-grid__hour-text tnum">{toKhmerDigits(`${hour}:${minute}`)}</span>
 }
 
 /**
