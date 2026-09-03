@@ -7,6 +7,7 @@ import { vibeOf } from '../types.ts'
 import type { StorefrontData } from '@/themes/types.ts'
 import { listCatalogue } from './catalogue.ts'
 import { publicMediaUrl } from '../media/storage.ts'
+import { publishedShopFrom } from '../storefront/published.ts'
 import { styleFor } from '../storefront/style.ts'
 import type { StorefrontStyle } from '../storefront/style.ts'
 
@@ -48,6 +49,12 @@ export async function getStorefront(
   const published = storefrontResult.data?.published as StorefrontContent | null | undefined
   // Unpublished means there is no site, not an empty one. A shop that never
   // pressed publish should 404, not show a blank page with its prices on it.
+  // Same predicate as `resolvePublishedShop` below, and `db/test.mjs` drives it
+  // with real rows.
+  if (!publishedShopFrom(business, storefrontResult.data)) return null
+  // Unreachable once the predicate passed: it refuses a null `published`. Kept
+  // so the compiler narrows the type for the whole block below rather than the
+  // reader being asked to trust a function call two lines up.
   if (!published) return null
 
   const telegram = (channelResult.data ?? []).find((row) => row.channel === 'telegram')
@@ -120,13 +127,10 @@ export async function resolvePublishedShop(
     .eq('id', business.id)
     .maybeSingle()
   throwIfDbError('resolve shop storefront', storefrontResult.error)
-  if (!storefrontResult.data?.published) return null
 
-  return {
-    businessId: business.id,
-    name: business.name,
-    currency: business.default_currency as CurrencyCode,
-  }
+  // The same predicate the page's own lookup applies, so the order route and
+  // the site can never disagree about which shops exist.
+  return publishedShopFrom(business, storefrontResult.data)
 }
 
 /** The owner's own view: draft and published side by side. */

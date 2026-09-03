@@ -35,6 +35,10 @@ import { assertUploadable, storageKey, MediaError, MAX_IMAGE_BYTES } from '../sr
 import { shopKhqrRail, isPollable } from '../src/lib/payments/shop-khqr.ts'
 import { KHQR_ACCOUNT_ID, paymentAccountFor } from '../src/lib/types.ts'
 import { createOrder, allocateInvoiceNumber, OrderError } from '../src/lib/orders/create.ts'
+import { expireWebOrders, findExpiredWebOrders } from '../src/lib/orders/expire.ts'
+import { orderErrorKm, orderErrorStatus } from '../src/lib/orders/messages.ts'
+import { confirmTarget } from '../src/lib/payments/confirm-target.ts'
+import { publishedShopFrom } from '../src/lib/storefront/published.ts'
 import { KHQR, CURRENCY, TAG } from 'ts-khqr'
 import {
   expectedSignature, isFulfillingEvent, parseSignatureHeader,
@@ -1994,6 +1998,230 @@ eq('a shop missing everything is not buried in its own warnings', brandNew.lengt
 eq('and it keeps the one row she runs every morning',
   brandNew.some((row) => row.id === 'day'), true)
 eq('no row is offered twice', new Set(brandNew.map((row) => row.id)).size, 3)
+
+
+// ── 40. the shop site takes money (PLAN.md Phase 13) ───────────────────────
+// The whole rail, against a real Postgres. The route above it is HTTP plumbing;
+// everything below is the part that can lose a shop money.
+console.log('\nthe shop site takes money')
+
+const B_MENU = 'b0000000-0000-4000-8000-0000000000a1'
+const P_ICED = 'e3000000-0000-4000-8000-0000000000a1'
+const P_TEA  = 'e3000000-0000-4000-8000-0000000000a2'
+await db.exec(`
+  insert into businesses (id, slug, name, business_type, default_currency)
+   values ('${B_MENU}', 'phase13-cafe', 'ហាងកាហ្វេ ១៣', 'cafe', 'KHR');
+  insert into products (id, business_id, name, price_minor, currency, stock) values
+   ('${P_ICED}', '${B_MENU}', 'កាហ្វេទឹកកក', 6000, 'KHR', 5),
+   ('${P_TEA}',  '${B_MENU}', 'ទឹកតែ',        1000, 'KHR', null);
+  insert into storefronts (id, theme, draft)
+   values ('${B_MENU}', 'counter', '{"theme":"counter"}'::jsonb)`)
+
+// The publish gate, driven with the REAL rows the route reads. A draft is not a
+// site: a shop that never pressed publish must 404 on its page AND refuse an
+// order, from the same predicate, or the two will disagree.
+const menuBusiness = await one(db, `select id, name, default_currency from businesses where id = '${B_MENU}'`)
+const draftOnly = await one(db, `select published from storefronts where id = '${B_MENU}'`)
+eq('a shop with a draft and nothing published takes no orders', publishedShopFrom(menuBusiness, draftOnly), null)
+await db.exec(`update storefronts set published = draft, published_at = now() where id = '${B_MENU}'`)
+const nowLive = await one(db, `select published from storefronts where id = '${B_MENU}'`)
+eq('once she publishes, the same lookup finds the shop',
+  publishedShopFrom(menuBusiness, nowLive)?.businessId, B_MENU)
+eq('a slug that matches no shop is nothing, not a guess', publishedShopFrom(null, nowLive), null)
+eq('and a shop with no storefront row at all is nothing', publishedShopFrom(menuBusiness, null), null)
+
+// A public order writes all four rows. `tx` is the same real-Postgres seam the
+// route hands `createOrder` in production.
+const webOrder = await createOrder(tx, {
+  businessId: B_MENU, customerId: null, channel: 'web',
+  lines: [{ productId: P_ICED, quantity: 2 }, { productId: P_TEA, quantity: 1 }],
+})
+eq('a public order totals from the catalogue', webOrder.totalMinor, 6000 * 2 + 1000)
+const written = await one(db, `select
+  (select count(*) from order_items where order_id = '${webOrder.orderId}') items,
+  (select count(*) from invoices    where order_id = '${webOrder.orderId}') invoices,
+  (select channel from orders where id = '${webOrder.orderId}') channel`)
+eq('it writes its lines', Number(written.items), 2)
+eq('and its invoice', Number(written.invoices), 1)
+eq('and it is recorded as a web order, which is what the expiry job keys on', written.channel, 'web')
+
+// FAULT INJECTION 1. The client cannot name its own price. Extra fields are
+// carried on the line exactly as a hostile caller would send them; the row the
+// shop is paid on must still carry the catalogue's number.
+const spoofed = await createOrder(tx, {
+  businessId: B_MENU, customerId: null, channel: 'web',
+  lines: [{ productId: P_ICED, quantity: 1, price_minor: 1, unit_price_minor: 1, priceMinor: 1, lineTotalMinor: 1 }],
+})
+eq('a client-sent price is ignored and the line is priced from the catalogue', spoofed.lines[0].unitPriceMinor, 6000)
+const spoofedRow = await one(db, `select unit_price_minor, line_total_minor from order_items where order_id = '${spoofed.orderId}'`)
+eq('and the stored line carries the catalogue price, not the one on the wire', spoofedRow.unit_price_minor, 6000)
+eq('so the total the shop is paid is the catalogue total', spoofed.totalMinor, 6000)
+
+// Tenancy at the till, on the PUBLIC path. A product id copied out of another
+// shop's page is not orderable here, however it was obtained: `createOrder`
+// scopes every read to the business the SLUG resolved to.
+let publicCrossTenant = 'ALLOWED'
+try {
+  await createOrder(tx, { businessId: B_MENU, customerId: null, channel: 'web',
+    lines: [{ productId: 'e0000000-0000-4000-8000-000000000003', quantity: 1 }] })
+} catch (e) { publicCrossTenant = e instanceof OrderError ? e.code : 'other' }
+eq('a product id from another shop is not orderable through this shop\'s site', publicCrossTenant, 'unknown_product')
+
+// Out of stock is its own code, because the customer can act on it.
+let publicOversell = 'ALLOWED'
+try {
+  await createOrder(tx, { businessId: B_MENU, customerId: null, channel: 'web',
+    lines: [{ productId: P_ICED, quantity: 99 }] })
+} catch (e) { publicOversell = e instanceof OrderError ? e.code : 'other' }
+eq('too many of something returns the out-of-stock code, not a generic failure', publicOversell, 'out_of_stock')
+
+console.log('\nwhat a refused order says to a customer')
+const REFUSALS = ['empty', 'unknown_product', 'out_of_stock', 'mixed_currency']
+eq('every refusal has a Khmer sentence a customer can read',
+  REFUSALS.every((code) => /[ក-៿]/.test(orderErrorKm(code))), true)
+eq('and no two of them say the same thing', new Set(REFUSALS.map(orderErrorKm)).size, 4)
+eq('an unknown code still reads as a sentence rather than an empty box',
+  /[ក-៿]/.test(orderErrorKm('something_new')), true)
+eq('out of stock is a well formed request the world moved under, so 409', orderErrorStatus('out_of_stock'), 409)
+eq('the rest are the caller\'s, so 400', orderErrorStatus('unknown_product'), 400)
+
+console.log('\npayments can pay for goods')
+await expectFail(db, 'a payment cannot name an order that does not exist',
+  `insert into payments (business_id, order_id, amount_minor, currency, status, idempotency_key)
+   values ('${B_MENU}', 'ffffffff-0000-4000-8000-00000000dead', 1000, 'KHR', 'pending', 'fk-test')`,
+  'payments_order_id_fkey')
+
+// The accounting claim: a deleted order must not take the record of money with
+// it. `on delete set null`, never cascade.
+const D_ORDER = (await one(db, `insert into orders (business_id, channel, total_minor, currency)
+  values ('${B_MENU}', 'web', 1000, 'KHR') returning id`)).id
+await db.exec(`insert into payments (id, business_id, order_id, amount_minor, currency, status, idempotency_key)
+  values ('e4000000-0000-4000-8000-0000000000d1', '${B_MENU}', '${D_ORDER}', 1000, 'KHR', 'pending', 'delete-test')`)
+await db.exec(`delete from orders where id = '${D_ORDER}'`)
+const orphan = await one(db, `select order_id from payments where id = 'e4000000-0000-4000-8000-0000000000d1'`)
+eq('deleting an order does not delete the record that money was asked for', orphan.order_id, null)
+
+// The metering coincidence, asserted rather than shrugged at. `v_month_usage`
+// counts a paid payment with a NULL booking_id as a standalone sale, which is
+// exactly what an order payment is. It is correct by coincidence and a later
+// edit could break it silently.
+const usageBefore = await one(db, `select txn_used from v_month_usage where business_id = '${B_MENU}'`)
+eq('the new shop has metered nothing yet', Number(usageBefore.txn_used), 0)
+await db.exec(`insert into payments (business_id, order_id, booking_id, amount_minor, currency, provider, status, paid_at, idempotency_key)
+  values ('${B_MENU}', '${webOrder.orderId}', null, ${webOrder.totalMinor}, 'KHR', 'khqr', 'paid', now(), '${webOrder.code}:order:paid')`)
+const usageAfter = await one(db, `select txn_used from v_month_usage where business_id = '${B_MENU}'`)
+eq('a paid order payment meters as a standalone sale, with no change to the view', Number(usageAfter.txn_used), 1)
+
+console.log('\ngiving the stock back')
+// FAULT INJECTION 2. `createOrder` takes stock at order time, which on a public
+// page lets anybody drain a shop for free. A lapsed web order must give back
+// EXACTLY what it took, and must not invent a number for an uncounted product.
+const runner = (work) => work(tx)
+const beforeLapse = Number((await one(db, `select stock from products where id = '${P_ICED}'`)).stock)
+const lapsing = await createOrder(tx, {
+  businessId: B_MENU, customerId: null, channel: 'web',
+  lines: [{ productId: P_ICED, quantity: 2 }, { productId: P_TEA, quantity: 3 }],
+})
+const duringLapse = Number((await one(db, `select stock from products where id = '${P_ICED}'`)).stock)
+eq('the order took its stock at order time, as it does on every channel', beforeLapse - duringLapse, 2)
+await db.exec(`insert into payments (business_id, order_id, amount_minor, currency, provider, status, expires_at, idempotency_key)
+  values ('${B_MENU}', '${lapsing.orderId}', ${lapsing.totalMinor}, 'KHR', 'khqr', 'pending', now() - interval '10 minutes', '${lapsing.code}:order:0')`)
+
+const dueOrders = await findExpiredWebOrders(tx, new Date())
+eq('the job sees exactly the one lapsed web order', dueOrders.length, 1)
+const expiry = await expireWebOrders(runner, { now: new Date() })
+eq('and cancels it', expiry.cancelled, 1)
+const afterLapse = Number((await one(db, `select stock from products where id = '${P_ICED}'`)).stock)
+eq('the stock the order took comes back, exactly', afterLapse, beforeLapse)
+const uncountedAfter = await one(db, `select stock from products where id = '${P_TEA}'`)
+eq('and an uncounted product is left uncounted, never given a number', uncountedAfter.stock, null)
+const lapsedRows = await one(db, `select
+  (select status from orders   where id = '${lapsing.orderId}') o,
+  (select status from payments where order_id = '${lapsing.orderId}') p,
+  (select count(*) from invoices where order_id = '${lapsing.orderId}') inv`)
+eq('the order is cancelled', lapsedRows.o, 'cancelled')
+eq('its payment is expired', lapsedRows.p, 'expired')
+// Invoice numbers are gapless per business by design. Deleting one to tidy up a
+// cancelled order is an accounting problem, not housekeeping.
+eq('and its invoice row is left exactly where it was', Number(lapsedRows.inv), 1)
+
+const secondSweep = await expireWebOrders(runner, { now: new Date() })
+eq('a second sweep finds nothing and gives nothing back twice', secondSweep.cancelled, 0)
+
+// The scope that makes this job safe. A Telegram order is being shepherded by
+// an agent in a live conversation and must not be cancelled underneath it.
+const tgOrder = await createOrder(tx, {
+  businessId: B_MENU, customerId: null, channel: 'telegram',
+  lines: [{ productId: P_ICED, quantity: 1 }],
+})
+await db.exec(`insert into payments (business_id, order_id, amount_minor, currency, provider, status, expires_at, idempotency_key)
+  values ('${B_MENU}', '${tgOrder.orderId}', ${tgOrder.totalMinor}, 'KHR', 'khqr', 'pending', now() - interval '10 minutes', '${tgOrder.code}:order:0')`)
+const tgSweep = await expireWebOrders(runner, { now: new Date() })
+eq('a pending Telegram order is not cancelled underneath its agent', tgSweep.cancelled, 0)
+const tgStatus = await one(db, `select status from orders where id = '${tgOrder.orderId}'`)
+eq('it is still pending, and its stock is still taken', tgStatus.status, 'pending')
+
+// Newest payment, not any payment. An order whose first QR lapsed and which was
+// then issued a fresh one has a live QR and a customer in front of it.
+const reissued = await createOrder(tx, {
+  businessId: B_MENU, customerId: null, channel: 'web',
+  lines: [{ productId: P_ICED, quantity: 1 }],
+})
+await db.exec(`insert into payments (business_id, order_id, amount_minor, currency, provider, status, expires_at, idempotency_key, created_at) values
+  ('${B_MENU}', '${reissued.orderId}', ${reissued.totalMinor}, 'KHR', 'khqr', 'pending', now() - interval '10 minutes', '${reissued.code}:order:0', now() - interval '10 minutes'),
+  ('${B_MENU}', '${reissued.orderId}', ${reissued.totalMinor}, 'KHR', 'khqr', 'pending', now() + interval '5 minutes',  '${reissued.code}:order:1', now())`)
+const reissueSweep = await expireWebOrders(runner, { now: new Date() })
+eq('an order whose QR was reissued is not cancelled out from under a live one', reissueSweep.cancelled, 0)
+
+console.log('\none code, two things')
+// Booking codes and order codes come from different generators over the same
+// alphabet. `confirmPayment` moves money, so a collision must be an outcome and
+// never a winner picked at random.
+eq('a code that names a booking and an order is ambiguous', confirmTarget({ id: 'b' }, { id: 'o' }).kind, 'ambiguous')
+eq('a booking alone confirms the booking', confirmTarget({ id: 'b' }, null).kind, 'booking')
+eq('an order alone confirms the order', confirmTarget(null, { id: 'o' }).kind, 'order')
+eq('neither is not found, which is not the same as ambiguous', confirmTarget(null, null).kind, 'none')
+
+// The same rule against real rows: one business, one code, two tables.
+const COLLIDE = 'ZZ9Q7X'
+await db.exec(`
+  insert into orders (business_id, code, channel, total_minor, currency)
+   values ('${B_MENU}', '${COLLIDE}', 'web', 6000, 'KHR');
+  insert into services (id, business_id, name, duration_min, price_minor, currency)
+   values ('50000000-0000-4000-8000-000000013b01', '${B_MENU}', 'សាកល្បង', 30, 6000, 'KHR');
+  insert into resources (id, business_id, name, kind)
+   values ('a0000000-0000-4000-8000-000000013b01', '${B_MENU}', 'តុ', 'table');
+  insert into customers (id, business_id, display_name)
+   values ('d0000000-0000-4000-8000-000000013b01', '${B_MENU}', 'សុខា');
+  insert into bookings (business_id, service_id, resource_id, customer_id, code, starts_at, ends_at, price_minor, currency)
+   values ('${B_MENU}', '50000000-0000-4000-8000-000000013b01', 'a0000000-0000-4000-8000-000000013b01',
+           'd0000000-0000-4000-8000-000000013b01', '${COLLIDE}', now() + interval '1 day', now() + interval '1 day 30 minutes', 6000, 'KHR')`)
+const collidedBooking = await one(db, `select id from bookings where business_id = '${B_MENU}' and code = '${COLLIDE}'`)
+const collidedOrder = await one(db, `select id from orders where business_id = '${B_MENU}' and code = '${COLLIDE}'`)
+eq('a real collision in one shop resolves to ambiguous, not to whichever was read first',
+  confirmTarget(collidedBooking, collidedOrder).kind, 'ambiguous')
+
+// The owner's confirmation of an ORDER payment, as the SQL confirm.ts runs.
+// Scoped to pending, so a second tap changes zero rows and says so.
+const toConfirm = await createOrder(tx, {
+  businessId: B_MENU, customerId: null, channel: 'web',
+  lines: [{ productId: P_TEA, quantity: 2 }],
+})
+await db.exec(`insert into payments (id, business_id, order_id, amount_minor, currency, provider, provider_account, status, idempotency_key)
+  values ('e4000000-0000-4000-8000-0000000000c1', '${B_MENU}', '${toConfirm.orderId}', ${toConfirm.totalMinor}, 'KHR', 'khqr', 'cafe@wing', 'pending', '${toConfirm.code}:order:confirm')`)
+const firstOrderConfirm = await db.query(`update payments set status = 'paid', paid_at = now(), provider_txn_id = 'owner-confirmed'
+  where id = 'e4000000-0000-4000-8000-0000000000c1' and business_id = '${B_MENU}' and status = 'pending' returning id`)
+eq('the owner confirming an order moves exactly one pending row', firstOrderConfirm.rows.length, 1)
+const secondOrderConfirm = await db.query(`update payments set status = 'paid', paid_at = now()
+  where id = 'e4000000-0000-4000-8000-0000000000c1' and business_id = '${B_MENU}' and status = 'pending' returning id`)
+eq('and a second tap moves nothing, which is what already_paid reports', secondOrderConfirm.rows.length, 0)
+const orderConfirmed = await db.query(`update orders set status = 'confirmed'
+  where id = '${toConfirm.orderId}' and business_id = '${B_MENU}' and status = 'pending' returning id`)
+eq('the order goes pending to confirmed in the same step', orderConfirmed.rows.length, 1)
+// A confirmed order is no longer pending, so the expiry job cannot reach it.
+const afterConfirmSweep = await expireWebOrders(runner, { now: new Date() })
+eq('a confirmed order is never cancelled by the expiry job', afterConfirmSweep.cancelled, 0)
+
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
