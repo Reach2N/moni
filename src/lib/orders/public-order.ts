@@ -2,6 +2,7 @@ import 'server-only'
 import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
 import { createOrder, type CreatedOrder, type OrderLine } from './create.ts'
+import { resolveOrderCustomer } from './customer.ts'
 import { withTransaction } from './connection.ts'
 import { idempotencyKey, QR_TTL_SECONDS } from '../payments.ts'
 import { getPaymentSettings } from '../payments/account.ts'
@@ -43,14 +44,23 @@ export async function placePublicOrder({
   customerPhone: string | null
   note: string | null
 }): Promise<PublicOrderResult> {
-  const customerId = await resolveCustomer(businessId, customerName, customerPhone)
-
-  // One transaction: stock taken, lines priced from the catalogue, invoice
-  // numbered. The client sent product ids and quantities and nothing else, so
-  // there is no price on the wire for it to have named.
-  const order = await withTransaction((tx) =>
-    createOrder(tx, { businessId, customerId, channel: 'web', lines, note }),
-  )
+  // One transaction: the customer resolved, stock taken, lines priced from the
+  // catalogue, invoice numbered. The client sent product ids and quantities and
+  // nothing else, so there is no price on the wire for it to have named. The
+  // customer is in here rather than before it because an order that fails must
+  // not leave a customer row behind: a public page would otherwise let anyone
+  // fill a shop's customer list without buying anything.
+  const { customerId, order } = await withTransaction(async (tx) => {
+    const resolved = await resolveOrderCustomer(tx, {
+      businessId,
+      displayName: customerName,
+      phone: customerPhone,
+    })
+    return {
+      customerId: resolved,
+      order: await createOrder(tx, { businessId, customerId: resolved, channel: 'web', lines, note }),
+    }
+  })
 
   const payment = await raisePayment({ businessId, customerId, order })
   return {
@@ -61,46 +71,6 @@ export async function placePublicOrder({
     has_qr: payment.hasQr,
     pay_at_shop: !payment.hasQr,
   }
-}
-
-/**
- * The name is required and the phone is not.
- *
- * Without a name the owner reads "Order A4F9C2, 23,000" and has no idea whose
- * it is. With a phone the row is matched rather than duplicated, so a regular
- * ordering twice in a week is one customer with two orders and not two
- * customers: that history is what the whole `customers` table exists for.
- */
-async function resolveCustomer(
-  businessId: string,
-  displayName: string,
-  phone: string | null,
-): Promise<string> {
-  if (phone) {
-    const existing = await db
-      .from('customers')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('phone', phone)
-      .maybeSingle()
-    throwIfDbError('match customer by phone', existing.error)
-    if (existing.data) {
-      const touched = await db
-        .from('customers')
-        .update({ display_name: displayName, last_seen_at: new Date().toISOString() })
-        .eq('id', existing.data.id)
-        .eq('business_id', businessId)
-      if (touched.error) console.error('[shop order] customer not touched:', touched.error.message)
-      return existing.data.id
-    }
-  }
-
-  const created = await db
-    .from('customers')
-    .insert({ business_id: businessId, display_name: displayName, phone })
-    .select('id')
-    .single()
-  return requireDbData('create customer for shop order', created).id
 }
 
 /**

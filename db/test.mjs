@@ -36,6 +36,7 @@ import { shopKhqrRail, isPollable } from '../src/lib/payments/shop-khqr.ts'
 import { KHQR_ACCOUNT_ID, paymentAccountFor } from '../src/lib/types.ts'
 import { createOrder, allocateInvoiceNumber, OrderError } from '../src/lib/orders/create.ts'
 import { expireWebOrders, findExpiredWebOrders } from '../src/lib/orders/expire.ts'
+import { resolveOrderCustomer } from '../src/lib/orders/customer.ts'
 import { orderErrorKm, orderErrorStatus } from '../src/lib/orders/messages.ts'
 import { confirmTarget } from '../src/lib/payments/confirm-target.ts'
 import { publishedShopFrom } from '../src/lib/storefront/published.ts'
@@ -52,6 +53,8 @@ import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib
 import { movePlan } from '../src/lib/catalogue/backfill.ts'
 import { calendarsFor, toCalendarEvents } from '../src/lib/calendar/events.ts'
 import { askSuggestions } from '../src/lib/agent/suggestions.ts'
+import { buildShopProposal, isShopProposal } from '../src/lib/agent/proposal.ts'
+import { OWNER_TOOLS, CUSTOMER_TOOLS } from '../src/lib/types.ts'
 import {
   escapeLikePattern,
   isApproved,
@@ -2075,6 +2078,23 @@ try {
 } catch (e) { publicOversell = e instanceof OrderError ? e.code : 'other' }
 eq('too many of something returns the out-of-stock code, not a generic failure', publicOversell, 'out_of_stock')
 
+// Whose order is this? The name is required because the alternative is an owner
+// reading "Order A4F9C2, 23,000" with no idea. It is resolved INSIDE the order's
+// transaction, so an order that fails leaves no customer row behind: a public
+// page would otherwise let anyone fill a shop's customer list without buying.
+const namedOnly = await resolveOrderCustomer(tx, { businessId: B_MENU, displayName: 'ចន្ថា', phone: null })
+const namedAgain = await resolveOrderCustomer(tx, { businessId: B_MENU, displayName: 'ចន្ថា', phone: null })
+eq('two orders with a name and no phone are two customers, since nothing links them',
+  namedOnly === namedAgain, false)
+const byPhone = await resolveOrderCustomer(tx, { businessId: B_MENU, displayName: 'សុភា', phone: '012345678' })
+const samePhone = await resolveOrderCustomer(tx, { businessId: B_MENU, displayName: 'សុភា ស', phone: '012345678' })
+eq('the same phone is the same customer, not a second row', samePhone, byPhone)
+const renamed = await one(db, `select display_name from customers where id = '${byPhone}'`)
+eq('and the newest name she gave is the one the owner sees', renamed.display_name, 'សុភា ស')
+// Tenancy: a phone number is only ever matched within one shop.
+const otherShopPhone = await resolveOrderCustomer(tx, { businessId: B_SALON, displayName: 'សុភា', phone: '012345678' })
+eq('the same phone at a different shop is a different customer', otherShopPhone === byPhone, false)
+
 console.log('\nwhat a refused order says to a customer')
 const REFUSALS = ['empty', 'unknown_product', 'out_of_stock', 'mixed_currency']
 eq('every refusal has a Khmer sentence a customer can read',
@@ -2221,6 +2241,104 @@ eq('the order goes pending to confirmed in the same step', orderConfirmed.rows.l
 // A confirmed order is no longer pending, so the expiry job cannot reach it.
 const afterConfirmSweep = await expireWebOrders(runner, { now: new Date() })
 eq('a confirmed order is never cancelled by the expiry job', afterConfirmSweep.cancelled, 0)
+
+
+// ── describe_shop proposes, it never writes ───────────────────────────────
+// The owner asked for one prompt for everything, so onboarding became a tool.
+// That tool is the ONE that can rewrite the profile, the hours and the whole
+// catalogue from a single sentence, so it is the one that still stops for her
+// (commit 315e126's approval gate, carried into the agent). These assertions
+// exist to go red the moment someone makes it write directly.
+eq('describe_shop is declared on the owner tool surface',
+  OWNER_TOOLS.includes('describe_shop'), true)
+eq('and no customer tool can reach it',
+  CUSTOMER_TOOLS.includes('describe_shop'), false)
+
+const CAFE_WORDS = 'ខ្ញុំលក់កាហ្វេទឹកកកនៅផ្លូវ ២៧១ តម្លៃ ៦០០០ រៀល បើកម៉ោង ៧ ដល់ ៦'
+const cafeProposal = buildShopProposal({
+  rawDescription: CAFE_WORDS,
+  model: 'gateway:google/gemini-3.7-flash',
+  parsed: {
+    name: 'កាហ្វេ ២៧១',
+    business_type: 'cafe',
+    default_currency: 'KHR',
+    services: [
+      { name: 'កាហ្វេទឹកកក', name_en: 'Iced coffee', price_minor: 6000, currency: 'KHR', unit: 'walk_in', duration_min: 10, buffer_min: 0 },
+      { name: 'នំបុ័ង', name_en: 'Bread', price_minor: 3000, currency: 'KHR', unit: 'walk_in', duration_min: 10, buffer_min: 0 },
+    ],
+    hours: [{ dow: 1, open: '07:00', close: '18:00' }],
+    resource_count: 1,
+    notes: null,
+  },
+  warnings: [],
+})
+eq('a described shop comes back as a proposal, not a result', cafeProposal.kind, 'shop_proposal')
+eq('and it says outright that nothing was applied', cafeProposal.applied, false)
+eq('and that it is waiting on the owner', cafeProposal.awaiting_owner_approval, true)
+eq('a complete description is ready to approve', cafeProposal.ready, true)
+eq('the cafe menu counts as products, not services',
+  `${cafeProposal.summary.services}s/${cafeProposal.summary.products}p`, '0s/2p')
+eq('prices go through formatMoney, never a km-KH locale', cafeProposal.lines[0].price, '6,000៛')
+// Rule 8. A re-parse rewrites the catalogue, never the source it was read from.
+eq('raw_description is carried verbatim into the setup body',
+  cafeProposal.setup_request.raw_description, CAFE_WORDS)
+eq('and what the owner approves is a body /api/setup actually accepts',
+  SetupRequestSchema.safeParse(cafeProposal.setup_request).success, true)
+eq('ai_instructions is absent, so approving a description never clears them',
+  'ai_instructions' in cafeProposal.setup_request, false)
+eq('the shop name is sent only because she named it',
+  cafeProposal.setup_request.business?.name, 'កាហ្វេ ២៧១')
+
+const unnamed = buildShopProposal({
+  rawDescription: 'I sell iced coffee for 6000 riel and bread',
+  parsed: { ...cafeProposal.setup_request.shop, name: null, services: cafeProposal.setup_request.shop.services },
+  warnings: [],
+})
+eq('a description that names no shop sends no business block, so nothing is renamed',
+  'business' in unnamed.setup_request, false)
+
+const emptyProposal = buildShopProposal({
+  rawDescription: 'I want to open a coffee shop one day',
+  parsed: { name: null, business_type: 'cafe', default_currency: 'KHR', services: [], hours: [], resource_count: 1, notes: null },
+  warnings: [],
+})
+eq('an intent with nothing named is blocked, not saved', emptyProposal.ready, false)
+eq('and it says which gate stopped it', emptyProposal.blockers.join(','), 'no_catalogue')
+eq('a cafe with nothing parsed is told about a menu, not a roster',
+  emptyProposal.summary.kind_if_empty, 'product')
+
+const unpriced = buildShopProposal({
+  rawDescription: 'I do haircuts and colouring at my salon',
+  parsed: {
+    name: null, business_type: 'salon', default_currency: 'KHR', hours: [], resource_count: 1, notes: null,
+    services: [{ name: 'កាត់សក់', name_en: 'Haircut', price_minor: 0, currency: 'KHR', unit: 'session', duration_min: 30, buffer_min: 0 }],
+  },
+  warnings: [],
+})
+eq('a service the owner never priced blocks the save', unpriced.ready, false)
+eq('and names the reason rather than guessing a price', unpriced.blockers.join(','), 'unpriced_row')
+eq('the unpriced line is flagged for the approval card', unpriced.lines[0].unpriced, true)
+eq('a salon row is still a service', `${unpriced.summary.services}s/${unpriced.summary.products}p`, '1s/0p')
+eq('the browser can narrow a proposal out of a JSON tool result',
+  isShopProposal(JSON.parse(JSON.stringify(cafeProposal))), true)
+eq('and cannot mistake an ordinary tool result for one',
+  isShopProposal({ added: 'កាហ្វេទឹកកក' }), false)
+
+// The guard that actually catches a regression: the tool's own body. Every
+// other owner tool writes; this one must have no way to. If someone reaches
+// for persistSetup or a table write inside describe_shop, this goes red before
+// a shop is silently overwritten from one sentence.
+const ownerToolsSource = readFileSync(join(here, '../src/lib/agent/owner-tools.ts'), 'utf8')
+eq('the owner tool module never imports the setup writer',
+  /setup\/persist/.test(ownerToolsSource), false)
+const describeStart = ownerToolsSource.indexOf('describe_shop: tool({')
+const describeEnd = ownerToolsSource.indexOf('report_setup_status: tool({', describeStart)
+eq('describe_shop is findable in the owner tool set', describeStart > 0 && describeEnd > describeStart, true)
+const describeBody = ownerToolsSource.slice(describeStart, describeEnd)
+eq('describe_shop touches no table',
+  /db\s*\.?\s*from\(|persistSetup|\.insert\(|\.upsert\(|\.update\(/.test(describeBody), false)
+eq('describe_shop hands back a proposal instead',
+  /buildShopProposal\(/.test(describeBody), true)
 
 
 // ── result ────────────────────────────────────────────────────────────────
