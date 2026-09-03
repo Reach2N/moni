@@ -14,7 +14,7 @@ import { Output, generateText } from 'ai'
 import { z } from 'zod'
 import { THEMES, WARMTHS, VOICES, DENSITIES, type StorefrontContent, type ThemeId } from '@/lib/types.ts'
 import { costMicroUsd, withFallback } from './models.ts'
-import { sanityCheck, type StorefrontWarning } from './storefront-check.ts'
+import { isOnlyHeadlineIsShopName, sanityCheck, type StorefrontWarning } from './storefront-check.ts'
 
 const THEME_IDS = THEMES.map((theme) => theme.id) as [ThemeId, ...ThemeId[]]
 
@@ -85,25 +85,40 @@ export async function generateStorefront(input: {
     .filter(Boolean)
     .join('\n')
 
-  const { result, ref } = await withFallback('parse', (model, _ref, abortSignal) =>
-    generateText({
-      abortSignal,
-      model,
-      system: SYSTEM,
-      prompt: brief,
-      output: Output.object({ schema: StorefrontSchema }),
-      temperature: 0.4,
-    }),
-  )
-
-  const content = result.output as StorefrontContent
-  const tokensIn = result.usage?.inputTokens ?? 0
-  const tokensOut = result.usage?.outputTokens ?? 0
-
-  return {
-    content,
-    warnings: sanityCheck(content, input.shopName),
-    model: ref,
-    cost_micro_usd: costMicroUsd(ref, tokensIn, tokensOut),
+  const runOnce = async (prompt: string): Promise<GeneratedStorefront> => {
+    const { result, ref } = await withFallback('parse', (model, _ref, abortSignal) =>
+      generateText({
+        abortSignal,
+        model,
+        system: SYSTEM,
+        prompt,
+        output: Output.object({ schema: StorefrontSchema }),
+        temperature: 0.4,
+      }),
+    )
+    const content = result.output as StorefrontContent
+    const tokensIn = result.usage?.inputTokens ?? 0
+    const tokensOut = result.usage?.outputTokens ?? 0
+    return {
+      content,
+      warnings: sanityCheck(content, input.shopName),
+      model: ref,
+      cost_micro_usd: costMicroUsd(ref, tokensIn, tokensOut),
+    }
   }
+
+  const first = await runOnce(brief)
+  if (!isOnlyHeadlineIsShopName(first.warnings)) return first
+
+  // The owner publishes past a warning beside a publish button, which is why
+  // this one rule gets an automatic second try instead of only a badge she can
+  // ignore. Bounded to exactly one retry, named in the prompt so the model is
+  // not guessing what was wrong: a weak headline still beats no page at all,
+  // and a retry loop running on a real owner's screen while she waits is worse
+  // than either, so a second miss keeps the first draft and lets the warning
+  // stand rather than trying again.
+  const retryPrompt = `${brief}\n\nYour previous headline was just the shop's name, "${input.shopName}", which says nothing on its own. Write a real headline instead: one line that promises something specific about this shop, using only the facts above.`
+  const second = await runOnce(retryPrompt)
+  const stillJustTheName = second.content.headline.trim().toLowerCase() === input.shopName.trim().toLowerCase()
+  return stillJustTheName ? first : second
 }

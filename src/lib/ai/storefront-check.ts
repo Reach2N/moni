@@ -60,3 +60,19 @@ export function sanityCheck(content: StorefrontContent, shopName: string): Store
   }
   return warnings
 }
+
+/**
+ * True when this rule fired and nothing else did. `generateStorefront` uses
+ * this to decide whether its one bounded retry is worth spending: a headline
+ * that merely repeats the shop name is a prompting miss a reroll can plausibly
+ * fix, but any other warning, alone or alongside this one, is a fact about the
+ * generation (a claim, a price, a markup fragment) that a second roll of the
+ * same dice is no more likely to avoid, so it is left for the owner to see.
+ */
+export function isOnlyHeadlineIsShopName(warnings: readonly StorefrontWarning[]): boolean {
+  return (
+    warnings.length === 1 &&
+    warnings[0].field === 'headline' &&
+    warnings[0].issue === 'is only the shop name, which says nothing'
+  )
+}

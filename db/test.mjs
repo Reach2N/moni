@@ -28,7 +28,8 @@ import { sortInbox } from '../src/lib/queries/inbox-order.ts'
 import { checkBudget, formatSpend, DEFAULT_CONVERSATION_CAP_MICRO_USD, DEFAULT_MONTH_CEILING_MICRO_USD } from '../src/lib/ops/budget.ts'
 import { createRateLimiter } from '../src/lib/ops/rate-limit.ts'
 import { shopSlugFromHost } from '../src/lib/hosting/subdomain.ts'
-import { sanityCheck } from '../src/lib/ai/storefront-check.ts'
+import { sanityCheck, isOnlyHeadlineIsShopName } from '../src/lib/ai/storefront-check.ts'
+import { catalogueCounts } from '../src/lib/setup/catalogue-count.ts'
 import { buildKhqrPayload, crc16, amountField, khqrMd5 } from '../src/lib/khqr/payload.ts'
 import { assertUploadable, storageKey, MediaError, MAX_IMAGE_BYTES } from '../src/lib/media/validate.ts'
 import { shopKhqrRail, isPollable } from '../src/lib/payments/shop-khqr.ts'
@@ -763,6 +764,19 @@ if (sanityCheck({ ...goodCopy, headline: 'Sokha Beauty' }, 'Sokha Beauty')
   ok('a headline that is only the shop name is caught')
 } else no('sanityCheck', 'an empty headline passed the check')
 
+// generateStorefront's one bounded retry fires only when this is the ENTIRE
+// warning list: a headline that repeats the shop name and nothing else. Any
+// other warning, alone or riding alongside it, is a fact a reroll cannot
+// reliably fix (an invented claim, a price, markup), so it must not trigger.
+eq('a headline-only-name warning, and only that one, is the retry trigger',
+  isOnlyHeadlineIsShopName(sanityCheck({ ...goodCopy, headline: 'Sokha Beauty' }, 'Sokha Beauty')), true)
+eq('honest copy has nothing to retry', isOnlyHeadlineIsShopName(sanityCheck(goodCopy, 'Sokha Beauty')), false)
+eq('a second warning alongside it cancels the retry',
+  isOnlyHeadlineIsShopName(
+    sanityCheck({ ...goodCopy, headline: 'Sokha Beauty', about: 'Open daily — closed Sunday' }, 'Sokha Beauty'),
+  ), false)
+eq('a different single warning is not this one', isOnlyHeadlineIsShopName(sanityCheck(withMarkup, 'Sokha Beauty')), false)
+
 await expectOk(db, 'a shop gets exactly one site, keyed by its own id',
   `insert into storefronts (id, theme, draft) values ('${B_SALON}', 'salon', '${JSON.stringify(goodCopy)}'::jsonb)`)
 await expectFail(db, 'and cannot have a second',
@@ -1333,6 +1347,41 @@ const emitted = Object.keys(styleFor(4242, DEFAULT_VIBE, 'counter').vars)
 const unread = emitted.filter((name) => !CONSUMERS.includes(`var(${name})`))
 eq(`all ${emitted.length} seeded tokens are read by a file that renders`, unread.join(',') || 'none', 'none')
 
+console.log('\nthe page renders what it was given, and draws nothing for what it was not')
+// No JSX renderer runs in this harness (registry.tsx and page.tsx are read as
+// text above too, for the same reason), so what is provable here is the
+// source shape: the exact substitutions this fix makes, pinned so neither
+// regresses silently.
+const registrySource = readFileSync(join(here, '../src/themes/registry.tsx'), 'utf8')
+const counterStart = registrySource.indexOf('function CounterStorefront')
+const workshopStart = registrySource.indexOf('function WorkshopStorefront')
+const registryEnd = registrySource.indexOf('export const THEME_REGISTRY')
+const counterSlice = registrySource.slice(counterStart, registryEnd)
+const workshopSlice = registrySource.slice(workshopStart, counterStart)
+const staySlice = registrySource.slice(registrySource.indexOf('function StayStorefront'), workshopStart)
+// counter is the theme a cafe gets, and it was the one theme of the four that
+// never rendered the highlights the model wrote: sanityCheck validates them
+// and the page dropped them on the floor, which is a large part of why a
+// cafe's page read as thin.
+eq('the counter theme renders the highlights the model wrote', counterSlice.includes('data.content.highlights'), true)
+eq('and an empty highlights array draws nothing there', counterSlice.includes('highlights.length > 0'), true)
+// Hours returns null for a shop with no recorded hours. The border that used
+// to wrap it unconditionally drew a rule around that empty space, which is
+// the empty band a real owner saw on her own page.
+eq('the hours divider is conditional on hours actually existing', counterSlice.includes('hasHours ?'), true)
+eq('an empty highlights array draws nothing in the stay theme either', staySlice.includes('highlights.length > 0'), true)
+eq('nor in the workshop theme, where the list itself carries the border', workshopSlice.includes('highlights.length > 0'), true)
+
+const storefrontPageSource = readFileSync(join(here, '../src/app/s/[slug]/page.tsx'), 'utf8')
+// The shop's address and phone are the two facts a customer needs to reach it
+// physically: text-label-3 measured 1.91:1 against the seeded surface, which
+// the contrast sweep above never caught because nothing there reads page.tsx
+// for which ink a given line actually uses, only which tokens exist at all.
+eq('the address and phone render on the readable secondary ink',
+  /text-label-2">\s*\{data\.shop\.address/.test(storefrontPageSource), true)
+eq('"Made with Moni" stays on the tertiary ink, which is genuinely secondary',
+  /text-label-3">Made with Moni/.test(storefrontPageSource), true)
+
 let worstButton = Infinity, worstAccent = Infinity, worstBody = Infinity, worstLeading = Infinity
 let worstSecondary = Infinity, worstSeparator = Infinity
 // A fixed arithmetic step (`i * k % modulus`) is a lattice, not a sample: every
@@ -1649,6 +1698,25 @@ for (const type of timeTypes) {
   }
 }
 eq(`none of the ${timeTypes.length} time-selling types leaks a product`, timeLeak, 0)
+
+console.log('\nthe setup screen tells the owner which table she is about to fill')
+// The bug this closes: ShopSetup's review screen called every parsed row a
+// "service" and showed her that word right beside the save button, so a cafe
+// owner was told she was about to save services when her whole menu was
+// about to become products. catalogueCounts is the same catalogKindFor split
+// persistSetup actually writes with, read here as its own pure function so
+// this is provable without a browser.
+eq('a cafe\'s whole menu counts as products, not services',
+  catalogueCounts('cafe', [{ unit: 'walk_in' }, { unit: 'walk_in' }]).products, 2)
+eq('and none of it is miscounted as a service',
+  catalogueCounts('cafe', [{ unit: 'walk_in' }, { unit: 'walk_in' }]).services, 0)
+eq('a salon\'s chair time counts as services',
+  catalogueCounts('salon', [{ unit: 'session' }, { unit: 'session' }]).services, 2)
+eq('a shop that sells both kinds gets both counted',
+  JSON.stringify(catalogueCounts('phone_repair', [{ unit: 'session' }, { unit: 'walk_in' }])),
+  JSON.stringify({ services: 1, products: 1 }))
+eq('an empty parse counts as nothing of either kind',
+  JSON.stringify(catalogueCounts('cafe', [])), JSON.stringify({ services: 0, products: 0 }))
 
 console.log('\na cafe\'s menu is filed where a menu belongs')
 // Before this, persist.ts wrote every row to services and the word "product"

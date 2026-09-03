@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 import type { ParseResponse } from '@/lib/parse-types.ts'
 import { sanityCheck } from '@/lib/ai/sanity.ts'
+import { catalogueCounts } from '@/lib/setup/catalogue-count.ts'
 import { moneyKm, toKhmerDigits } from './dashboard-format.ts'
 
 const SAMPLE =
@@ -273,6 +274,19 @@ export function ShopSetup({
    * with no reason beside it is its own defect, so the reasons are rendered.
    */
   const reviewServices = parsed?.shop.services ?? []
+  // "សេវា" was said for every business, a cafe's whole menu included. This is
+  // the same split `persistSetup` (lib/setup/plan.ts) applies when it actually
+  // writes these rows into `services` or `products`, so what she is shown here
+  // names the table a row is about to land in, not a guess that is wrong for
+  // half the shops on the platform.
+  const catalogueCount = parsed ? catalogueCounts(parsed.shop.business_type, reviewServices) : { services: 0, products: 0 }
+  const catalogueSummary =
+    [
+      catalogueCount.services > 0 ? `${toKhmerDigits(catalogueCount.services)} សេវា` : null,
+      catalogueCount.products > 0 ? `${toKhmerDigits(catalogueCount.products)} មុខទំនិញ` : null,
+    ]
+      .filter(Boolean)
+      .join(' និង ') || `${toKhmerDigits(0)} សេវា`
   const blockers: string[] = []
   if (reviewServices.length === 0) {
     blockers.push('បន្ថែមសេវាយ៉ាងតិចមួយ មុនពេលរក្សាទុក')
@@ -317,7 +331,7 @@ export function ShopSetup({
               <ArrowLeft data-icon="inline-start" aria-hidden />
               កែពិពណ៌នា
             </Button>
-            <p className="km tnum text-xs text-rule">{toKhmerDigits(parsed?.shop.services.length ?? 0)} សេវា</p>
+            <p className="km tnum text-xs text-rule">{catalogueSummary}</p>
           </div>
 
           <div className="border border-rule/70">
@@ -490,7 +504,7 @@ export function ShopSetup({
                 description="Moni នឹងឆ្លើយអតិថិជនតាមតម្លៃ និងម៉ោងខាងលើ។"
                 command="រក្សាទុកសេវា និងម៉ោងទៅក្នុងហាង"
                 details={[
-                  { label: 'សេវា', value: `${toKhmerDigits(parsed?.shop.services.length ?? 0)}` },
+                  { label: 'ចំនួន', value: catalogueSummary },
                   { label: 'រូបិយប័ណ្ណ', value: parsed?.shop.default_currency ?? '' },
                 ]}
                 confirmLabel={state === 'saving' ? 'កំពុងរក្សាទុក' : 'រក្សាទុក'}

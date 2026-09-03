@@ -45,7 +45,11 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
     >
       <theme.Storefront data={data} tileSeed={style.tileSeed} />
       <footer className="border-t border-separator px-5 py-6">
-        <p className="km text-xs text-label-3">
+        {/* The two facts a customer needs to physically reach the shop, so this
+            line owes the readable ink: text-label-3 measured 1.91:1 against the
+            seeded surface, which is not legible, and text-label-2 is the one the
+            harness proves against every seed. */}
+        <p className="km text-xs text-label-2">
           {data.shop.address ? `${data.shop.address} · ` : ''}
           {data.shop.phone ?? ''}
         </p>

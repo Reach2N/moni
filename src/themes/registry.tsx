@@ -158,9 +158,11 @@ function StayStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: nu
         <section>
           <h2 className="km text-sm font-semibold tracking-wide text-label-2">អំពីកន្លែងស្នាក់នៅ</h2>
           <p className="km mt-2 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
-          <ul className="km mt-4 flex flex-col gap-1 text-sm text-label-2">
-            {data.content.highlights.map((line) => <li key={line}>{line}</li>)}
-          </ul>
+          {data.content.highlights.length > 0 ? (
+            <ul className="km mt-4 flex flex-col gap-1 text-sm text-label-2">
+              {data.content.highlights.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          ) : null}
           <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">ការទទួលភ្ញៀវ</h2>
           <div className="mt-2"><Hours data={data} /></div>
         </section>
@@ -176,14 +178,16 @@ function WorkshopStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed
       <h1 className="km text-[length:var(--sf-text-3)] font-semibold">{data.content.headline}</h1>
       <p className="km mt-3 text-[length:var(--sf-text-1)] text-label-2">{data.content.subhead}</p>
 
-      <ol className="km mt-8 flex flex-col gap-3 border-y border-separator py-6">
-        {data.content.highlights.map((line, index) => (
-          <li key={line} className="flex gap-3 text-[0.9375rem]">
-            <span className="tnum shrink-0 text-label-3">{index + 1}</span>
-            <span>{line}</span>
-          </li>
-        ))}
-      </ol>
+      {data.content.highlights.length > 0 ? (
+        <ol className="km mt-8 flex flex-col gap-3 border-y border-separator py-6">
+          {data.content.highlights.map((line, index) => (
+            <li key={line} className="flex gap-3 text-[0.9375rem]">
+              <span className="tnum shrink-0 text-label-3">{index + 1}</span>
+              <span>{line}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
 
       <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">ការងារ និងតម្លៃ</h2>
       <Items data={data} tileSeed={tileSeed} className="mt-2" />
@@ -196,6 +200,12 @@ function WorkshopStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed
 
 /** Walk in and order: food, drinks, retail. */
 function CounterStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed: number }) {
+  // Hours is the one piece of this footer that can be nothing at all (`Hours`
+  // returns null for a shop with no recorded hours), so the divider that used
+  // to sit above it unconditionally is now conditional on hours actually
+  // existing: a rule drawn above empty space reads as a broken section, not a
+  // quiet one, and that empty band is what showed on a real shop's page.
+  const hasHours = orderedHours(data.shop.hours).length > 0
   return (
     <div className="mx-auto w-full max-w-xl px-5 py-10">
       <h1 className="km text-[length:var(--sf-text-2)] font-semibold">{data.content.headline}</h1>
@@ -204,9 +214,14 @@ function CounterStorefront({ data, tileSeed }: { data: StorefrontData; tileSeed:
       <h2 className="km mt-8 text-sm font-semibold tracking-wide text-label-2">មុខម្ហូប និងតម្លៃ</h2>
       <Items data={data} tileSeed={tileSeed} className="mt-2" />
 
-      <div className="mt-8 border-t border-separator pt-6">
+      <div className={hasHours ? 'mt-8 border-t border-separator pt-6' : 'mt-8'}>
         <Hours data={data} />
         <p className="km mt-4 text-[0.9375rem] leading-relaxed">{data.content.about}</p>
+        {data.content.highlights.length > 0 ? (
+          <ul className="km mt-4 flex flex-col gap-1 text-sm text-label-2">
+            {data.content.highlights.map((line) => <li key={line}>{line}</li>)}
+          </ul>
+        ) : null}
         <Action data={data} className="km mt-6 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-green px-6 text-[0.9375rem] font-medium text-on-green" />
       </div>
     </div>
