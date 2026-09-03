@@ -671,24 +671,13 @@ Design: `docs/superpowers/specs/2026-09-02-seeded-storefront-design.md`. Plan:
   specifically exits the script non-zero on anything but 200, since it is the one route
   in the list that must be a real published page; `/app`'s legitimate sign-in redirect
   keeps its own captures exempt from that check.
-- **A named blocking prerequisite for Phase 13.** Onboarding writes every parsed
-  catalogue row into `services` and never into `products`: `src/lib/setup/schema.ts` and
-  `src/lib/setup/persist.ts` contain zero occurrences of the word "product", `db/seed.sql`
-  has two `insert into services` and zero `insert into products`, and the live `products`
-  table is empty database-wide. The only writers to `products` today are the manual and
-  agent tools on `/app/products` and the owner conversation. Consequences:
-  - the tile feature built in this phase is correct but currently INERT for every shop
-    that came through onboarding, because none of them has a product row to be
-    photoless;
-  - this is the same bug class Phase 11 already named for `v_catalog`, where the
-    storefront and the `/app` redirect were fixed but the setup WRITE path was not;
-  - it blocks more than tiles: Phase 13's checkout is built on `createOrder`, which
-    operates on `products` only, so a shop onboarded today could never take an order
-    either;
-  - the fix is well defined and simply not yet applied: `src/lib/types.ts` already
-    exports `sellsFor()`, and CLAUDE.md already decides that what a shop sells is
-    `sells` on the business type. This needs its own spec before Phase 13 starts, not a
-    patch inside it.
+- **A named blocking prerequisite for Phase 13, since CLEARED by Phase 12.5.** This phase
+  found that onboarding wrote every parsed catalogue row into `services` and never into
+  `products`, which made the tile feature above correct but unreachable for every shop
+  that came through onboarding, and which would have blocked Phase 13's checkout too
+  because `createOrder` operates on `products` only. Phase 12.5 fixed the write path, so
+  do not go looking for this bug again. What blocks Phase 13 now is `DATABASE_URL`, which
+  is not a code problem at all: see section 7.
 - Acceptance, as verified in this environment: `npm run db:test`, `npm run test:signals`,
   `npx tsc --noEmit` and `npm run build` all pass. `npm run shoot` captures the one shop
   published in the live database, `sansethireach`, cleanly at both widths, and its menu
@@ -705,6 +694,94 @@ Design: `docs/superpowers/specs/2026-09-02-seeded-storefront-design.md`. Plan:
   item-row variants; the token layer is built so this can be added without redoing it),
   photo-derived palettes, an explicit owner-set brand colour override, and a second
   vendored font family. None of these have stubs or reserved fields.
+
+### Phase 12.5: A cafe's menu is products
+
+Design:
+`docs/superpowers/specs/2026-09-03-catalogue-routing-and-storefront-finish-design.md`.
+Plan: `docs/superpowers/plans/2026-09-03-catalogue-routing.md`. Shipped 3 September 2026,
+64 new assertions in `npm run db:test` (443 passing).
+
+- **The tile feature was not broken, it was unreachable**, and that was the bug. Phase 11
+  named the cafe problem and fixed three READ paths for it: the storefront, the customer
+  agent's catalogue, and the `/app` redirect all learned to read `v_catalog` instead of
+  `services`. The WRITE path in `src/lib/setup/persist.ts` was missed, so onboarding kept
+  filing every parsed row into `services` whatever the shop was. A real cafe could
+  therefore describe her menu, save it, and get a published page with no photographs on
+  it, because a `services` row can hold neither a photo nor a `createOrder` line. Phase 12
+  built seeded tiles on top of that and correctly reported them inert.
+- **`catalogKindFor(businessTypeId, unit)` in `src/lib/types.ts` is the one rule, and it
+  needed no column and no migration.** A business whose type `sells: 'time'` always gets a
+  `service`, whatever a stray unit says, because reading it the other way round would let
+  one odd parse turn a salon into a shop. Otherwise a `walk_in` row is a `product`,
+  because it occupies nobody's time. Both inputs already existed: `sells` has lived on the
+  business type since Phase 11 per hard rule 5, and `unit` already rides on every parsed
+  row. The split is therefore a function, not a schema change, and the parse output did
+  not change shape.
+- **`src/lib/setup/plan.ts` extracts `planCatalogue()`**, a pure function with no
+  `server-only` and no database import, which decides updates, inserts and deactivations
+  for BOTH tables; `persist.ts` is reduced to two selects, this plan, and the writes it
+  describes. The extraction is the point: it is what makes the central fix provable by
+  `db/test.mjs` rather than resting on a seed-shape check, since `server-only` makes a
+  module unimportable from the plain-Node harness. The assertions check the behaviour and
+  not the record: that a row flipping from booked to walk-in retires its old service row
+  and lands as a fresh product insert rather than a migrated id, and that the service-only
+  columns (`duration_min`, `capacity`, the deposit pair) are dropped rather than carried
+  as null.
+- **Setup never deactivates a product, only a service, and the asymmetry is principled
+  rather than an oversight.** A service list IS the shop's description of itself, so a
+  service the latest parse stops mentioning is a real retirement and is deactivated
+  exactly as before. A product list is inventory that lives its own life: it carries
+  photographs the owner uploaded, stock counts and categories, all set from a different
+  screen (`/app/products`, `createProduct`, the `create_products_bulk` owner tool) that a
+  re-parse of the shop's DESCRIPTION knows nothing about. Without this rule an owner who
+  built a menu with photographs and then re-saved her shop description would have lost the
+  whole menu silently. `products.deactivate` is a permanently empty list in the plan type,
+  with the reasoning recorded at the field. For the same reason `stock`, `category`,
+  `photo_path` and `photo_alt` are absent from the update values entirely rather than set
+  to null, so a re-parse leaves a photograph untouched.
+- **`db/backfill-catalogue.mjs` repairs the shops that already existed, and it is written
+  to refuse.** It defaults to a dry run and only writes on an explicit `--write`, which an
+  explicit `--dry-run` always beats. It refuses any row a booking references, counting
+  every status including cancelled and no_show, because the safety rule is about the
+  foreign key existing and not about whether the booking still matters to anyone. It moves
+  one business per transaction, guards the delete with a `NOT EXISTS` against bookings at
+  the moment of the write and not only at the moment of the read, so a customer booking
+  during the run becomes a loud rollback rather than a silent orphan. It exits non-zero on
+  any skip or failure, because a half migrated catalogue is worse than a filed-wrong one.
+  The pure decision lives in `src/lib/catalogue/backfill.ts` so the harness can prove the
+  refusal.
+- **The storefront finish.** `counter` and `salon` both dropped the model's `highlights`
+  entirely, so the two to four lines the schema requires of every generation were written
+  and never shown; both now render them, and all four themes guard the empty case so no
+  theme draws a rule around a void. `counter`'s hours divider is now conditional on the shop actually having
+  hours, since `Hours` returns null and an empty bordered band reads as a broken section
+  rather than a quiet one. The footer's address and phone moved from `text-label-3`,
+  measured at 1.91:1 against the seeded surface and not legible, to the `text-label-2` the
+  contrast harness proves against every seed: they are the two facts a customer needs to
+  physically reach the shop. `generateStorefront` now retries once when its only warning is
+  a headline that merely repeats the shop name, naming the fault in the retry prompt, and
+  keeps the first draft unless the retry both fixed the headline and introduced no warning
+  the first draft did not already have, because a second roll of the same dice can invent a
+  claim just as easily as it can fix a headline, and a lie on a real shop's public page is
+  the one failure this product cannot recover from. A failed retry keeps the first draft.
+  `shop-setup.tsx` no longer tells a cafe owner she saved "services": `catalogueCounts()`
+  and `catalogueZeroKind()` apply the same `catalogKindFor` rule to the review screen.
+- **`db/seed.sql` gains a third business**, Sabay Coffee, a cafe whose entire menu is
+  walk-in and which owns zero bookable time. It is the fixture that proves a shop can have
+  a real catalogue with no `services` row in it at all, which no seed could demonstrate
+  before.
+- Acceptance, as verified in this environment: `npm run db:test` 443 passing 0 failing,
+  `npm run test:signals` all passing, `npx tsc --noEmit` clean, `npm run build` succeeding,
+  and `npm run shoot` capturing `/s/sansethireach` clean at both widths in both colour
+  schemes. **The backfill has NOT been run.** Its dry run against the live database reports
+  it would move exactly 2 rows on `sansethireach` and skip nothing, leaving the salon and
+  guesthouse untouched because both are time-selling types, and the write run then refused
+  and changed nothing because `DATABASE_URL` is not set. So new shops route correctly from
+  the moment `persist.ts` shipped, and the tile feature remains inert on live data until
+  that variable exists and the backfill is run for real. `/app/site` and `/app/products` are
+  behind Clerk with no test credentials here, so the tiles have still never been seen on a
+  real shop's page.
 
 ### Explicit room left, not built now
 
@@ -759,6 +836,21 @@ reserved, with seams that must not be casually implemented or deleted:
   `npx clerk@latest init` claims to create one non-interactively with no account,
   which is worth trying first. Two keys land in `.env.local`:
   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
+- Put **`DATABASE_URL`** in `.env.local`. It is not there today, and it is the one thing
+  now blocking Phase 13. Two callers need a real transaction, which PostgREST cannot
+  express:
+  - `src/lib/orders/connection.ts`, the single direct Postgres connection in the codebase,
+    which backs `createOrder` and gapless invoice numbering. Without it none of Phase 13's
+    checkout can run at all;
+  - `db/backfill-catalogue.mjs`, because moving a catalogue row between tables is an insert
+    plus a delete that must succeed or fail together. Its write run refused and changed
+    nothing, so the Phase 12.5 repair is still pending on live data.
+
+  Get it from the Supabase dashboard: Project Settings, Database, Connection string,
+  **transaction mode (port 6543, the Supavisor pooler)**, not the direct port 5432, with
+  `SUPABASE_DB_PASSWORD` substituted in. Transaction mode is the correct choice because
+  both callers already set `prepare: false`, which is the pairing that avoids "prepared
+  statement already exists" on the second request to any route.
 - Create the **Resend** account and verified sending domain.
 - Select and install the strongest Beautiful UI landing components, then record the sources.
 - Create the **Meta developer app** and a test page for Messenger dev mode.

@@ -334,6 +334,17 @@ docs/archive/        historical research, never an implementation source
   products and no services, so any code asking "does this shop have anything to sell"
   reads the view. Three places got this wrong at once and all three shipped: the setup
   spine, the storefront and the `/app` redirect.
+- **A walk-in row is a product, a timed row is a service** (decided 3 September 2026).
+  `catalogKindFor(businessType, unit)` in types.ts is the one rule, and it needed no column
+  because `sells` already lives on the business type and `unit` already rides on every parsed
+  row. Phase 11 fixed three READ paths for the cafe bug and missed the WRITE path in
+  `setup/persist.ts`, which is why a real cafe's published page showed no photographs: the
+  tile feature was not broken, it was unreachable.
+- **Setup never deactivates a product, only a service.** A service list is the shop's
+  description of itself, so dropping a service from that description is a real retirement.
+  A product list is inventory: it carries uploaded photographs, stock and categories, and it
+  is edited from another screen by other tools. Re-saving a shop description must never empty
+  a menu.
 - **`products.photo_path` is a Supabase Storage key, never a URL.** `publicMediaUrl()` in
   `src/lib/media/storage.ts` is the only function that knows the `shop-media` bucket is
   public, so if that ever changes, one function changes and no row does.
