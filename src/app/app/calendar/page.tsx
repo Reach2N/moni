@@ -5,12 +5,12 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ប្រតិទិន' }
 
 export default async function CalendarPage() {
-  const [{ requireMember }, { getCalendarDay }] = await Promise.all([
+  const [{ requireMember }, { getCalendarRange }] = await Promise.all([
     import('@/lib/auth/member.ts'),
     import('@/lib/queries/calendar.ts'),
   ])
   const member = await requireMember()
-  const day = await getCalendarDay(member.businessId)
+  const day = await getCalendarRange(member.businessId)
 
   return (
     <>

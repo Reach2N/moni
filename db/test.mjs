@@ -46,6 +46,7 @@ import { TILE_PATTERNS, ROTATIONS_FOR, tileFor, patternGeometry, shouldDrawTile 
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import { movePlan } from '../src/lib/catalogue/backfill.ts'
+import { calendarsFor, toCalendarEvents } from '../src/lib/calendar/events.ts'
 import {
   escapeLikePattern,
   isApproved,
@@ -1899,6 +1900,39 @@ const archivedPlan = planCatalogue(
 eq('an archived product still matches by name', archivedPlan.products.updates.length, 1)
 eq('and the update does not carry active at all',
   Object.prototype.hasOwnProperty.call(archivedPlan.products.updates[0].values, 'active'), false)
+
+console.log('\na booking becomes an event without moving in time or losing its money')
+const range = {
+  date: '2026-09-03',
+  start: '2026-09-03T01:00:00.000Z',
+  end: '2026-09-03T13:00:00.000Z',
+  resources: [
+    { id: 'r-1', name: 'Chair 1', kind: 'chair' },
+    { id: 'r-2', name: 'Chair 2', kind: 'chair' },
+  ],
+  bookings: [
+    { id: 'b-1', code: 'AB12CD', status: 'confirmed', startsAt: '2026-09-03T02:00:00.000Z', endsAt: '2026-09-03T02:30:00.000Z', customer: 'Sokha', service: 'Haircut', resourceId: 'r-1', channel: 'telegram', priceMinor: 15000, paidMinor: 0, currency: 'KHR' },
+    { id: 'b-2', code: 'EF34GH', status: 'confirmed', startsAt: '2026-09-03T03:00:00.000Z', endsAt: '2026-09-03T03:30:00.000Z', customer: 'Dara', service: 'Shave', resourceId: null, channel: 'walk_in', priceMinor: 5000, paidMinor: 5000, currency: 'KHR' },
+  ],
+}
+const events = toCalendarEvents(range)
+eq('every booking becomes an event', events.length, 2)
+// The single most damaging thing a calendar can do is show the wrong hour. The
+// database stores UTC; the shop reads Phnom Penh, which is UTC+7 with no DST.
+// 02:00Z is 09:00 in the shop.
+eq('a booking is rendered in Phnom Penh time, not UTC', events[0].start.includes('09:00'), true)
+eq('and its end moves with it', events[0].end.includes('09:30'), true)
+// A booking with no resource must still appear. Hiding it would lose a real
+// customer from the owner's day.
+eq('a booking with no resource still becomes an event', events[1].calendarId, 'unassigned')
+eq('a booking with a resource takes that resource as its calendar', events[0].calendarId, 'r-1')
+// Money goes through formatMoney, never a float and never a raw minor unit.
+eq('the money reads as money', events[0].title.includes(formatMoney(15000, 'KHR')), true)
+// Every resource gets its own calendar, plus the neutral one, so a colour means
+// exactly one chair.
+const calendars = calendarsFor(range.resources)
+eq('each resource is its own calendar', Object.keys(calendars).length, 3)
+eq('and the neutral one exists for unassigned bookings', 'unassigned' in calendars, true)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

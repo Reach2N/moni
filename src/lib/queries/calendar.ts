@@ -5,10 +5,18 @@ import { cambodiaDayBounds } from '../time/cambodia.ts'
 import type { CurrencyCode } from '../types.ts'
 
 /**
- * A day of bookings, arranged by resource, which is the model this product
- * actually has. ARCHITECTURE.md rejects Cal.com precisely here: Cal.com does one
- * person's calendar, and a salon is three chairs, a guesthouse is twelve rooms.
- * Lanes are the shape of the business, not a display preference.
+ * A span of bookings, each one still carrying its resource.
+ *
+ * The resource used to be a column: one lane per chair, per room, per bay. It is
+ * a colour now, because the resource view is a paid schedule-x plugin that is
+ * not obtainable through npm, so the choice was a hand-built grid or a real
+ * calendar. Nothing about the query changed, and that is deliberate: the
+ * resource still travels on every booking, so the information the lanes carried
+ * survives the view change and a resource view can be restored by reading the
+ * same rows differently.
+ *
+ * The range is half-open and its edges are Cambodian-local days, so a week is
+ * the same query as a day and neither can drift a booking across midnight.
  */
 export type LaneBooking = {
   id: string
@@ -25,7 +33,8 @@ export type LaneBooking = {
   currency: CurrencyCode
 }
 
-export type CalendarDay = {
+export type CalendarRange = {
+  /** The first Cambodian-local day in the range. */
   date: string
   start: string
   end: string
@@ -33,8 +42,16 @@ export type CalendarDay = {
   bookings: LaneBooking[]
 }
 
-export async function getCalendarDay(businessId: string, day = new Date()): Promise<CalendarDay> {
-  const bounds = cambodiaDayBounds(day)
+/**
+ * `to` defaults to `from`, so one day is a range of one and the caller that
+ * wants today writes no dates at all.
+ */
+export async function getCalendarRange(
+  businessId: string,
+  from = new Date(),
+  to = from,
+): Promise<CalendarRange> {
+  const bounds = { start: cambodiaDayBounds(from).start, end: cambodiaDayBounds(to).end }
 
   const [resourcesResult, bookingsResult] = await Promise.all([
     db

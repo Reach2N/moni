@@ -2,7 +2,7 @@
 
 import { Fragment } from 'react'
 import { CircleDot } from 'lucide-react'
-import type { CalendarDay, LaneBooking } from '@/lib/queries/calendar.ts'
+import type { CalendarRange, LaneBooking } from '@/lib/queries/calendar.ts'
 import { formatMoney } from '@/lib/types.ts'
 import { toKhmerDigits } from './dashboard-format.ts'
 import { ChannelIcon } from './channel-icon.tsx'
@@ -23,7 +23,7 @@ import { useLiveBookings } from './live-bookings.tsx'
  * packages with no resource view among them. So `npm install` cannot obtain it
  * at any price short of a licence.
  *
- * `CalendarDay` is nonetheless shaped to match theirs, resources plus a
+ * `CalendarRange` is nonetheless shaped to match theirs, resources plus a
  * `resourceId` per booking, so a licensed plugin later is a swap of this file
  * and not of the query. Both would still need the Khmer line height and
  * `formatMoney()` bolted on.
@@ -55,7 +55,7 @@ const TONE: Record<string, string> = {
   no_show: 'border-hairline bg-paper text-rule line-through',
 }
 
-export function CalendarLanes({ day, businessId }: { day: CalendarDay; businessId: string }) {
+export function CalendarLanes({ day, businessId }: { day: CalendarRange; businessId: string }) {
   const { arrived, connected } = useLiveBookings(businessId)
 
   // A booking that arrived on the stream is merged in rather than replacing the
