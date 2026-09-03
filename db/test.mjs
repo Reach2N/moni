@@ -39,6 +39,7 @@ import { expireWebOrders, findExpiredWebOrders } from '../src/lib/orders/expire.
 import { resolveOrderCustomer } from '../src/lib/orders/customer.ts'
 import { orderErrorKm, orderErrorStatus } from '../src/lib/orders/messages.ts'
 import { confirmTarget } from '../src/lib/payments/confirm-target.ts'
+import { applyScope, confirmScope } from '../src/lib/payments/confirm-scope.ts'
 import { publishedShopFrom } from '../src/lib/storefront/published.ts'
 import { KHQR, CURRENCY, TAG } from 'ts-khqr'
 import {
@@ -2221,23 +2222,54 @@ const collidedOrder = await one(db, `select id from orders where business_id = '
 eq('a real collision in one shop resolves to ambiguous, not to whichever was read first',
   confirmTarget(collidedBooking, collidedOrder).kind, 'ambiguous')
 
-// The owner's confirmation of an ORDER payment, as the SQL confirm.ts runs.
-// Scoped to pending, so a second tap changes zero rows and says so.
+// The owner's confirmation of an ORDER payment, through the scope confirm.ts
+// actually applies. Every where clause below is BUILT from `confirmScope`, not
+// typed out beside it: this block used to hand-write the same three filters,
+// which proved that Postgres honours a where clause and nothing about
+// `confirm.ts`, and dropping `.eq('status', 'pending')` from the real code left
+// all of it passing. `confirm.ts` is `server-only` and cannot be imported here,
+// so the DECISION moved to a pure sibling and this is what reads it.
+const whereScoped = (scope) =>
+  Object.entries(scope).map(([column, value]) => `${column} = '${value}'`).join(' and ')
+
+// First, the application itself: a fake builder that records each narrowing, so
+// the chain confirm.ts sends to PostgREST is asserted rather than assumed.
+const narrowed = []
+const recorder = { eq(column, value) { narrowed.push(`${column}=${value}`); return this } }
+applyScope(recorder, confirmScope('pay-1', 'biz-1'))
+eq('a confirm write is narrowed to the row, the shop and pending, in that order',
+  narrowed.join(' '), 'id=pay-1 business_id=biz-1 status=pending')
+
 const toConfirm = await createOrder(tx, {
   businessId: B_MENU, customerId: null, channel: 'web',
   lines: [{ productId: P_TEA, quantity: 2 }],
 })
+const PAY_ROW = 'e4000000-0000-4000-8000-0000000000c1'
 await db.exec(`insert into payments (id, business_id, order_id, amount_minor, currency, provider, provider_account, status, idempotency_key)
-  values ('e4000000-0000-4000-8000-0000000000c1', '${B_MENU}', '${toConfirm.orderId}', ${toConfirm.totalMinor}, 'KHR', 'khqr', 'cafe@wing', 'pending', '${toConfirm.code}:order:confirm')`)
+  values ('${PAY_ROW}', '${B_MENU}', '${toConfirm.orderId}', ${toConfirm.totalMinor}, 'KHR', 'khqr', 'cafe@wing', 'pending', '${toConfirm.code}:order:confirm')`)
+
+// The tenancy half. RLS is deny-all with zero policies and the service role
+// bypasses it, so `business_id` is the only wall: another shop's owner tapping
+// this code must move nothing at all.
+const foreignConfirm = await db.query(`update payments set status = 'paid', paid_at = now()
+  where ${whereScoped(confirmScope(PAY_ROW, B_SALON))} returning id`)
+eq('another shop confirming this payment moves nothing', foreignConfirm.rows.length, 0)
+
 const firstOrderConfirm = await db.query(`update payments set status = 'paid', paid_at = now(), provider_txn_id = 'owner-confirmed'
-  where id = 'e4000000-0000-4000-8000-0000000000c1' and business_id = '${B_MENU}' and status = 'pending' returning id`)
+  where ${whereScoped(confirmScope(PAY_ROW, B_MENU))} returning id`)
 eq('the owner confirming an order moves exactly one pending row', firstOrderConfirm.rows.length, 1)
+// The idempotence half. Same scope, same row, already paid: zero rows is what
+// `confirmPayment` reads as `already_paid`, and a second receipt to the
+// customer is what a widened scope would send.
 const secondOrderConfirm = await db.query(`update payments set status = 'paid', paid_at = now()
-  where id = 'e4000000-0000-4000-8000-0000000000c1' and business_id = '${B_MENU}' and status = 'pending' returning id`)
+  where ${whereScoped(confirmScope(PAY_ROW, B_MENU))} returning id`)
 eq('and a second tap moves nothing, which is what already_paid reports', secondOrderConfirm.rows.length, 0)
 const orderConfirmed = await db.query(`update orders set status = 'confirmed'
-  where id = '${toConfirm.orderId}' and business_id = '${B_MENU}' and status = 'pending' returning id`)
+  where ${whereScoped(confirmScope(toConfirm.orderId, B_MENU))} returning id`)
 eq('the order goes pending to confirmed in the same step', orderConfirmed.rows.length, 1)
+const orderConfirmedTwice = await db.query(`update orders set status = 'confirmed'
+  where ${whereScoped(confirmScope(toConfirm.orderId, B_MENU))} returning id`)
+eq('and the order cannot be confirmed a second time either', orderConfirmedTwice.rows.length, 0)
 // A confirmed order is no longer pending, so the expiry job cannot reach it.
 const afterConfirmSweep = await expireWebOrders(runner, { now: new Date() })
 eq('a confirmed order is never cancelled by the expiry job', afterConfirmSweep.cancelled, 0)

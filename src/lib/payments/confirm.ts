@@ -3,6 +3,7 @@ import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
 import { deliverToCustomer } from '../channels/deliver.ts'
 import { confirmTarget } from './confirm-target.ts'
+import { applyScope, confirmScope } from './confirm-scope.ts'
 import { formatMoney, type CurrencyCode } from '../types.ts'
 
 /**
@@ -107,12 +108,15 @@ export async function confirmPayment({
   if (payment.status === 'paid') return { outcome: 'already_paid', code: upper, amount }
 
   const now = new Date().toISOString()
-  const paid = await db
-    .from('payments')
-    .update({ status: 'paid', paid_at: now, provider_txn_id: 'owner-confirmed', last_checked_at: now })
-    .eq('id', payment.id)
-    .eq('business_id', businessId)
-    .eq('status', 'pending')
+  // Scoped through `confirmScope`, never a hand-written eq chain: the row, the
+  // shop and `pending`, so a second tap changes nothing and says already_paid.
+  // See `confirm-scope.ts` for why the rule lives there and not here.
+  const paid = await applyScope(
+    db
+      .from('payments')
+      .update({ status: 'paid', paid_at: now, provider_txn_id: 'owner-confirmed', last_checked_at: now }),
+    confirmScope(payment.id, businessId),
+  )
     .select('id')
     .maybeSingle()
   throwIfDbError('confirm payment', paid.error)
@@ -127,20 +131,16 @@ export async function confirmPayment({
   if (witness.error) console.error('[confirm_payment] event not recorded:', witness.error.message)
 
   if (isOrder) {
-    const confirmed = await db
-      .from('orders')
-      .update({ status: 'confirmed' })
-      .eq('id', target.id)
-      .eq('business_id', businessId)
-      .eq('status', 'pending')
+    const confirmed = await applyScope(
+      db.from('orders').update({ status: 'confirmed' }),
+      confirmScope(target.id, businessId),
+    )
     if (confirmed.error) console.error('[confirm_payment] order not confirmed:', confirmed.error.message)
   } else {
-    const confirmed = await db
-      .from('bookings')
-      .update({ status: 'confirmed' })
-      .eq('id', target.id)
-      .eq('business_id', businessId)
-      .eq('status', 'pending')
+    const confirmed = await applyScope(
+      db.from('bookings').update({ status: 'confirmed' }),
+      confirmScope(target.id, businessId),
+    )
     if (confirmed.error) console.error('[confirm_payment] booking not confirmed:', confirmed.error.message)
   }
 
