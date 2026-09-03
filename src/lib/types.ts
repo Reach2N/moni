@@ -427,6 +427,16 @@ export type Payment = {
   id: string
   business_id: string
   booking_id: string | null
+  /**
+   * The order this pays for, when it pays for goods rather than time.
+   *
+   * A payment hangs off a booking or an order and never both. There is no CHECK
+   * forcing one of the two, because a standalone sale with neither is already a
+   * legitimate row: `record_manual_payment` writes one for cash over the
+   * counter. What matters downstream is that `booking_id` stays NULL here, which
+   * is what makes a paid order count as a standalone sale in `v_month_usage`.
+   */
+  order_id: string | null
   customer_id: string | null
   kind: PaymentKind | string
   amount_minor: number

@@ -394,6 +394,20 @@ create table if not exists orders (
 );
 create index if not exists orders_business_created on orders (business_id, created_at desc);
 
+-- A payment can pay for goods, not only for time. It lives here rather than
+-- inline in `payments` above because `orders` is created after `payments` and a
+-- forward reference is not a thing Postgres will take. `add column if not
+-- exists` keeps schema.sql re-runnable, which the harness asserts.
+--
+-- `on delete set null`, never cascade: a deleted order must not take the record
+-- of money with it. No CHECK forcing exactly one of booking_id and order_id: a
+-- standalone sale with neither is already legitimate (cash over the counter).
+alter table payments
+  add column if not exists order_id uuid references orders(id) on delete set null;
+comment on column payments.order_id is 'The order this pays for, when it pays for goods rather than time. A payment hangs off a booking or an order and never both, and neither is also legal (cash over the counter). booking_id staying NULL here is what makes a paid row count as a standalone sale in v_month_usage.';
+create index if not exists payments_order on payments (order_id)
+  where order_id is not null;
+
 create table if not exists order_items (
   id               uuid primary key default gen_random_uuid(),
   order_id         uuid not null references orders(id) on delete cascade,
