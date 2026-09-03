@@ -1,64 +1,57 @@
 'use client'
 
-import { startTransition, useMemo, useState } from 'react'
+import { startTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useReducedMotion } from 'motion/react'
 import {
   ArrowUpRight,
-  CalendarRange,
   Bot,
+  CalendarDays,
+  CalendarRange,
+  ImagePlus,
   ListChecks,
+  RotateCcw,
+  Tags,
   TriangleAlert,
-  Settings2,
-  Store,
+  Wallet,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { AgentApprovalCard } from '@/components/agent/approval-card.tsx'
 import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.tsx'
-import { ASK_CATEGORIES, organizeExamples, operateExamples } from '@/lib/agent/categories.ts'
+import type { AskSuggestion, SuggestionIcon } from '@/lib/agent/suggestions.ts'
 import { RECEIPT_EVENT, type MoniReceiptEvent } from '@/lib/moni-events.ts'
-import type { Sells } from '@/lib/types.ts'
 import { toKhmerDigits } from './dashboard-format.ts'
-import { Panel, PanelHeader } from './panel.tsx'
+import { Panel, PanelHeader, PanelRow, PanelRows } from './panel.tsx'
+import { VoiceNote } from './voice-note.tsx'
 import {
   OwnerToolTrace,
   type OwnerToolTraceStatus,
   type OwnerToolTraceStep,
 } from './owner-tool-trace.tsx'
 
-type CategoryId = (typeof ASK_CATEGORIES)[number]['id']
 type ApiStep = { tool: string; args: unknown; result: unknown }
 type WorkState = 'idle' | 'working' | 'steps' | 'receipt' | 'error'
 
-const CATEGORY_ICON = {
-  setup: ListChecks,
-  organize: Settings2,
-  plan: CalendarRange,
-  operate: Store,
-} satisfies Record<CategoryId, typeof Settings2>
-
-const CATEGORY_LOADING: Record<CategoryId, string> = {
-  setup: 'Moni កំពុងពិនិត្យអ្វីដែលហាងត្រូវការ…',
-  organize: 'Moni កំពុងរៀបចំហាងតាមសំណើនេះ…',
-  plan: 'Moni កំពុងគ្រោងផែនការពីទិន្នន័យហាង…',
-  operate: 'Moni កំពុងធ្វើការងារនេះក្នុងហាង…',
+/** A glyph per suggestion, so a row is read before it is read word by word. */
+const SUGGESTION_ICON: Record<SuggestionIcon, LucideIcon> = {
+  catalogue: Tags,
+  photo: ImagePlus,
+  money: Wallet,
+  day: CalendarDays,
+  week: CalendarRange,
+  checklist: ListChecks,
 }
 
 /**
- * Two starting points per tab. The operate pair is built from a booking code
- * belonging to THIS shop, because the pair it replaced was built from the seed
- * fixtures: see `operateExamples` in lib/agent/categories.ts.
+ * One line, because there is one surface now.
+ *
+ * The four it replaces each named a category the browser had invented and never
+ * sent: `/api/ask` is posted the text and nothing else, so "Moni is planning
+ * from shop data" was said over a request that might have been changing a price.
  */
-function categoryExamples(bookingCode: string | null, sells: Sells): Record<CategoryId, readonly string[]> {
-  return {
-    setup: [ASK_CATEGORIES[0].examples[0], ASK_CATEGORIES[0].examples[2]],
-    organize: organizeExamples(sells),
-    plan: [ASK_CATEGORIES[2].examples[0], ASK_CATEGORIES[2].examples[2]],
-    operate: operateExamples(bookingCode),
-  }
-}
+const WORKING_LABEL = 'Moni កំពុងអានហាងរបស់អ្នក ហើយធ្វើការងារនេះ…'
 
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -291,11 +284,15 @@ function wait(duration: number) {
  * The shop is whoever is signed in. `/api/ask` resolves the tenant from the
  * Clerk session, so this component no longer names one: a component that can
  * name a tenant is a component that can be made to name the wrong one.
+ *
+ * It no longer asks her to pick a category either. `suggestions` arrives ranked
+ * from `lib/agent/suggestions.ts`, which reads what the shop is missing, so the
+ * judgement lives in one testable place and this file only prints it (CLAUDE.md
+ * rule 9).
  */
-export function AskMoni({ sampleCode = null, sells = 'both' }: { sampleCode?: string | null; sells?: Sells }) {
+export function AskMoni({ suggestions }: { suggestions: readonly AskSuggestion[] }) {
   const router = useRouter()
   const reduceMotion = useReducedMotion()
-  const [category, setCategory] = useState<CategoryId>('plan')
   const [text, setText] = useState('')
   const [lastCommand, setLastCommand] = useState('')
   const [state, setState] = useState<WorkState>('idle')
@@ -305,9 +302,8 @@ export function AskMoni({ sampleCode = null, sells = 'both' }: { sampleCode?: st
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null)
 
   const busy = state === 'working' || state === 'steps'
-  const examples = useMemo(() => categoryExamples(sampleCode, sells), [sampleCode, sells])
   const empty = text.trim().length === 0
-  const firstExample = examples[category][0] ?? ''
+  const firstSuggestion = suggestions[0]?.text ?? ''
   const traceSteps: OwnerToolTraceStep[] = steps.map((step, index) => ({
     id: `${index}-${step.title}`,
     label: step.title,
@@ -373,7 +369,12 @@ export function AskMoni({ sampleCode = null, sells = 'both' }: { sampleCode?: st
   function requestSend(command = text) {
     const trimmed = command.trim()
     if (!trimmed || busy) return
-    if (category === 'plan') {
+    // The tab used to decide this, which meant an owner who asked a question
+    // from the wrong tab changed her prices with no confirmation at all. A
+    // suggestion Moni wrote is one Moni knows the shape of; anything else could
+    // change the shop, and the panel says so rather than guessing at her words.
+    const known = suggestions.find((suggestion) => suggestion.text === trimmed)
+    if (known && !known.writes) {
       void send(trimmed)
       return
     }
@@ -389,53 +390,49 @@ export function AskMoni({ sampleCode = null, sells = 'both' }: { sampleCode?: st
         note="សរសេរជាភាសាធម្មតា ដូចអ្នកប្រាប់បុគ្គលិក"
       />
 
-      <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryId)} className="gap-0">
-        <TabsList variant="line" aria-label="ប្រភេទការងារ" className="relative grid h-11 w-full grid-cols-4 gap-0 rounded-none border-b border-hairline p-0">
-          {ASK_CATEGORIES.map((item) => {
-            const Icon = CATEGORY_ICON[item.id]
+      {suggestions.length > 0 ? (
+        <PanelRows aria-label="សំណើពីហាងរបស់អ្នក" className="border-b border-hairline">
+          {suggestions.map((suggestion) => {
+            const Icon = SUGGESTION_ICON[suggestion.icon]
             return (
-              <TabsTrigger
-                key={item.id}
-                value={item.id}
-                className="min-w-0 rounded-none px-2 py-0 after:bg-seal data-[state=active]:font-semibold"
-              >
-                <Icon data-icon="inline-start" aria-hidden />
-                <span className="km truncate">{item.km}</span>
-              </TabsTrigger>
-            )
-          })}
-        </TabsList>
-
-        {ASK_CATEGORIES.map((item) => (
-          <TabsContent key={item.id} value={item.id} className="m-0">
-            <div className="grid grid-cols-2">
-              {examples[item.id].map((example, index) => (
+              <PanelRow key={suggestion.id}>
                 <button
-                  key={example}
                   type="button"
-                  onClick={() => setText(example)}
+                  onClick={() => setText(suggestion.text)}
                   disabled={busy}
-                  className={`km flex min-h-11 items-center justify-between gap-2 border-b border-hairline px-3 py-1.5 text-left text-sm text-rule transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:px-4 sm:py-2 ${index === 0 ? 'border-r' : ''}`}
+                  className="km flex min-h-11 w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm text-rule transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:px-4 sm:py-2"
                 >
-                  <span>{example}</span>
+                  <Icon className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                  <span className="min-w-0 flex-1">{suggestion.text}</span>
                   <ArrowUpRight className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
                 </button>
-              ))}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+              </PanelRow>
+            )
+          })}
+        </PanelRows>
+      ) : null}
 
       <div className="p-2.5 sm:p-4">
         <AgentPromptBar
           value={text}
           onChange={setText}
-          onSubmit={() => (empty ? setText(firstExample) : requestSend())}
+          onSubmit={() => (empty ? setText(firstSuggestion) : requestSend())}
           disabled={busy}
           placeholder="ឧ. ថ្ងៃនេះមានអ្វីខ្លះ…"
           submitLabel={empty ? 'បំពេញឧទាហរណ៍' : 'ធ្វើការងារ'}
           ariaLabel="ប្រាប់ Moni ឱ្យធ្វើអ្វី"
           helper="Moni អានតម្លៃ និងម៉ោងពីហាងរបស់អ្នក វាមិនស្មានទេ"
+          leading={
+            /* The same composer the onboarding screen uses, down to the slot the
+               microphone sits in: an owner who described her shop by voice must
+               not find a box she can only type into on the next screen. */
+            <VoiceNote
+              disabled={busy}
+              onTranscript={(spoken) =>
+                setText((current) => (current.trim() ? `${current.trim()} ${spoken}` : spoken))
+              }
+            />
+          }
           textareaClassName="border-0"
         />
       </div>
@@ -448,6 +445,7 @@ export function AskMoni({ sampleCode = null, sells = 'both' }: { sampleCode?: st
             <AlertDescription>
               <p>{error}</p>
               <Button type="button" variant="ghost" onClick={() => void send(lastCommand)} className="km min-h-11 rounded-none px-0 font-semibold text-ink underline decoration-rule underline-offset-4">
+                <RotateCcw data-icon="inline-start" aria-hidden />
                 សាកម្តងទៀត
               </Button>
             </AlertDescription>
@@ -460,7 +458,7 @@ export function AskMoni({ sampleCode = null, sells = 'both' }: { sampleCode?: st
           status={traceStatus}
           steps={traceSteps}
           receipt={state === 'receipt' ? { command: lastCommand, summary } : undefined}
-          labels={{ working: CATEGORY_LOADING[category] }}
+          labels={{ working: WORKING_LABEL }}
           defaultOpen
         />
       ) : null}
@@ -470,13 +468,7 @@ export function AskMoni({ sampleCode = null, sells = 'both' }: { sampleCode?: st
           title="បញ្ជាក់ការងារដែលនឹងប្តូរហាង"
           description="Moni អាចកែតម្លៃ ម៉ោង ការណាត់ ឬកំណត់ត្រាប្រាក់តាមសំណើនេះ។ ពិនិត្យម្តងទៀតមុនធ្វើ។"
           command={confirmCommand}
-          details={[
-            {
-              label: 'ប្រភេទការងារ',
-              value: ASK_CATEGORIES.find((item) => item.id === category)?.km ?? category,
-            },
-            { label: 'ការពារ', value: 'Moni នឹងកែតែបន្ទាប់ពីអ្នកបញ្ជាក់' },
-          ]}
+          details={[{ label: 'ការពារ', value: 'Moni នឹងកែតែបន្ទាប់ពីអ្នកបញ្ជាក់' }]}
           cancelLabel="ត្រឡប់ទៅកែ"
           confirmLabel="បញ្ជាក់ និងធ្វើការងារ"
           onCancel={() => setConfirmCommand(null)}

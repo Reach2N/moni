@@ -5,6 +5,7 @@ import { DayLedger } from '@/components/app/day-ledger.tsx'
 import { RightRail } from '@/components/app/right-rail.tsx'
 import { ShopSignals } from '@/components/app/shop-signals.tsx'
 import { Takings } from '@/components/app/takings.tsx'
+import { askSuggestions } from '@/lib/agent/suggestions.ts'
 import { setupComplete } from '@/lib/queries/setup-progress.ts'
 import { sellsFor } from '@/lib/types.ts'
 
@@ -20,14 +21,19 @@ export default async function OwnerCommandCentre() {
   // Keep database configuration out of the build-time module graph. This route
   // is dynamic and needs credentials only when an owner opens the dashboard;
   // importing the query modules above made `next build` fail on a clean clone.
-  const [{ requireMember }, { getDashboardSnapshot }, { shopSignals }, { loadSetupProgress }, { countCatalogue }] =
-    await Promise.all([
-      import('@/lib/auth/member.ts'),
-      import('@/lib/queries/dashboard.ts'),
-      import('@/lib/queries/signals.ts'),
-      import('@/lib/queries/setup.ts'),
-      import('@/lib/queries/catalogue.ts'),
-    ])
+  const [
+    { requireMember },
+    { getDashboardSnapshot },
+    { shopSignals },
+    { loadSetupProgress },
+    { countCatalogue, countProductPhotos },
+  ] = await Promise.all([
+    import('@/lib/auth/member.ts'),
+    import('@/lib/queries/dashboard.ts'),
+    import('@/lib/queries/signals.ts'),
+    import('@/lib/queries/setup.ts'),
+    import('@/lib/queries/catalogue.ts'),
+  ])
   // The gated layout already resolved this member; `memberGate` is request
   // cached, so asking again costs nothing and keeps the tenant id out of props.
   const member = await requireMember()
@@ -39,9 +45,23 @@ export default async function OwnerCommandCentre() {
   // It counted SERVICES until 2 September 2026, which sent a cafe with a full
   // menu back to onboarding on every single visit, forever. A menu is a
   // catalogue.
-  if ((await countCatalogue(member.businessId)) === 0) redirect('/app/onboarding')
+  const catalogueCount = await countCatalogue(member.businessId)
+  if (catalogueCount === 0) redirect('/app/onboarding')
   const signals = shopSignals(snapshot)
-  const steps = await loadSetupProgress(member.businessId)
+  const [steps, photos] = await Promise.all([
+    loadSetupProgress(member.businessId),
+    countProductPhotos(member.businessId),
+  ])
+  // What Moni offers her is what her shop is short of, ranked in one pure
+  // module rather than sorted into tabs she had to choose between first.
+  const suggestions = askSuggestions({
+    sells: sellsFor(snapshot.business.businessType),
+    catalogueCount,
+    productCount: photos.products,
+    photoCount: photos.withPhoto,
+    hasPaymentAccount: steps.some((step) => step.key === 'money' && step.state === 'done'),
+    hasLiveChannel: steps.some((step) => step.key === 'channel' && step.state === 'done'),
+  })
 
   return (
     <>
@@ -59,10 +79,7 @@ export default async function OwnerCommandCentre() {
           </div>
 
           <div className="order-2 xl:order-none xl:col-start-1 xl:row-start-1">
-            <AskMoni
-              sampleCode={snapshot.today.bookings[0]?.code ?? null}
-              sells={sellsFor(snapshot.business.businessType)}
-            />
+            <AskMoni suggestions={suggestions} />
           </div>
 
           <div className="order-3 xl:order-none xl:col-start-1 xl:row-start-2">

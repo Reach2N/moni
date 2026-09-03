@@ -1,9 +1,21 @@
 /**
  * What the owner agent can do, grouped the way the owner thinks about her shop.
  *
- * Client safe on purpose: the UI renders these as starting points so a non
- * technical owner is never staring at an empty box wondering what to type. Kept
+ * Client safe on purpose: these are the sentences a non technical owner is
+ * offered so she is never staring at an empty box wondering what to type. Kept
  * out of owner-prompt.ts because that module is server-only.
+ *
+ * The groups are a filing system for THIS file and nothing else. They were once
+ * four tabs in the ask panel, and the tab never left the browser: `/api/ask` is
+ * posted the text and nothing more, so the owner was classifying her request
+ * for an audience of nobody. `lib/agent/suggestions.ts` picks from these by
+ * what the shop is actually missing instead.
+ *
+ * Two of the groups carry invented values (`sokha@wing`, a sample menu), and
+ * the operate pair once carried the literal booking codes from `db/seed.sql`,
+ * so an owner who tapped one sent a code her shop had never issued to the real
+ * agent and was told so. Anything offered as a starting point must work in the
+ * shop looking at it: a starting point that cannot is worse than an empty box.
  */
 export const ASK_CATEGORIES = [
   {
@@ -53,31 +65,3 @@ export const ASK_CATEGORIES = [
     ],
   },
 ] as const
-
-/**
- * The organize pair, chosen by what the shop actually sells.
- *
- * A cafe owner shown "add a children's haircut" is being taught the wrong verb
- * for her shop, which is the same failure as the seeded booking codes below: a
- * starting point that does not fit is worse than an empty box.
- */
-export function organizeExamples(sells: 'time' | 'goods' | 'both'): readonly [string, string] {
-  const organize = ASK_CATEGORIES[1].examples
-  if (sells === 'time') return [organize[1], organize[3]]
-  return [organize[4], organize[5]]
-}
-
-/**
- * The two operate chips used to read `MN7Q1A បានមកហើយ` and `MN9X5C មិនបានមក`.
- * Those are not illustrations, they are the literal booking codes from
- * `db/seed.sql`, so an owner who tapped one sent a code that does not exist in
- * their own shop to the real /api/ask and was told so. A starting point that
- * cannot work is worse than an empty box.
- *
- * So the code comes from the owner's own day. With no booking yet there is no
- * code to name, and the two reads below answer correctly against an empty shop.
- */
-export function operateExamples(bookingCode: string | null): readonly [string, string] {
-  if (!bookingCode) return [ASK_CATEGORIES[2].examples[0], ASK_CATEGORIES[2].examples[1]]
-  return [`${bookingCode} បានមកហើយ`, `${bookingCode} មិនបានមក`]
-}

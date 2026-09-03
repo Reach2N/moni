@@ -44,6 +44,27 @@ export async function countCatalogue(businessId: string): Promise<number> {
 }
 
 /**
+ * How much of the shop's own goods has a picture, in one read.
+ *
+ * Photos live on `products` and nowhere else: `v_catalog` reports a service's
+ * photo_path as null by construction, so counting the view would tell a salon
+ * it is missing pictures it can never have. ARCHITECTURE.md puts a shop under
+ * fifty items, so the rows are counted here rather than in two head queries.
+ */
+export async function countProductPhotos(
+  businessId: string,
+): Promise<{ products: number; withPhoto: number }> {
+  const result = await db
+    .from('products')
+    .select('photo_path')
+    .eq('business_id', businessId)
+    .eq('active', true)
+  throwIfDbError('count product photos', result.error)
+  const rows = result.data ?? []
+  return { products: rows.length, withPhoto: rows.filter((row) => row.photo_path).length }
+}
+
+/**
  * The shape the assistant is given.
  *
  * Prices are formatted here, because the agent is forbidden from doing

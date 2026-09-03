@@ -47,6 +47,7 @@ import { extractMessengerMessages, verifySignature } from '../src/lib/channels/m
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import { movePlan } from '../src/lib/catalogue/backfill.ts'
 import { calendarsFor, toCalendarEvents } from '../src/lib/calendar/events.ts'
+import { askSuggestions } from '../src/lib/agent/suggestions.ts'
 import {
   escapeLikePattern,
   isApproved,
@@ -1933,6 +1934,66 @@ eq('the money reads as money', events[0].title.includes(formatMoney(15000, 'KHR'
 const calendars = calendarsFor(range.resources)
 eq('each resource is its own calendar', Object.keys(calendars).length, 3)
 eq('and the neutral one exists for unassigned bookings', 'unassigned' in calendars, true)
+
+console.log('\nthe agent panel offers what the shop is missing, not a taxonomy')
+// The four tabs this replaces never left the browser: /api/ask is posted the
+// text and nothing else, so the owner was filing her request for an audience of
+// nobody, then being shown a loading line that claimed the filing had mattered.
+// These are the rules that took their place, and every one of them decides a
+// row she taps, so every one of them is asserted here.
+const READY_SHOP = {
+  sells: 'goods',
+  catalogueCount: 8,
+  productCount: 8,
+  photoCount: 8,
+  hasPaymentAccount: true,
+  hasLiveChannel: true,
+}
+const readyRows = askSuggestions(READY_SHOP)
+eq('a shop missing nothing is still offered its day', readyRows.length, 3)
+eq('and it leads with the day rather than inventing a warning', readyRows[0].id, 'day')
+eq('nothing offered to a finished shop can change it', readyRows.every((row) => !row.writes), true)
+// The same shop must give the same rows in the same order. A row that moves
+// under her thumb is a row she stops trusting, and it is also how the sentence
+// she meant to send becomes the one underneath it.
+eq('the same shop state gives the same rows in the same order',
+  JSON.stringify(askSuggestions(READY_SHOP)), JSON.stringify(readyRows))
+
+const emptyCafe = askSuggestions({ ...READY_SHOP, catalogueCount: 0, productCount: 0, photoCount: 0 })
+eq('an empty catalogue outranks every other need', emptyCafe[0].id, 'catalogue')
+eq('and a cafe is asked for a menu', emptyCafe[0].text.includes('ម៉ឺនុយ'), true)
+const emptySalon = askSuggestions({ ...READY_SHOP, sells: 'time', catalogueCount: 0, productCount: 0, photoCount: 0 })
+eq('a salon is asked for services, never for a menu', emptySalon[0].text.includes('សេវាកម្ម'), true)
+
+const noPhotos = askSuggestions({ ...READY_SHOP, photoCount: 0 })
+eq('a menu with no pictures is offered pictures', noPhotos[0].id, 'photos')
+// A service cannot hold a photo: v_catalog reports its photo_path as null by
+// construction. So a shop with nothing to photograph must never be told to.
+const salonNoProducts = askSuggestions({ ...READY_SHOP, sells: 'time', productCount: 0, photoCount: 0 })
+eq('a shop with nothing to photograph is never asked for a photograph',
+  salonNoProducts.some((row) => row.id === 'photos'), false)
+
+const unpaid = askSuggestions({ ...READY_SHOP, hasPaymentAccount: false })
+eq('a shop that cannot be paid is offered its own Bakong account', unpaid[0].id, 'payment')
+eq('and that row asks her first, because it writes to the shop', unpaid[0].writes, true)
+
+// A brand new shop is short of everything. It still may not be three warnings:
+// she has a day to run today, whatever else is unfinished.
+const brandNew = askSuggestions({
+  sells: 'both',
+  catalogueCount: 0,
+  productCount: 0,
+  photoCount: 0,
+  hasPaymentAccount: false,
+  hasLiveChannel: false,
+})
+eq('a shop missing everything is not buried in its own warnings', brandNew.length, 3)
+// Named, not counted. "At least one row that does not write" passes on the
+// setup-status row, which is a warning wearing a question mark: the assertion
+// has to say that her DAY survives, because that is the row being protected.
+eq('and it keeps the one row she runs every morning',
+  brandNew.some((row) => row.id === 'day'), true)
+eq('no row is offered twice', new Set(brandNew.map((row) => row.id)).size, 3)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
