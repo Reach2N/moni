@@ -2,7 +2,7 @@ import 'server-only'
 import { db } from '../db.ts'
 import { requireDbData, throwIfDbError } from '../db-result.ts'
 import type { Json } from '../database.types.ts'
-import { businessType } from '../types.ts'
+import { businessType, catalogKindFor } from '../types.ts'
 import { getBusinessById } from '../queries/business.ts'
 import { normalizeServiceName, type SetupRequest } from './schema.ts'
 
@@ -18,6 +18,7 @@ const RESOURCE_LABEL: Record<string, string> = {
 type PersistSetupResult = {
   businessId: string
   services: { active: number; updated: number; inserted: number; deactivated: number }
+  products: { active: number; updated: number; inserted: number; deactivated: number }
   resources: { requested: number; active: number; created: number; reactivated: number; deactivated: number }
   warnings: string[]
 }
@@ -72,6 +73,18 @@ export async function persistSetup(businessId: string, input: SetupRequest): Pro
     .single()
   requireDbData('save setup business', updatedBusiness)
 
+  // One parsed array, two tables. A cafe's cappuccino and a salon's haircut both
+  // arrive as "a thing the owner listed", but only one of them can hold a photo
+  // or be sold without booking anyone's time. `catalogKindFor` reads the
+  // business type's `sells` plus the row's own unit, so the split needs no new
+  // input field and no change to what the parse produces.
+  const serviceRows = input.shop.services.filter(
+    (service) => catalogKindFor(input.shop.business_type, service.unit) === 'service',
+  )
+  const productRows = input.shop.services.filter(
+    (service) => catalogKindFor(input.shop.business_type, service.unit) === 'product',
+  )
+
   const currentServicesResult = await db
     .from('services')
     .select('id, name, active')
@@ -105,7 +118,13 @@ export async function persistSetup(businessId: string, input: SetupRequest): Pro
   }> = []
   const updates: Array<PromiseLike<unknown>> = []
 
-  input.shop.services.forEach((service, sortOrder) => {
+  // Only the service-bound rows reach this table. A row that used to live here
+  // and is now product-bound (the owner's re-parse changed its unit, or its
+  // business type changed) is simply absent from serviceRows, so it never
+  // retains an id below and falls into the deactivate pass exactly like a row
+  // the owner deleted outright. That is what keeps a row from ever sitting in
+  // both tables at once.
+  serviceRows.forEach((service, sortOrder) => {
     const existing = byName.get(normalizeServiceName(service.name))
     const values = {
       name: service.name,
@@ -159,6 +178,100 @@ export async function persistSetup(businessId: string, input: SetupRequest): Pro
     throwIfDbError('deactivate omitted services', deactivated.error)
   }
 
+  // Second reconciliation, same shape as the one above, a different table. A
+  // shop that sells only time (a salon) always finds productRows empty here, so
+  // this whole block is a no-op for it; a shop that sells only goods (a cafe)
+  // finds serviceRows empty above instead. Nothing about the reconciliation
+  // itself changes with what a shop sells, only which rows reach it.
+  const currentProductsResult = await db
+    .from('products')
+    .select('id, name, active')
+    .eq('business_id', business.id)
+    .order('created_at')
+  throwIfDbError('load setup products', currentProductsResult.error)
+
+  const byProductName = new Map<string, { id: string; name: string; active: boolean }>()
+  for (const product of currentProductsResult.data ?? []) {
+    const key = normalizeServiceName(product.name)
+    const current = byProductName.get(key)
+    if (!current || (product.active && !current.active)) byProductName.set(key, product)
+  }
+
+  const retainedProductIds = new Set<string>()
+  const productInserts: Array<{
+    business_id: string
+    name: string
+    name_en: string | null
+    description: string | null
+    price_minor: number
+    currency: string
+    active: boolean
+    sort_order: number
+  }> = []
+  const productUpdates: Array<PromiseLike<unknown>> = []
+
+  // A row that used to be a product and is now service-bound is, symmetrically,
+  // simply absent from productRows: it falls into the deactivate pass below
+  // exactly like one the owner deleted. That is the other half of what keeps a
+  // row from ever sitting in both tables when its kind changes between parses.
+  productRows.forEach((item, sortOrder) => {
+    const existing = byProductName.get(normalizeServiceName(item.name))
+    // Carried fields only. duration_min, buffer_min, capacity, requires_deposit
+    // and deposit_minor are dropped on purpose, not just unused: a cappuccino has
+    // no duration and nothing books against it, so the parse's booking fields for
+    // a walk-in row describe nothing real, and writing them into products would
+    // just be zeros nobody asked for on a table that has no such columns anyway.
+    // stock, category, photo_path and photo_alt are left out of `values` below
+    // entirely rather than set to null: on an update that means an owner's
+    // photo, stock count or category survives a re-parse untouched, and on an
+    // insert it means the same columns default to null on their own, which is
+    // the right answer for a product the owner only described in text.
+    const values = {
+      name: item.name,
+      name_en: item.name_en,
+      description: item.description,
+      price_minor: item.price_minor,
+      currency: item.currency,
+      active: true,
+      sort_order: sortOrder,
+    }
+    if (existing) {
+      retainedProductIds.add(existing.id)
+      productUpdates.push(
+        db
+          .from('products')
+          .update(values)
+          .eq('business_id', business.id)
+          .eq('id', existing.id)
+          .select('id')
+          .single()
+          .then((result) => requireDbData(`update product ${item.name}`, result)),
+      )
+    } else {
+      productInserts.push({ business_id: business.id, ...values })
+    }
+  })
+
+  await Promise.all(productUpdates)
+
+  if (productInserts.length > 0) {
+    const insertedProducts = await db.from('products').insert(productInserts).select('id')
+    throwIfDbError('insert setup products', insertedProducts.error)
+    for (const product of insertedProducts.data ?? []) retainedProductIds.add(product.id)
+  }
+
+  const omittedProductIds = (currentProductsResult.data ?? [])
+    .filter((product) => product.active && !retainedProductIds.has(product.id))
+    .map((product) => product.id)
+  if (omittedProductIds.length > 0) {
+    const deactivatedProducts = await db
+      .from('products')
+      .update({ active: false })
+      .eq('business_id', business.id)
+      .in('id', omittedProductIds)
+    throwIfDbError('deactivate omitted products', deactivatedProducts.error)
+  }
+
   const resourceResult = await ensureResourceCount(business.id, type.resourceKind, input.shop.resource_count)
 
   const activeServicesResult = await db
@@ -192,7 +305,8 @@ export async function persistSetup(businessId: string, input: SetupRequest): Pro
     entity_type: 'business',
     entity_id: business.id,
     after: {
-      services: input.shop.services.length,
+      services: serviceRows.length,
+      products: productRows.length,
       resource_count: input.shop.resource_count,
       business_type: input.shop.business_type,
     },
@@ -202,10 +316,16 @@ export async function persistSetup(businessId: string, input: SetupRequest): Pro
   return {
     businessId: business.id,
     services: {
-      active: input.shop.services.length,
+      active: serviceRows.length,
       updated: updates.length,
       inserted: inserts.length,
       deactivated: omittedIds.length,
+    },
+    products: {
+      active: productRows.length,
+      updated: productUpdates.length,
+      inserted: productInserts.length,
+      deactivated: omittedProductIds.length,
     },
     resources: resourceResult,
     warnings: resourceResult.active > resourceResult.requested

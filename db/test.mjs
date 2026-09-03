@@ -81,6 +81,11 @@ const one = async (db, q) => (await db.query(q)).rows[0]
 
 const B_SALON = 'b0000000-0000-4000-8000-000000000001'
 const B_HOUSE = 'b0000000-0000-4000-8000-000000000002'
+// db/seed.sql's own cafe, walk-in menu only. Not the same fixture as the
+// ad hoc 'test-cafe' business created further down for the photo and
+// storefront checks (a different id): that one is scaffolding built inline
+// for those specific assertions, this one is seed data every developer sees.
+const B_COFFEE = 'b0000000-0000-4000-8000-000000000003'
 const R_SOKHA = 'a0000000-0000-4000-8000-000000000001'
 const R_MOM   = 'a0000000-0000-4000-8000-000000000002'
 const R_101   = 'a0000000-0000-4000-8000-000000000011'
@@ -99,7 +104,7 @@ await expectOk(db, 'schema.sql applies cleanly', sql('schema.sql'))
 await expectOk(db, 'schema.sql is re-runnable (no migration needed to redeploy)', sql('schema.sql'))
 await expectOk(db, 'seed.sql applies cleanly', sql('seed.sql'))
 await expectOk(db, 'seed.sql is idempotent (re-run leaves no duplicates)', sql('seed.sql'))
-eq('businesses seeded', Number((await one(db, 'select count(*) c from businesses')).c), 2)
+eq('businesses seeded', Number((await one(db, 'select count(*) c from businesses')).c), 3)
 eq('bookings seeded', Number((await one(db, 'select count(*) c from bookings')).c), 5)
 eq('messages not duplicated by re-seed', Number((await one(db, 'select count(*) c from messages')).c), 9)
 
@@ -1642,6 +1647,27 @@ for (const type of timeTypes) {
   }
 }
 eq(`none of the ${timeTypes.length} time-selling types leaks a product`, timeLeak, 0)
+
+console.log('\na cafe\'s menu is filed where a menu belongs')
+// Before this, persist.ts wrote every row to services and the word "product"
+// did not appear in the file. That is why a real cafe's published page showed
+// no photographs: not a rendering bug, an unreachable feature. db/seed.sql's
+// own cafe (B_COFFEE) is seeded directly into products, which is the shape
+// setup/persist.ts now produces on its own: this pins that shape so nobody
+// re-seeds a walk-in menu into services again, the exact regression this
+// whole phase exists to close.
+const cafeProducts = await one(db, `select count(*) c from products where business_id = '${B_COFFEE}' and active`)
+const cafeWalkInServices = await one(db, `select count(*) c from services where business_id = '${B_COFFEE}' and active and unit = 'walk_in'`)
+eq('a cafe has product rows', Number(cafeProducts.c) > 0, true)
+eq('and no walk-in row was left behind in services', Number(cafeWalkInServices.c), 0)
+// A plain salon is untouched by all of this: it sells time only, so it must
+// never carry a product, on any table's terms. B_SALON itself is not the
+// witness here: it already carries one deliberately seeded retail item from
+// the "one view, two kinds" check above, so a zero there would prove nothing.
+// B_NEW is a salon business type nobody has ever given a catalogue at all,
+// which is the honest way to ask "did a salon leak a product".
+const salonProducts = await one(db, `select count(*) c from products where business_id = '${B_NEW}'`)
+eq('a salon has no products at all', Number(salonProducts.c), 0)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

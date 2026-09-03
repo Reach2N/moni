@@ -1,5 +1,8 @@
--- Moni demo seed. Two businesses on purpose: a salon (30-minute sessions) and a
--- guesthouse (2-night stay): same tables, same constraint, no special cases.
+-- Moni demo seed. Three businesses on purpose: a salon (30-minute sessions), a
+-- guesthouse (2-night stay), and a cafe whose whole menu is walk-in and owns
+-- zero bookable time. Same tables, same constraints, no special cases; the
+-- cafe is what proves a shop can have a real catalogue with no services row
+-- in it at all.
 -- Idempotent: fixed UUIDs + on conflict do nothing. Safe to re-run.
 
 -- ═══════════════════════════════════════ 1. salon, Sokha Beauty, Takeo
@@ -225,3 +228,33 @@ insert into waitlist (id, email, locale, source, note, approved_at, approved_by,
  ('11000000-0000-4000-8000-000000000001','sokha@example.com','km','landing','Salon in Takeo, two chairs', now(), 'mense', 'b0000000-0000-4000-8000-000000000001'),
  ('11000000-0000-4000-8000-000000000002','visal@example.com','km','landing','Guesthouse, asks about Messenger', null, null, null)
 on conflict do nothing;
+
+-- ═══════════════════════════════════════ 4. cafe, Sabay Coffee, walk-in menu only
+-- The fixture the catalogue-routing phase exists for: a shop whose whole menu
+-- is walk-in, so every row belongs in `products` and none belongs in
+-- `services`. Before setup/persist.ts learned to route by catalogKindFor, a
+-- shop like this had no honest place in the schema: its menu would have
+-- landed in `services`, where it can hold neither a photo nor a
+-- `createOrder` line. No hours, resources or bookings here on purpose: this
+-- fixture's whole job is the menu, not a second demonstration of the booking
+-- rails the salon and guesthouse already cover.
+
+insert into businesses (id, slug, name, business_type, category, phone, address, province,
+                        locale, default_currency, raw_description, parsed_at, parse_model, hours)
+values ('b0000000-0000-4000-8000-000000000003', 'sabay-coffee', 'Sabay Coffee',
+        'cafe', 'food', '+85512000333', 'Street 240', 'Phnom Penh', 'km', 'KHR',
+        'កាហ្វេទឹកកក 5000៛។ កាហ្វេខ្មៅ 4000៛។ ទឹកសុទ្ធតូច 1000៛។ '
+        || 'Open every day, 6am to 6pm. No booking, walk in and order at the counter.',
+        now(), 'claude-opus-5',
+        '[{"dow":0,"open":"06:00","close":"18:00"},{"dow":1,"open":"06:00","close":"18:00"},
+          {"dow":2,"open":"06:00","close":"18:00"},{"dow":3,"open":"06:00","close":"18:00"},
+          {"dow":4,"open":"06:00","close":"18:00"},{"dow":5,"open":"06:00","close":"18:00"},
+          {"dow":6,"open":"06:00","close":"18:00"}]'::jsonb)
+on conflict (id) do nothing;
+
+-- KHR: price_minor is whole riel, zero decimals. 5000 = 5,000 riel.
+insert into products (id, business_id, name, name_en, price_minor, currency, sort_order) values
+ ('52000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000003','កាហ្វេទឹកកក','Iced coffee',5000,'KHR',1),
+ ('52000000-0000-4000-8000-000000000002','b0000000-0000-4000-8000-000000000003','កាហ្វេខ្មៅ','Black coffee',4000,'KHR',2),
+ ('52000000-0000-4000-8000-000000000003','b0000000-0000-4000-8000-000000000003','ទឹកសុទ្ធតូច','Small bottled water',1000,'KHR',3)
+on conflict (id) do nothing;
