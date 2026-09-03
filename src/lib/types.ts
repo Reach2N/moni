@@ -555,6 +555,11 @@ export type CustomerTool = (typeof CUSTOMER_TOOLS)[number]
  * OPERATE what happened, and SET UP the shop itself. `ownerTools()` is typed
  * `satisfies Record<OwnerTool, Tool>`, so a name declared here and never
  * implemented, or implemented and never declared, is a compile error.
+ *
+ * Every tool here acts immediately, with ONE exception: `describe_shop` returns
+ * a proposal the owner approves, because it is the only call that can rewrite
+ * the profile, the hours and the whole catalogue at once. See
+ * `src/lib/agent/proposal.ts`.
  */
 export const OWNER_TOOLS = [
   // ORGANIZE
@@ -581,6 +586,7 @@ export const OWNER_TOOLS = [
   'confirm_payment',       // the owner saw the riel arrive in her own bank app
   'export_customers',
   // SETUP
+  'describe_shop',         // the whole shop from one paragraph. PROPOSES, never writes
   'report_setup_status',
   'set_payment_account',
   'generate_shop_site',

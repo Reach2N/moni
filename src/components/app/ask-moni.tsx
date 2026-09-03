@@ -21,6 +21,7 @@ import { AgentPromptBar } from '@/components/agent/prompt-bar.tsx'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import type { AskSuggestion, SuggestionIcon } from '@/lib/agent/suggestions.ts'
+import { isShopProposal, type ShopProposal, type ShopProposalBlocker } from '@/lib/agent/proposal.ts'
 import { RECEIPT_EVENT, type MoniReceiptEvent } from '@/lib/moni-events.ts'
 import { toKhmerDigits } from './dashboard-format.ts'
 import { Panel, PanelHeader, PanelRow, PanelRows } from './panel.tsx'
@@ -78,6 +79,26 @@ const CHANGE_LABEL: Record<string, string> = {
   stock: 'ចំនួនក្នុងស្តុក',
 }
 
+/**
+ * Why a proposal is missing something, in her words. The decision itself is
+ * made once in `lib/agent/proposal.ts` and travels as a code, so this file only
+ * prints it (CLAUDE.md rule 9).
+ */
+const PROPOSAL_BLOCKER: Record<ShopProposalBlocker, string> = {
+  no_catalogue: 'បន្ថែមមុខទំនិញ ឬសេវាយ៉ាងតិចមួយ មុនពេលរក្សាទុក',
+  unnamed_row: 'មុខខ្លះមិនទាន់មានឈ្មោះ',
+  unpriced_row: 'មុខខ្លះមិនទាន់មានតម្លៃ',
+}
+
+function proposalCount(summary: ShopProposal['summary']) {
+  const parts = [
+    summary.services > 0 ? `${toKhmerDigits(summary.services)} សេវា` : null,
+    summary.products > 0 ? `${toKhmerDigits(summary.products)} មុខទំនិញ` : null,
+  ].filter(Boolean)
+  if (parts.length > 0) return parts.join(' និង ')
+  return summary.kind_if_empty === 'service' ? `${toKhmerDigits(0)} សេវា` : `${toKhmerDigits(0)} មុខទំនិញ`
+}
+
 const BOOKING_STATUS: Record<string, string> = {
   completed: 'បានបញ្ចប់',
   no_show: 'មិនបានមក',
@@ -91,6 +112,20 @@ function ownerStep(step: ApiStep): OwnerStep {
   const result = record(step.result)
   const error = typeof result.error === 'string' ? result.error : null
   if (error) return { title: 'Moni មិនអាចបញ្ចប់ជំហាននេះបាន', details: [error], failed: true }
+
+  if (step.tool === 'describe_shop' && isShopProposal(step.result)) {
+    const proposal = step.result
+    return {
+      title: 'បានអានហាងរបស់អ្នកពីពិពណ៌នា',
+      details: [
+        proposalCount(proposal.summary),
+        `បើក ${toKhmerDigits(proposal.summary.open_days)} ថ្ងៃ · ${toKhmerDigits(proposal.summary.resource_count)} កន្លែង`,
+        ...proposal.blockers.map((blocker) => PROPOSAL_BLOCKER[blocker]),
+        'មិនទាន់រក្សាទុកទេ។ បញ្ជាក់ខាងក្រោមសិន',
+      ],
+      failed: false,
+    }
+  }
 
   switch (step.tool) {
     case 'create_service':
@@ -299,9 +334,17 @@ export function AskMoni({ suggestions }: { suggestions: readonly AskSuggestion[]
   const [steps, setSteps] = useState<OwnerStep[]>([])
   const [summary, setSummary] = useState('')
   const [error, setError] = useState('')
-  const [confirmCommand, setConfirmCommand] = useState<string | null>(null)
+  /**
+   * The ONE thing that waits for her. Every other tool has already run by the
+   * time its row appears, which is the point of one prompt: she types and it
+   * happens. `describe_shop` comes back as a proposal instead, so the shop's
+   * whole profile, its hours and its catalogue are never rewritten from one
+   * sentence without her seeing what the sentence was read as first.
+   */
+  const [proposal, setProposal] = useState<ShopProposal | null>(null)
+  const [savingShop, setSavingShop] = useState(false)
 
-  const busy = state === 'working' || state === 'steps'
+  const busy = state === 'working' || state === 'steps' || savingShop
   const empty = text.trim().length === 0
   const firstSuggestion = suggestions[0]?.text ?? ''
   const traceSteps: OwnerToolTraceStep[] = steps.map((step, index) => ({
@@ -324,6 +367,7 @@ export function AskMoni({ suggestions }: { suggestions: readonly AskSuggestion[]
     setSteps([])
     setSummary('')
     setError('')
+    setProposal(null)
     setState('working')
 
     try {
@@ -342,6 +386,9 @@ export function AskMoni({ suggestions }: { suggestions: readonly AskSuggestion[]
       const receiptSummary = typeof body.text === 'string' && body.text.trim()
         ? body.text.trim()
         : 'Moni បានបញ្ចប់ការងារនេះ។'
+
+      const proposed = returned.find((step) => step.tool === 'describe_shop' && isShopProposal(step.result))
+      setProposal(proposed && isShopProposal(proposed.result) ? proposed.result : null)
 
       setSteps(ownerSteps)
       setSummary(receiptSummary)
@@ -366,19 +413,45 @@ export function AskMoni({ suggestions }: { suggestions: readonly AskSuggestion[]
     }
   }
 
-  function requestSend(command = text) {
-    const trimmed = command.trim()
-    if (!trimmed || busy) return
-    // The tab used to decide this, which meant an owner who asked a question
-    // from the wrong tab changed her prices with no confirmation at all. A
-    // suggestion Moni wrote is one Moni knows the shape of; anything else could
-    // change the shop, and the panel says so rather than guessing at her words.
-    const known = suggestions.find((suggestion) => suggestion.text === trimmed)
-    if (known && !known.writes) {
-      void send(trimmed)
-      return
+  /**
+   * The approval, and the only one. It posts back exactly the body the tool
+   * proposed, so the browser decides nothing about the shop: `/api/setup`
+   * validates it with `SetupRequestSchema` and `persistSetup` writes it against
+   * the businessId in the Clerk session, never one named here.
+   */
+  async function saveShop() {
+    if (!proposal || !proposal.ready || savingShop) return
+    setSavingShop(true)
+    setError('')
+    try {
+      const response = await fetch('/api/setup', {
+        // Bounded, like the setup screen's own save: a save that never returns
+        // leaves her unable to tell whether her shop was written or not.
+        signal: AbortSignal.timeout(35_000),
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(proposal.setup_request),
+      })
+      const body = await response.json()
+      if (!response.ok || body.error) throw new Error(body.error ?? 'save failed')
+
+      const saved = proposalCount(proposal.summary)
+      setProposal(null)
+      const receipt: MoniReceiptEvent = {
+        id: crypto.randomUUID(),
+        command: lastCommand,
+        summary: `បានរក្សាទុកព័ត៌មានហាង · ${saved}`,
+        createdAt: new Date().toISOString(),
+        status: 'success',
+      }
+      window.dispatchEvent(new CustomEvent(RECEIPT_EVENT, { detail: receipt }))
+      startTransition(() => router.refresh())
+    } catch {
+      setError('មិនអាចបញ្ជាក់ថាបានរក្សាទុកទេ។ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកម្តងទៀត។')
+      setState('error')
+    } finally {
+      setSavingShop(false)
     }
-    setConfirmCommand(trimmed)
   }
 
   return (
@@ -416,7 +489,7 @@ export function AskMoni({ suggestions }: { suggestions: readonly AskSuggestion[]
         <AgentPromptBar
           value={text}
           onChange={setText}
-          onSubmit={() => (empty ? setText(firstSuggestion) : requestSend())}
+          onSubmit={() => (empty ? setText(firstSuggestion) : void send())}
           disabled={busy}
           placeholder="ឧ. ថ្ងៃនេះមានអ្វីខ្លះ…"
           submitLabel={empty ? 'បំពេញឧទាហរណ៍' : 'ធ្វើការងារ'}
@@ -463,20 +536,33 @@ export function AskMoni({ suggestions }: { suggestions: readonly AskSuggestion[]
         />
       ) : null}
 
-      {confirmCommand ? (
+      {proposal ? (
         <AgentApprovalCard
-          title="បញ្ជាក់ការងារដែលនឹងប្តូរហាង"
-          description="Moni អាចកែតម្លៃ ម៉ោង ការណាត់ ឬកំណត់ត្រាប្រាក់តាមសំណើនេះ។ ពិនិត្យម្តងទៀតមុនធ្វើ។"
-          command={confirmCommand}
-          details={[{ label: 'ការពារ', value: 'Moni នឹងកែតែបន្ទាប់ពីអ្នកបញ្ជាក់' }]}
-          cancelLabel="ត្រឡប់ទៅកែ"
-          confirmLabel="បញ្ជាក់ និងធ្វើការងារ"
-          onCancel={() => setConfirmCommand(null)}
-          onConfirm={() => {
-            const command = confirmCommand
-            setConfirmCommand(null)
-            if (command) void send(command)
-          }}
+          title="រក្សាទុកព័ត៌មានហាង"
+          description="Moni នឹងឆ្លើយអតិថិជនតាមតម្លៃ និងម៉ោងទាំងនេះ។ ពិនិត្យមុនរក្សាទុក។"
+          command={proposal.summary.shop_name ?? 'ព័ត៌មានហាងពីពិពណ៌នារបស់អ្នក'}
+          details={[
+            { label: 'ចំនួន', value: proposalCount(proposal.summary) },
+            { label: 'រូបិយប័ណ្ណ', value: proposal.summary.currency },
+            { label: 'ម៉ោងបើក', value: `${toKhmerDigits(proposal.summary.open_days)} ថ្ងៃ` },
+            ...(proposal.blockers.length > 0
+              ? [{
+                  label: 'ត្រូវបំពេញ',
+                  value: proposal.blockers.map((blocker) => PROPOSAL_BLOCKER[blocker]).join(' · '),
+                }]
+              : []),
+            ...proposal.lines.slice(0, 4).map((line) => ({
+              label: line.name,
+              // `line.price` came through formatMoney, grouped in en-US. Only
+              // the digits are transliterated, never a km-KH locale.
+              value: line.unpriced ? 'មិនទាន់មានតម្លៃ' : toKhmerDigits(line.price),
+            })),
+          ]}
+          cancelLabel="បោះបង់"
+          confirmLabel={savingShop ? 'កំពុងរក្សាទុក' : 'រក្សាទុកព័ត៌មានហាង'}
+          onCancel={() => setProposal(null)}
+          onConfirm={() => void saveShop()}
+          disabled={savingShop || !proposal.ready}
         />
       ) : null}
     </Panel>
