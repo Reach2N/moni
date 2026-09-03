@@ -785,6 +785,91 @@ Plan: `docs/superpowers/plans/2026-09-03-catalogue-routing.md`. Shipped 3 Septem
   `/app/products` are behind Clerk with no test credentials here, so the owner-facing halves
   of the feature are unseen too.
 
+### Phase 12.6: The calendar comes from a library
+
+Design: `docs/superpowers/specs/2026-09-03-calendar-library-design.md`. Plan:
+`docs/superpowers/plans/2026-09-03-calendar-library.md`. Shipped 3 September 2026, 8 new
+assertions in `npm run db:test` (467 passing, a total that also carries the Phase 13 work
+landing in parallel).
+
+- **A resource is a colour now, not a column.** `src/components/app/calendar-lanes.tsx`
+  was a hand-built CSS grid, one column per chair or room, one row per half hour, and it
+  is deleted. `src/components/app/calendar-view.tsx` renders schedule-x's MIT core instead:
+  `@schedule-x/react` 4.1.0, `@schedule-x/calendar` 4.7.0, `@schedule-x/theme-default`
+  4.7.0 and `@schedule-x/events-service` 4.7.0. The owner gains day, week and month views,
+  keyboard focus, overlap resolution and a responsive grid; she loses the lanes.
+- **The reason the lanes go is not that lanes are wrong.** The horizontal resource view is
+  a paid schedule-x plugin, and both `@schedule-x/resource-scheduler` and
+  `@sx-premium/resource-scheduler` return 404 from npm, verified a third time on 3
+  September 2026 and recorded in CREDITS.md so nobody looks a fourth. The choice was a
+  hand-built grid or a real calendar, and ARCHITECTURE.md's rule is that a library
+  component wins.
+- **Only the VIEW changed. The MODEL did not.** `resources` is still a table,
+  `bookings.resource_id` still travels on every row, the exclusion constraint still refuses
+  a double-booked chair, and `src/lib/queries/calendar.ts` is unchanged: it still returns
+  the resources and the resource id per booking. `calendarsFor()` in
+  `src/lib/calendar/events.ts` turns each resource id into its own colour, seeded through
+  `mulberry32` off an FNV-1a hash of the id alone, so adding or retiring a chair never
+  recolours the others and a reload never reshuffles the day. A licensed resource view
+  later reads the same rows.
+- **The hour is the thing that must never be wrong, so it is decided on the server and
+  proved without a browser.** `toCalendarEvents()` converts each `timestamptz` to the
+  shop's Phnom Penh wall clock once, through `src/lib/time/cambodia.ts`, and hands the
+  component plain `YYYY-MM-DD HH:mm` strings. `db/test.mjs` asserts that 02:00Z draws at
+  09:00. The component parses those strings back into `Temporal` objects and adds no
+  offset of its own, because an offset written twice is an offset that can disagree with
+  itself. Money is in the event title through `formatMoney()`, and a booking with no
+  resource takes a fixed grey calendar rather than being filtered out of the owner's day.
+- **schedule-x 4 reads the GLOBAL `Temporal`**, which is why `temporal-polyfill` 0.3.0 is
+  now a direct dependency and why `calendar-view.tsx` imports `temporal-polyfill/global`
+  for its side effect. A named import of the identical polyfill fails the library's
+  `instanceof` check, the calendar throws on mount, and the page renders an empty box. It
+  was found by rendering the component, not by reading it.
+- **The theme is remapped, never edited.** One unlayered `.moni-calendar` block in
+  `src/app/globals.css` feeds schedule-x's own `--sx-*` variables from the Invitation's
+  tokens, the same move `.sf` makes for a shop's public site, and zeroes the Material
+  rounding and shadow the dashboard's grammar does not use. It also restores
+  `line-height: 1.75` and `letter-spacing: normal` inside the library's DOM: the global
+  Khmer rule names a list of elements that reaches `span` but not `div`, and schedule-x
+  draws an event title in a div. Unlayered because Tailwind emits its utilities inside
+  `@layer utilities`, so an unlayered rule wins with no `!important`.
+- **Two of the library's own extension points are used rather than worked around.** A
+  `weekGridHour` custom component puts the time axis in Khmer numerals through
+  `toKhmerDigits`, never a `km-KH` locale, and carries the library's own
+  `.sx__week-grid__hour-text` class so the label sits in the axis gutter. And
+  `_options.additionalClasses` puts the booking's status on the event block, so a cancelled
+  booking recedes without its event being redrawn.
+- **The live stream is unchanged and pushes rather than re-renders.**
+  `useLiveBookings(businessId)` is called exactly as the lanes called it, the connected and
+  not-yet-connected states are the same two Khmer lines with the same lucide `CircleDot`,
+  and an arrival is added through the events service's `add` so the view and the day the
+  owner had navigated to survive it. Arrivals are deduplicated against the ids the server
+  already drew, because the hook redelivers, and each one is mapped through the same
+  `toCalendarEvent()` the server used so a live booking cannot draw at a different hour or
+  in a different colour than a reload would give it.
+- **What was not carried over: the per-booking channel icon.** The lanes drew a lucide
+  glyph per booking for Telegram, web, walk-in and the rest. Drawing it inside a schedule-x
+  event means supplying a `timeGridEvent` custom component, and the library then hands the
+  event block's background and border to the caller, which is exactly the colour that
+  carries the resource. Redrawing the block to keep the icon would have traded the feature
+  this phase is named for, and CLAUDE.md's sourcing rule forbids redrawing a library
+  component in any case. The channel still travels on every row and is still shown in the
+  inbox.
+- Acceptance, as verified in this environment: `npm run db:test` 467 passing 0 failing,
+  `npm run test:signals` all passing, `npx tsc --noEmit` clean, `npm run build` succeeding,
+  and `npm run shoot` unchanged from its Phase 12.5 baseline. `shoot` does not reach this
+  screen: its three `/app` captures are the Clerk sign-in page, because the script signs in
+  to nothing. **`/app/calendar` itself has never been seen signed in**,
+  because it is behind Clerk and there are no test credentials here. It was rendered
+  instead against fabricated bookings on a throwaway local route, deleted before this
+  commit, which is what caught both defects above. What that proved: the 09:00 booking
+  draws at 09:00 and not at 02:00, each resource takes a distinct colour and an unassigned
+  booking takes the grey one, money reads `15,000៛` and `$35.00`, the time axis reads
+  `០១:០០`, computed `line-height` is 21px against an 11px font with `letter-spacing:
+  normal`, the today marker is `#059669`, corner rounding is 0, and there is no horizontal
+  overflow at 1440 or at 390. What it did not prove: anything about real rows, the live
+  stream against a real business id, or the page inside the app shell.
+
 ### Explicit room left, not built now
 
 Four items moved INTO scope and are now phases 7 and 8: payment

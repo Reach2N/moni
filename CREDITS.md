@@ -262,6 +262,48 @@ delivered instead attaches each parse warning to the row it concerns, so a row M
 unsure about is visually distinct at the point the owner is looking at it, rather than
 listed separately below the table.
 
+## schedule-x: the owner's calendar, adopted 3 September 2026
+
+- Project: [schedule-x](https://github.com/schedule-x/schedule-x)
+- Docs: [schedule-x.dev](https://schedule-x.dev/)
+- Installed from npm, exact versions:
+  - `@schedule-x/react` 4.1.0
+  - `@schedule-x/calendar` 4.7.0
+  - `@schedule-x/theme-default` 4.7.0
+  - `@schedule-x/events-service` 4.7.0
+- License: MIT, declared in each package's own `package.json`
+- Local usage: `src/components/app/calendar-view.tsx` (the only file that imports any of
+  them), fed by `src/lib/calendar/events.ts` and `src/lib/queries/calendar.ts`, rendered by
+  `src/app/app/calendar/page.tsx`
+
+This entry replaces the search record that used to live in the header of
+`src/components/app/calendar-lanes.tsx`, deleted in the same pass. That record was written
+in the code rather than here, which is why CREDITS.md never carried a calendar entry until
+now. Its conclusion still stands and its component does not.
+
+What is kept, per the sourcing rule: the library's structure, its views, its event
+rendering and its own class names. `@schedule-x/theme-default` is imported unmodified and
+its Material palette is remapped onto the Invitation's tokens by a scoped, unlayered
+`.moni-calendar` block in `src/app/globals.css`, the same move `.sf` makes for a shop's
+public site. Nothing in a library file is edited.
+
+Two extension points the library documents are used rather than worked around: a
+`weekGridHour` custom component, so the time axis reads in Khmer numerals through
+`toKhmerDigits` and never through a `km-KH` locale, and `_options.additionalClasses`, so a
+cancelled booking recedes without its event block being redrawn.
+
+`temporal-polyfill` 0.3.0 (MIT) is a direct dependency because of this adoption.
+schedule-x 4 takes `Temporal` objects and validates them against the GLOBAL `Temporal`, so
+`temporal-polyfill/global` has to be imported for the calendar to mount at all.
+
+**The resource view is not obtainable and this is the third check.** Both
+`@schedule-x/resource-scheduler` and `@sx-premium/resource-scheduler` return 404 from npm,
+verified again on 3 September 2026. The MIT core carries the resource DATA model
+(`resources`, `resourceId` on an event, `resourceGridOptions`) but ships only day, week,
+month, list and agenda renderers; the horizontal resource view is a paid plugin on a
+private registry. Nobody needs to look a fourth time. A resource is drawn as a colour
+instead, seeded from its own id in `calendarsFor()`.
+
 ## The catalogue screen: a reported gap, 2 September 2026
 
 `/app/products` composes installed primitives rather than adopting a library component,

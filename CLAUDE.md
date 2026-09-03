@@ -330,6 +330,15 @@ docs/archive/        historical research, never an implementation source
   the email must be in `waitlist` or manually approved (`approved_at`). The gate is one
   `requireMember()` helper so launch is deleting one call site.
 - Hotels, courts and tailoring jobs need no new tables. Resource plus range covers them.
+- **The calendar is schedule-x's MIT core and has no resource lanes** (decided
+  3 September 2026, reversing the earlier hand-built decision). Both
+  `@schedule-x/resource-scheduler` and `@sx-premium/resource-scheduler` 404 on npm,
+  so the paid view is not obtainable at any price short of a licence. A resource is
+  now a colour rather than a column: the model still carries `resourceId` on every
+  booking, only the view changed. It reads the GLOBAL `Temporal`, so
+  `src/components/app/calendar-view.tsx` imports `temporal-polyfill/global` for its side
+  effect; a named import of the same polyfill fails the library's `instanceof` check and
+  the calendar renders nothing at all.
 - **A catalogue is `v_catalog`, never `services`** (decided 2 September 2026). A cafe has
   products and no services, so any code asking "does this shop have anything to sell"
   reads the view. Three places got this wrong at once and all three shipped: the setup
