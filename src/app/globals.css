@@ -598,3 +598,84 @@ body:has(.moni-hig) {
 .sf[data-rule='tint'] .sf-row { border-bottom: 0; }
 .sf[data-rule='tint'] .sf-row:nth-child(odd) { background: var(--sf-accent-tint); }
 .sf[data-rule='none'] .sf-row { border-bottom: 0; }
+
+/* ── the calendar wears /app's own tokens ─────────────────────────────────
+   schedule-x ships a Material palette and declares it on `:root`, which would
+   put a purple Material calendar in the middle of a black-and-white dashboard.
+   Everything below is a REMAPPING onto the Invitation's tokens, the same move
+   `.sf` makes for a shop's public site: the library's own variable names are
+   kept, so nothing in `@schedule-x/theme-default` is edited and an upgrade is
+   an install rather than a re-patch.
+
+   Scoped to `.moni-calendar`, the wrapper `calendar-view.tsx` draws, rather
+   than to `:root`. A custom property resolves per element, so a declaration on
+   an ancestor of the calendar beats the library's `:root` declaration for every
+   element inside it, whichever stylesheet the bundler emits first. That matters
+   here: the theme's CSS is imported by the component, so it lands AFTER this
+   file, and a `:root` override would have lost the tie.
+
+   Unlayered on purpose, the same cascade-layer trick as the `:lang(km)` rules
+   above: Tailwind emits utilities inside @layer utilities, so these win with no
+   !important anywhere. */
+.moni-calendar {
+  /* Green is the one accent, and it lands on structure: today's date, the
+     active view button, the now-line. */
+  --sx-color-primary:                 var(--color-seal);
+  --sx-color-on-primary:              var(--color-on-ink);
+  --sx-color-primary-container:       color-mix(in srgb, var(--color-seal) 14%, #FFFFFF);
+  --sx-color-on-primary-container:    var(--color-foreground);
+  --sx-color-secondary:               var(--color-rule);
+  --sx-color-on-secondary:            var(--color-on-ink);
+  --sx-color-secondary-container:     var(--color-paper);
+  --sx-color-on-secondary-container:  var(--color-foreground);
+  --sx-color-tertiary:                var(--color-rule);
+  --sx-color-on-tertiary:             var(--color-on-ink);
+  --sx-color-tertiary-container:      var(--color-paper);
+  --sx-color-on-tertiary-container:   var(--color-foreground);
+
+  --sx-color-surface:                 #FFFFFF;
+  --sx-color-surface-dim:             var(--color-paper);
+  --sx-color-surface-bright:          #FFFFFF;
+  --sx-color-on-surface:              var(--color-foreground);
+  --sx-color-surface-container:       var(--color-paper);
+  --sx-color-surface-container-low:   #FFFFFF;
+  --sx-color-surface-container-high:  var(--color-paper);
+  --sx-color-background:              #FFFFFF;
+  --sx-color-on-background:           var(--color-foreground);
+  --sx-color-outline:                 var(--color-rule);
+  --sx-color-outline-variant:         var(--color-hairline);
+  --sx-color-surface-tint:            var(--color-seal);
+  --sx-internal-color-text:           var(--color-foreground);
+  --sx-internal-color-light-gray:     var(--color-paper);
+  --sx-internal-color-gray-ripple-background: var(--color-hairline);
+
+  /* No cards, no shadows, no radius: the Invitation's grammar, stated once in
+     components/app/panel.tsx and answered here rather than argued with. */
+  --sx-rounding-extra-small:  0;
+  --sx-rounding-small:        0;
+  --sx-rounding-extra-large:  0;
+  --sx-box-shadow-level3:     none;
+}
+
+/* Khmer inside the library's DOM. The global rules further up name a list of
+   elements and reach `span` but not `div`, and schedule-x draws an event title
+   in a div, so a coeng subscript clipped inside the calendar while the same
+   word set correctly everywhere else on the page. `letter-spacing: normal`
+   comes along because a Khmer cluster is drawn as one unit: tracking pulls the
+   coeng and the vowel signs off the consonant they attach to. */
+.moni-calendar :is(:lang(km), .km),
+.moni-calendar :is(:lang(km), .km) * {
+  line-height: 1.75;
+  letter-spacing: normal;
+}
+
+/* A day that happened as it happened. `toCalendarEvent` puts the status on the
+   block's class list through schedule-x's own `additionalClasses`, so a
+   cancelled booking recedes without anyone redrawing the library's event
+   component. This is the one piece of the lanes' tone table worth keeping: an
+   owner who reads a cancelled booking as a live one turns up for nobody. */
+.moni-calendar .moni-status-cancelled,
+.moni-calendar .moni-status-no_show {
+  opacity: 0.55;
+  text-decoration: line-through;
+}

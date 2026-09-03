@@ -23,6 +23,14 @@ export type CalendarEvent = {
   end: string
   calendarId: string
   description: string
+  /**
+   * schedule-x pushes `additionalClasses` straight onto the event block's class
+   * list, which is how a cancelled booking still recedes without anyone
+   * redrawing the library's event component. The class carries the status and
+   * globals.css decides what a status looks like, so a new status is a rule
+   * rather than a component.
+   */
+  _options: { additionalClasses: string[] }
 }
 
 /**
@@ -69,7 +77,19 @@ function titleFor(booking: LaneBooking): string {
  * owner's day without telling her.
  */
 export function toCalendarEvents(range: CalendarRange): CalendarEvent[] {
-  return range.bookings.map((booking) => ({
+  return range.bookings.map(toCalendarEvent)
+}
+
+/**
+ * One booking, as one event.
+ *
+ * Split out of `toCalendarEvents` because a booking that arrives on the live
+ * stream after the page rendered has to become an event too, and it must become
+ * exactly the same kind of event: the same hour, the same colour, the same
+ * money. One function, so a live arrival can never drift from a server render.
+ */
+export function toCalendarEvent(booking: LaneBooking): CalendarEvent {
+  return {
     id: booking.id,
     title: titleFor(booking),
     start: shopWallClock(booking.startsAt),
@@ -78,7 +98,8 @@ export function toCalendarEvents(range: CalendarRange): CalendarEvent[] {
     // The code is how a booking is named everywhere else in the product, in
     // chat and on the receipt, so it is what an owner searches the day for.
     description: `${booking.code} · ${booking.status}`,
-  }))
+    _options: { additionalClasses: [`moni-status-${booking.status}`] },
+  }
 }
 
 /** The light and dark colour pair schedule-x's theme reads per calendar. */
