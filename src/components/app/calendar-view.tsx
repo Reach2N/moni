@@ -114,6 +114,12 @@ export function CalendarView({
   // booking added twice is a booking the owner sees twice.
   const placed = useRef(new Set(events.map((event) => event.id)))
 
+  // Only so the empty-day note can retract. A booking that lands on an empty
+  // day is drawn by the events service, which React never hears about, so
+  // without this the calendar would show a real booking above a line reading
+  // "no bookings today yet".
+  const [liveCount, setLiveCount] = useState(0)
+
   const calendar = useCalendarApp(
     {
       views: [createViewDay(), createViewWeek(), createViewMonthGrid()],
@@ -160,6 +166,7 @@ export function CalendarView({
         currency: live.currency as LaneBooking['currency'],
       }
       eventsService.add(hydrate(toCalendarEvent(booking)))
+      setLiveCount((count) => count + 1)
     }
   }, [arrived, calendar, eventsService, rangeStart, rangeEnd])
 
@@ -178,7 +185,7 @@ export function CalendarView({
         <ScheduleXCalendar calendarApp={calendar} customComponents={CUSTOM_COMPONENTS} />
       </div>
 
-      {events.length === 0 ? (
+      {events.length === 0 && liveCount === 0 ? (
         <p className="km mt-3 border border-rule/70 px-3 py-6 text-center text-sm text-rule">
           មិនទាន់មានការណាត់សម្រាប់ថ្ងៃនេះទេ។
         </p>
