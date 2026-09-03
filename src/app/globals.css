@@ -412,7 +412,17 @@
    Phase 5 rebuilds /app in the Apple palette and may give it a real dark
    scheme. When it does, this block moves with it rather than being deleted:
    the portal still needs to be told which world it came from. */
-[data-slot$="-portal"],
+/* Radix's DialogPortal destructures only { __scopeDialog, forceMount, children,
+   container } and DISCARDS every other prop, then renders with asChild, so it
+   has no DOM element of its own. A `data-slot="sheet-portal"` attribute
+   therefore never reaches the document and a selector for it matches nothing:
+   that is exactly how the first attempt at this fix passed its own check (the
+   rule compiled) while the drawer stayed unreadable (the rule never applied).
+   These four slots are on real elements, which is why they are the ones pinned. */
+[data-slot="sheet-content"],
+[data-slot="sheet-overlay"],
+[data-slot="dialog-content"],
+[data-slot="dialog-overlay"],
 [data-sonner-toaster] {
   color-scheme: light;
 
