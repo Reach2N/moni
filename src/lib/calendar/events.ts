@@ -166,5 +166,30 @@ export function calendarsFor(resources: CalendarRange['resources']): Record<stri
   return out
 }
 
+/**
+ * A live arrival, given back the resource the view drops.
+ *
+ * `v_bookings_agent` carries `resource_name` and `resource_kind` but not
+ * `resource_id`, and the id is what a colour is keyed on: `calendarsFor()`
+ * seeds the hue from it and `toCalendarEvent` reads it as `calendarId`. So a
+ * booking arriving on the SSE stream drew in the neutral grey while the same
+ * booking took its chair's colour on reload, which loses the one thing the
+ * calendar rewrite traded the resource columns for.
+ *
+ * The stream route does the second read and hands both lists here. Pure, so
+ * `db/test.mjs` proves the merge against real rows with no browser and no
+ * server: a booking whose id is not in `owners` keeps a null, which
+ * `toCalendarEvent` draws as unassigned rather than dropping.
+ */
+export function attachResourceIds<T extends { id: string | null }>(
+  rows: readonly T[],
+  owners: ReadonlyArray<{ id: string | null; resource_id: string | null }>,
+): Array<T & { resource_id: string | null }> {
+  // The view types every column as nullable, so an id can be null here. It
+  // matches no owner and keeps its null, which is the unassigned colour.
+  const byId = new Map(owners.map((owner) => [owner.id, owner.resource_id]))
+  return rows.map((row) => ({ ...row, resource_id: byId.get(row.id) ?? null }))
+}
+
 /** The zone the events above are written in, for the calendar to be told once. */
 export const CALENDAR_TIME_ZONE = CAMBODIA_TIME_ZONE

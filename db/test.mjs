@@ -52,7 +52,7 @@ import { TILE_PATTERNS, ROTATIONS_FOR, tileFor, patternGeometry, shouldDrawTile 
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
 import { movePlan } from '../src/lib/catalogue/backfill.ts'
-import { calendarsFor, toCalendarEvents } from '../src/lib/calendar/events.ts'
+import { attachResourceIds, calendarsFor, toCalendarEvent, toCalendarEvents } from '../src/lib/calendar/events.ts'
 import { askSuggestions } from '../src/lib/agent/suggestions.ts'
 import { buildShopProposal, isShopProposal } from '../src/lib/agent/proposal.ts'
 import { OWNER_TOOLS, CUSTOMER_TOOLS } from '../src/lib/types.ts'
@@ -1942,6 +1942,49 @@ eq('the money reads as money', events[0].title.includes(formatMoney(15000, 'KHR'
 const calendars = calendarsFor(range.resources)
 eq('each resource is its own calendar', Object.keys(calendars).length, 3)
 eq('and the neutral one exists for unassigned bookings', 'unassigned' in calendars, true)
+
+// The LIVE path, against real rows. A booking that arrives on the SSE stream
+// has to take the same colour as the one a reload draws, and it did not: the
+// stream reads `v_bookings_agent`, which carries `resource_name` but no
+// `resource_id`, and the id is what a colour is keyed on. Every live arrival
+// drew in the neutral grey, which is the whole trade the calendar rewrite made
+// (a resource is a colour now, not a column) lost on exactly the bookings the
+// owner has the screen open for.
+//
+// So the stream reads the ids back and `attachResourceIds` merges them. Below
+// is that merge run on what the two queries actually return.
+const streamRows = (await db.query(`
+  select id, code, status, starts_at, ends_at, customer_name, service_name, resource_name,
+         channel, price_minor, paid_minor, currency
+    from v_bookings_agent where business_id = '${B_SALON}' order by starts_at limit 3`)).rows
+const streamOwners = (await db.query(`
+  select id, resource_id from bookings where business_id = '${B_SALON}'
+   and id in (${streamRows.map((row) => `'${row.id}'`).join(',')})`)).rows
+eq('the view the stream reads carries no resource id at all',
+  'resource_id' in streamRows[0], false)
+const merged = attachResourceIds(streamRows, streamOwners)
+eq('the stream gives every live arrival its resource back',
+  merged.every((row) => typeof row.resource_id === 'string'), true)
+// The assertion that names the bug: through the SAME mapper the server render
+// uses, a live arrival lands on its chair's calendar and not on the grey one.
+const liveEvent = toCalendarEvent({
+  id: merged[0].id, code: merged[0].code, status: merged[0].status,
+  startsAt: merged[0].starts_at, endsAt: merged[0].ends_at,
+  customer: merged[0].customer_name, service: merged[0].service_name,
+  resourceId: merged[0].resource_id, channel: merged[0].channel,
+  priceMinor: merged[0].price_minor, paidMinor: merged[0].paid_minor,
+  currency: merged[0].currency,
+})
+eq('a live arrival draws in its resource colour, not the neutral one',
+  liveEvent.calendarId === streamOwners.find((owner) => owner.id === merged[0].id).resource_id, true)
+eq('and that colour is a real calendar the legend names',
+  liveEvent.calendarId in calendarsFor((await db.query(
+    `select id, name, kind from resources where business_id = '${B_SALON}'`)).rows), true)
+// A row the second read could not name keeps its null and stays visible, rather
+// than disappearing from the owner's day.
+const unmatchedArrival = attachResourceIds([{ id: 'not-a-booking' }], streamOwners)
+eq('a booking the id read missed is still drawn, in the neutral colour',
+  toCalendarEvent({ ...range.bookings[1], resourceId: unmatchedArrival[0].resource_id }).calendarId, 'unassigned')
 
 console.log('\nthe agent panel offers what the shop is missing, not a taxonomy')
 // The four tabs this replaces never left the browser: /api/ask is posted the

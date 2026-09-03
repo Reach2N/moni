@@ -22,6 +22,13 @@ export type LiveBooking = {
   customer_name: string | null
   service_name: string | null
   resource_name: string | null
+  /**
+   * The chair, room or table, as the id the calendar colours a booking by.
+   * `v_bookings_agent` does not carry it, so the stream route adds it with a
+   * follow-up read; null only when that read could not name one, which the
+   * calendar draws as unassigned exactly as a server render would.
+   */
+  resource_id: string | null
   channel: string
   price_minor: number
   paid_minor: number

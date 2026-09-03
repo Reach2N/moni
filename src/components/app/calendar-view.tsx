@@ -209,7 +209,10 @@ export function CalendarView({
       placed.current.add(live.id)
       // Through the same mapper the server used, so a live arrival cannot draw
       // at a different hour, in a different colour, or with different money
-      // than the same booking would have on a reload.
+      // than the same booking would have on a reload. The colour half of that
+      // is why the stream carries `resource_id`: `toCalendarEvent` keys the
+      // calendar on it, and a null one drew every live arrival in the neutral
+      // grey while the same booking took its chair's colour on reload.
       const booking: LaneBooking = {
         id: live.id,
         code: live.code,
@@ -218,7 +221,7 @@ export function CalendarView({
         endsAt: live.ends_at,
         customer: live.customer_name ?? 'អតិថិជន',
         service: live.service_name ?? '',
-        resourceId: null,
+        resourceId: live.resource_id,
         channel: live.channel,
         priceMinor: live.price_minor,
         paidMinor: live.paid_minor,

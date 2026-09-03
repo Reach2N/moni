@@ -1,6 +1,7 @@
 import { requireMemberApi } from '@/lib/auth/member.ts'
 import { ApiRequestError } from '@/lib/http/post.ts'
 import { db } from '@/lib/db.ts'
+import { attachResourceIds } from '@/lib/calendar/events.ts'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -83,7 +84,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ business
           if (bookings.error || conversations.error) {
             send('warning', { message: 'a refresh failed, still watching' })
           } else {
-            if (bookings.data?.length) send('bookings', bookings.data)
+            if (bookings.data?.length) send('bookings', await withResourceIds(businessId, bookings.data))
             if (conversations.data?.length) send('conversations', conversations.data)
             since = now
           }
@@ -124,4 +125,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ business
       'x-accel-buffering': 'no',
     },
   })
+}
+
+/**
+ * The resource each booking belongs to, read back for rows the view cannot
+ * carry.
+ *
+ * A follow-up read rather than a widened view, because widening a view is a
+ * migration against the live project and this is not: it is the same shape as
+ * the payments read in `getCalendarRange`, one lookup by primary key, and only
+ * on a tick that actually returned rows. Why the calendar needs it at all is in
+ * `attachResourceIds`, which does the merge and is where it is tested.
+ */
+async function withResourceIds<T extends { id: string | null }>(businessId: string, rows: T[]) {
+  const owners = await db
+    .from('bookings')
+    .select('id, resource_id')
+    .eq('business_id', businessId)
+    .in('id', rows.flatMap((row) => (row.id ? [row.id] : [])))
+  // A failed lookup is not a reason to drop the arrival. The booking still
+  // reaches the owner, in the neutral colour, which is what it did before.
+  return attachResourceIds(rows, owners.data ?? [])
 }
