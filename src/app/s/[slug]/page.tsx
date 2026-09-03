@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import type { CSSProperties } from 'react'
 import { themeFor } from '@/themes/registry.tsx'
+import { Cart } from '@/components/storefront/cart.tsx'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +45,26 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
       data-rule={style.rule}
     >
       <theme.Storefront data={data} tileSeed={style.tileSeed} />
+      {/* Products get a counter, services keep the contact action the theme drew
+          above. It sits here rather than inside each of the four themes so
+          there is one cart and one placement, and no theme's signature changes:
+          `StorefrontData` gains nothing and the cart reads the same `items`
+          array the themes already receive, filtered to what can be put in a
+          basket. A shop with no products renders nothing at all here. */}
+      <div className="mx-auto w-full max-w-2xl">
+        <Cart
+          slug={data.shop.slug}
+          items={data.items
+            .filter((item) => item.kind === 'product')
+            .map((item) => ({
+              id: item.id,
+              name: item.name,
+              nameEn: item.nameEn,
+              priceMinor: item.priceMinor,
+              currency: item.currency,
+            }))}
+        />
+      </div>
       <footer className="border-t border-separator px-5 py-6">
         {/* The two facts a customer needs to physically reach the shop, so this
             line owes the readable ink: text-label-3 measured 1.91:1 against the

@@ -4,6 +4,8 @@ import { db } from '@/lib/db.ts'
 import { dueReminders, keepAlive, pendingPayments, recordReminder } from '@/lib/queries/ops.ts'
 import { deliverToCustomer } from '@/lib/channels/deliver.ts'
 import { isPollable, railsFor } from '@/lib/payments/rails.ts'
+import { withTransaction } from '@/lib/orders/connection.ts'
+import { expireWebOrders } from '@/lib/orders/expire.ts'
 import type { CurrencyCode } from '@/lib/types.ts'
 import { cambodiaClock } from '@/lib/time/cambodia.ts'
 
@@ -108,6 +110,24 @@ async function runPaymentPolling() {
   return { checked: pending.length, settled }
 }
 
+/**
+ * Give the stock back.
+ *
+ * `createOrder` takes stock at order time, which is right for a Telegram order
+ * an agent is shepherding and wrong for a public page where anybody can place a
+ * hundred orders she never intends to pay for. A pending WEB order whose QR has
+ * lapsed is cancelled and what it took is put back, scoped to `channel = 'web'`
+ * so a live Telegram conversation is never cancelled underneath its agent.
+ *
+ * This is the one job here that needs a real transaction, so it needs
+ * DATABASE_URL. Without it the job throws and is caught and reported like any
+ * other, which is the honest failure: the tick keeps running and the report
+ * names what did not.
+ */
+async function runExpiredOrders() {
+  return expireWebOrders(withTransaction)
+}
+
 export async function POST(req: Request) {
   if (!authorised(req)) {
     return NextResponse.json({ error: 'not found' }, { status: 404 })
@@ -120,6 +140,7 @@ export async function POST(req: Request) {
   for (const [name, job] of [
     ['reminders', runReminders],
     ['payments', runPaymentPolling],
+    ['expired_orders', runExpiredOrders],
     ['keep_alive', async () => ({ businesses: await keepAlive() })],
   ] as const) {
     try {

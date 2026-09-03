@@ -599,8 +599,8 @@ export function ownerTools(businessId: string) {
 
     confirm_payment: tool({
       description:
-        'OPERATE. The owner saw a KHQR payment arrive in her own banking app. Marks that booking\'s pending QR as paid and confirms the booking. Use when she says a code was paid, "MN7Q1A paid", "the money for 4K2P came in". Refuses nothing twice: an already paid code is reported, not re-marked.',
-      inputSchema: z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{4,12}$/).describe('booking code') }),
+        'OPERATE. The owner saw a KHQR payment arrive in her own banking app. Marks that pending QR as paid and confirms what it was for, a booking or a shop-site order. Use when she says a code was paid, "MN7Q1A paid", "the money for 4K2P came in". Refuses nothing twice: an already paid code is reported, not re-marked. If it returns outcome "ambiguous" the code names both a booking and an order: say so and ask her which, never pick one.',
+      inputSchema: z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{4,12}$/).describe('booking or order code') }),
       execute: async ({ code }) => confirmPayment({ businessId, code, actorLabel: 'owner via moni' }),
     }),
 

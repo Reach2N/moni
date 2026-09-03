@@ -21,7 +21,7 @@ import type { StorefrontStyle } from '../storefront/style.ts'
  */
 export async function getStorefront(
   slug: string,
-): Promise<{ data: StorefrontData; style: StorefrontStyle } | null> {
+): Promise<{ businessId: string; data: StorefrontData; style: StorefrontStyle } | null> {
   const businessResult = await db
     .from('businesses')
     .select('id, slug, name, province, address, phone, default_currency, hours')
@@ -87,7 +87,46 @@ export async function getStorefront(
   // The style is computed here and not inside a theme, so a theme cannot reach
   // the seed and no theme can disagree with another about what a seed means.
   const style = styleFor(storefrontResult.data?.seed ?? 0, vibeOf(published), published.theme)
-  return { data, style }
+  // The id is returned alongside, never inside `StorefrontData`. A theme has no
+  // business knowing the tenant's primary key, and the order route and the order
+  // page both need it: the slug is the only tenancy input either of them takes.
+  return { businessId: business.id, data, style }
+}
+
+/**
+ * The tenant behind a public slug, and nothing else.
+ *
+ * The same published gate `getStorefront` applies, in one small read, for the
+ * order route: a shop that never pressed publish has no site and takes no
+ * orders, and both are the same 404. Widening the owner-only `POST /api/orders`
+ * instead would have put the tenancy decision inside a request body, where a
+ * caller could set it.
+ */
+export async function resolvePublishedShop(
+  slug: string,
+): Promise<{ businessId: string; name: string; currency: CurrencyCode } | null> {
+  const businessResult = await db
+    .from('businesses')
+    .select('id, name, default_currency')
+    .eq('slug', slug)
+    .maybeSingle()
+  throwIfDbError('resolve shop by slug', businessResult.error)
+  const business = businessResult.data
+  if (!business) return null
+
+  const storefrontResult = await db
+    .from('storefronts')
+    .select('published')
+    .eq('id', business.id)
+    .maybeSingle()
+  throwIfDbError('resolve shop storefront', storefrontResult.error)
+  if (!storefrontResult.data?.published) return null
+
+  return {
+    businessId: business.id,
+    name: business.name,
+    currency: business.default_currency as CurrencyCode,
+  }
 }
 
 /** The owner's own view: draft and published side by side. */

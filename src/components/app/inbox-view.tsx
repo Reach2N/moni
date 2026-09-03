@@ -6,6 +6,7 @@ import { BadgeCheck, CircleAlert, LoaderCircle, Send, UserRound } from 'lucide-r
 import { Button } from '@/components/ui/button.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 import type { InboxRow, Transcript } from '@/lib/queries/inbox.ts'
+import { toKhmerDigits } from '@/lib/format/khmer.ts'
 import { ChannelIcon, channelLabel } from './channel-icon.tsx'
 
 /**
@@ -208,7 +209,19 @@ export function InboxView({ rows, initialTranscript }: { rows: InboxRow[]; initi
             {transcript.pendingPayments.map((payment) => (
               <li key={payment.code} className="flex flex-wrap items-center gap-2 px-3 py-2">
                 <span className="km min-w-0 flex-1 text-sm text-ink">
-                  រង់ចាំប្រាក់ <span className="tnum font-semibold">{payment.amount}</span> សម្រាប់ {payment.code}
+                  រង់ចាំប្រាក់ <span className="tnum font-semibold">{payment.amount}</span> សម្រាប់
+                  {payment.kind === 'order' ? ' ការបញ្ជាទិញ ' : ' ការណាត់ '}
+                  {payment.code}
+                  {/* What she is confirming, not just what it is called. An
+                      order's lines are the only way to tell two 23,000 riel
+                      orders apart in a busy hour. */}
+                  {payment.lines.length > 0 ? (
+                    <span className="km block text-xs text-rule">
+                      {payment.lines
+                        .map((line) => `${line.name} ×${toKhmerDigits(line.quantity)}`)
+                        .join('៖ ')}
+                    </span>
+                  ) : null}
                   {payment.provider === 'khqr' ? (
                     <span className="km block text-xs text-rule">ចូលគណនី Bakong របស់ហាងផ្ទាល់។ ពិនិត្យកម្មវិធីធនាគាររបស់អ្នក រួចបញ្ជាក់។</span>
                   ) : null}

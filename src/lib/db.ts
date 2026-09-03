@@ -1,15 +1,17 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from './database.types.ts'
+import type { Database } from './database.pending.ts'
 
 /**
- * The generated row types, straight from the live schema.
+ * The generated row types, plus whatever schema.sql has grown since the live
+ * project was last migrated.
  *
- * There was briefly a `database.pending.ts` alongside this, carrying the tables
- * schema.sql had grown before the live project was migrated. The migration
- * landed on 30 August 2026 and the types were regenerated, so the promissory
- * note was paid and the file deleted. If that window ever reopens, reopen the
- * file rather than hand editing the generated one.
+ * `database.pending.ts` is that overlay and it is deliberately tiny: on
+ * 3 September 2026 it names one column, `payments.order_id`. The window closes
+ * by applying `supabase/migrations/20260903000100_order_payments.sql`,
+ * regenerating `database.types.ts`, deleting the overlay and pointing this
+ * import back at the generated file. The generated file itself is never hand
+ * edited, which is the whole reason the overlay exists.
  */
 type Db = Database
 
