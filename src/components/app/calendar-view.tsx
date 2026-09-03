@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CircleDot } from 'lucide-react'
+import { CircleDot, Square } from 'lucide-react'
 // Installs `globalThis.Temporal` and the Temporal-aware `Intl.DateTimeFormat`.
 // Not optional and not a convenience: schedule-x 4 reads the GLOBAL `Temporal`
 // to validate every event it is handed, so a named import of the same polyfill
@@ -15,7 +15,7 @@ import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { ScheduleXCalendar, useCalendarApp } from '@schedule-x/react'
 import '@schedule-x/theme-default/dist/calendar.css'
 import type { CalendarColours, CalendarEvent } from '@/lib/calendar/events.ts'
-import { CALENDAR_TIME_ZONE, toCalendarEvent } from '@/lib/calendar/events.ts'
+import { CALENDAR_TIME_ZONE, UNASSIGNED, toCalendarEvent } from '@/lib/calendar/events.ts'
 import type { LaneBooking } from '@/lib/queries/calendar.ts'
 import { toKhmerDigits } from '@/lib/format/khmer.ts'
 import { useLiveBookings } from './live-bookings.tsx'
@@ -86,9 +86,66 @@ function WeekGridHour({ gridStep }: { gridStep: { hour: number; minute: number }
  */
 const CUSTOM_COMPONENTS = { weekGridHour: WeekGridHour }
 
+/** What a booking with no chair, room or table yet is called on the legend. */
+const UNASSIGNED_LABEL = 'មិនទាន់កំណត់'
+
+/**
+ * The key to the colours, because a colour with no legend carries nothing.
+ *
+ * Trading resource COLUMNS for resource COLOURS only pays if the owner can read
+ * the colours, and without headers she could not: the chair's name lived in the
+ * column head that went away, so telling green from blue meant opening a
+ * booking. This puts the names back, once, above the whole calendar.
+ *
+ * The swatches are read out of the SAME `calendars` record the calendar itself
+ * was built from, never a second colour table, so the legend and the events
+ * cannot disagree. Fill is `container` and stroke is `main` because that is how
+ * schedule-x paints an event block: the swatch is a miniature of the thing it
+ * names rather than an approximation of it.
+ *
+ * No business logic, per CLAUDE.md rule 9: this reads two props and draws them.
+ */
+function CalendarLegend({
+  resources,
+  calendars,
+}: {
+  resources: Array<{ id: string; name: string }>
+  calendars: Record<string, CalendarColours>
+}) {
+  // A legend of one entry distinguishes nothing. A cafe has no chairs to book,
+  // so every booking is neutral and naming the neutral colour is just noise.
+  if (resources.length === 0) return null
+
+  const rows = [
+    ...resources.map((resource) => ({ id: resource.id, name: resource.name })),
+    { id: UNASSIGNED, name: UNASSIGNED_LABEL },
+  ]
+
+  return (
+    <ul aria-label="ពណ៌សម្គាល់" className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+      {rows.map(({ id, name }) => {
+        const colours = calendars[id]
+        if (!colours) return null
+        return (
+          <li key={id} className="km flex items-center gap-1.5 text-xs text-rule">
+            <Square
+              className="size-3 shrink-0"
+              strokeWidth={2}
+              style={{ color: colours.lightColors.main, fill: colours.lightColors.container }}
+              aria-hidden
+            />
+            {name}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 export function CalendarView({
   events,
   calendars,
+  resources,
   date,
   rangeStart,
   rangeEnd,
@@ -96,6 +153,8 @@ export function CalendarView({
 }: {
   events: CalendarEvent[]
   calendars: Record<string, CalendarColours>
+  /** The chairs, rooms or tables, in the order the shop lists them, for the legend. */
+  resources: Array<{ id: string; name: string }>
   /** `YYYY-MM-DD`, the first Cambodian-local day of the range. */
   date: string
   /** The half-open UTC bounds a live arrival has to fall inside to be shown. */
@@ -180,6 +239,8 @@ export function CalendarView({
         />
         {connected ? 'កំពុងតាមដានផ្ទាល់' : 'មិនទាន់តភ្ជាប់ផ្ទាល់'}
       </p>
+
+      <CalendarLegend resources={resources} calendars={calendars} />
 
       <div className="moni-calendar mt-2">
         <ScheduleXCalendar calendarApp={calendar} customComponents={CUSTOM_COMPONENTS} />

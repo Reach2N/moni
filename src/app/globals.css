@@ -381,6 +381,77 @@
   --ui-hairline:  var(--color-hairline);
   --ui-thumb:     var(--color-rule);
 }
+
+/* ── the portal layer ───────────────────────────────────────────────────────
+   Every surface in this phase is light only: `.moni-hig` pins the homepage,
+   `.sf` pins a shop's site, and `src/app/app/layout.tsx` pins /app with
+   `[color-scheme:light]` on the `.moni-invitation` div. There is a FOURTH place
+   a surface renders and it was missed: a Radix Portal mounts its subtree on
+   `document.body`, OUTSIDE all three of those wrappers, so a Sheet or a Dialog
+   opened from /app reads `:root` instead.
+
+   That is the whole of the "more" drawer defect. `bg-paper` is `--color-paper`,
+   an unconditional #F8FAFC, while `:root` resolves `--ink` to `var(--label)`,
+   which the `prefers-color-scheme: dark` block turns near white. Measured in
+   the drawer: 1.04:1, ink and paper the same colour. `text-rule` is a theme
+   COLOUR rather than a runtime var, so the icons stayed at 7.24:1 and only the
+   words disappeared, which is exactly what the screenshot shows.
+
+   Fixing it here rather than on the drawer's classes corrects every component
+   that reads `bg-paper` and `text-ink` inside any portal at once, present and
+   future. The values are the document's own LIGHT scheme, the same set
+   `.moni-hig` pins, so a portal reads what an unthemed light document reads
+   whichever subtree opened it. `--ink` and friends are re-declared alongside
+   `--label` and NOT left to derive: a custom property computes where it is
+   declared, so re-declaring only `--label` here would leave the inherited
+   near-white `--ink` untouched. Same trap `.moni-hig` already sidesteps.
+
+   Unlayered, like the Khmer rules above: Tailwind emits utilities inside
+   @layer utilities, so this wins by cascade layer with no !important.
+
+   Phase 5 rebuilds /app in the Apple palette and may give it a real dark
+   scheme. When it does, this block moves with it rather than being deleted:
+   the portal still needs to be told which world it came from. */
+[data-slot$="-portal"],
+[data-sonner-toaster] {
+  color-scheme: light;
+
+  --background:           #FFFFFF;
+  --background-secondary: #F5F5F7;
+  --label:                #1D1D1F;
+  --label-secondary:      rgba(60, 60, 67, 0.60);
+  --label-tertiary:       rgba(60, 60, 67, 0.30);
+  --separator:            rgba(60, 60, 67, 0.29);
+  --accent:               #34C759;
+  --on-accent:            #0B2E16;
+  --destructive:          #FF3B30;
+
+  --surface:      var(--background);
+  --page:         var(--background);
+  --canvas:       var(--background-secondary);
+  --inset:        var(--background-secondary);
+  --field:        var(--background-secondary);
+  --hover:        var(--background-secondary);
+  --hover-2:      color-mix(in srgb, var(--label) 8%, var(--background));
+  --ink:          var(--label);
+  --ink-2:        var(--label-secondary);
+  --ink-3:        var(--label-tertiary);
+  --line:         var(--separator);
+  --line-strong:  color-mix(in srgb, var(--label) 38%, transparent);
+  --line-soft:    color-mix(in srgb, var(--label) 12%, transparent);
+  --accent-ink:   var(--on-accent);
+  --accent-tint:  color-mix(in srgb, var(--accent) 12%, transparent);
+  --green:        var(--accent);
+  --green-tint:   color-mix(in srgb, var(--accent) 12%, transparent);
+  --red:          var(--destructive);
+  --red-tint:     color-mix(in srgb, var(--destructive) 12%, transparent);
+
+  --ui-accent:    var(--accent);
+  --ui-ground:    var(--background);
+  --ui-hairline:  var(--separator);
+  --ui-thumb:     var(--label-tertiary);
+}
+
 /* The onboarding screen, and only that screen, renders on the Apple palette
    while the rest of /app is still the Invitation (PLAN.md Phase 5 owns the rest).
    It carries `.moni-hig` for the palette itself, and this class on top.

@@ -31,6 +31,7 @@ export default async function CalendarPage() {
           <CalendarView
             events={events}
             calendars={calendars}
+            resources={day.resources}
             date={day.date}
             rangeStart={day.start}
             rangeEnd={day.end}
