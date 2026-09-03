@@ -44,6 +44,7 @@ import { candidateSeeds, contrastRatio, isSeed, mulberry32, paletteFor, styleFor
 import { TILE_PATTERNS, ROTATIONS_FOR, tileFor, patternGeometry, shouldDrawTile } from '../src/lib/media/tile.ts'
 import { extractMessengerMessages, verifySignature } from '../src/lib/channels/messenger.ts'
 import { assertVoiceNote, normalizeAudioType, MAX_VOICE_BYTES } from '../src/lib/ai/voice.ts'
+import { movePlan } from '../src/lib/catalogue/backfill.ts'
 import {
   escapeLikePattern,
   isApproved,
@@ -1669,6 +1670,21 @@ eq('and no walk-in row was left behind in services', Number(cafeWalkInServices.c
 // which is the honest way to ask "did a salon leak a product".
 const salonProducts = await one(db, `select count(*) c from products where business_id = '${B_NEW}'`)
 eq('a salon has no products at all', Number(salonProducts.c), 0)
+
+console.log('\nno backfill may move a row a customer is holding')
+// A booking's service_id is a real commitment to a real person. Moving that row
+// either breaks the foreign key or orphans the booking, so a booked row is
+// refused and REPORTED. A silent skip is how a half migrated catalogue happens.
+eq('an unbooked walk-in row on a cafe is movable',
+  movePlan({ businessType: 'cafe', unit: 'walk_in', bookingCount: 0 }).move, true)
+eq('the same row with one booking is refused',
+  movePlan({ businessType: 'cafe', unit: 'walk_in', bookingCount: 1 }).move, false)
+eq('and the refusal names its reason',
+  movePlan({ businessType: 'cafe', unit: 'walk_in', bookingCount: 1 }).reason, 'booked')
+eq('a salon row is never moved, booked or not',
+  movePlan({ businessType: 'salon', unit: 'walk_in', bookingCount: 0 }).move, false)
+eq('and that refusal names a different reason',
+  movePlan({ businessType: 'salon', unit: 'walk_in', bookingCount: 0 }).reason, 'already correct')
 
 console.log('\nplanCatalogue: the routing fix, provable without a live database')
 // persist.ts carries `server-only` and a live Supabase client, so nothing

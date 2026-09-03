@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:test": "node --experimental-strip-types db/test.mjs",
+    "db:backfill": "node --experimental-strip-types db/backfill-catalogue.mjs",
     "test:mvp": "node --experimental-strip-types scripts/mvp-acceptance.mjs",
     "shoot": "node scripts/shoot.mjs",
     "test:signals": "node --experimental-strip-types scripts/signals-test.mjs",
