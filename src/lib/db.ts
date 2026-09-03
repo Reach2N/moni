@@ -1,17 +1,20 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from './database.pending.ts'
+import type { Database } from './database.types.ts'
 
 /**
- * The generated row types, plus whatever schema.sql has grown since the live
- * project was last migrated.
+ * The generated row types, straight from the live schema.
  *
- * `database.pending.ts` is that overlay and it is deliberately tiny: on
- * 3 September 2026 it names one column, `payments.order_id`. The window closes
- * by applying `supabase/migrations/20260903000100_order_payments.sql`,
- * regenerating `database.types.ts`, deleting the overlay and pointing this
- * import back at the generated file. The generated file itself is never hand
- * edited, which is the whole reason the overlay exists.
+ * When `db/schema.sql` grows a column the live project has not been migrated to
+ * yet, this import points at a tiny hand-written OVERLAY instead, never at an
+ * edited copy of the generated file. `payments.order_id` spent 3 September 2026
+ * in exactly that state: `database.pending.ts` named the one column, the
+ * migration was applied, the types were regenerated, and the overlay deleted
+ * itself the same day.
+ *
+ * Reopen that pattern rather than hand editing `database.types.ts`, which is
+ * generated and is never edited. An overlay says in twelve lines what it is
+ * promising; a copied file has to be diffed to find out.
  */
 type Db = Database
 

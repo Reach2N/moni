@@ -965,6 +965,7 @@ export type Database = {
           idempotency_key: string
           kind: string
           last_checked_at: string | null
+          order_id: string | null
           paid_at: string | null
           provider: string
           provider_account: string | null
@@ -987,6 +988,7 @@ export type Database = {
           idempotency_key: string
           kind?: string
           last_checked_at?: string | null
+          order_id?: string | null
           paid_at?: string | null
           provider?: string
           provider_account?: string | null
@@ -1009,6 +1011,7 @@ export type Database = {
           idempotency_key?: string
           kind?: string
           last_checked_at?: string | null
+          order_id?: string | null
           paid_at?: string | null
           provider?: string
           provider_account?: string | null
@@ -1066,6 +1069,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
