@@ -18,6 +18,7 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { cambodiaDayBounds, cambodiaMonthBounds } from '../src/lib/time/cambodia.ts'
 import { assertSameOriginBrowserPost, readJsonBody } from '../src/lib/http/post.ts'
 import { SetupRequestSchema } from '../src/lib/setup/schema.ts'
+import { planCatalogue } from '../src/lib/setup/plan.ts'
 import { instructionsBlock } from '../src/lib/agent/instructions.ts'
 import { decryptSecret, encryptSecret, newWebhookSecret, secretsMatch } from '../src/lib/crypto/secrets.ts'
 import { extractIncoming, looksLikeBotToken } from '../src/lib/channels/telegram.ts'
@@ -1668,6 +1669,67 @@ eq('and no walk-in row was left behind in services', Number(cafeWalkInServices.c
 // which is the honest way to ask "did a salon leak a product".
 const salonProducts = await one(db, `select count(*) c from products where business_id = '${B_NEW}'`)
 eq('a salon has no products at all', Number(salonProducts.c), 0)
+
+console.log('\nplanCatalogue: the routing fix, provable without a live database')
+// persist.ts carries `server-only` and a live Supabase client, so nothing
+// above this line ever calls it: the seed-shape checks just now can prove
+// the FIXTURE is right, not that the reconciliation code stays right. This
+// is what closes that gap. `planCatalogue` decides everything (the split by
+// kind, the name matching, the field mapping, what retires) with no database
+// call inside it, so it runs here exactly as persist.ts calls it.
+const row = (overrides) => ({
+  name: 'Item', name_en: null, description: null, price_minor: 1000, currency: 'KHR',
+  unit: 'walk_in', duration_min: 30, buffer_min: 0, capacity: 1, requires_deposit: false,
+  deposit_minor: null, ...overrides,
+})
+
+// The exact carried key set. A cappuccino has no duration and nothing books
+// against it, so a booking field surviving into a product row would be a
+// silent regression, not a loud one: nothing downstream reads it, so nothing
+// would ever complain until an owner asked why her drink has a buffer time.
+const cappuccino = row({
+  name: 'Cappuccino', name_en: 'Cappuccino', description: 'Hot, with milk', price_minor: 4500,
+  duration_min: 45, buffer_min: 10, capacity: 3, requires_deposit: true, deposit_minor: 1000,
+})
+const mappingPlan = planCatalogue('cafe', [cappuccino], [], [])
+eq('a brand new walk-in row is a fresh product insert', mappingPlan.products.inserts.length, 1)
+const insertedProduct = mappingPlan.products.inserts[0]
+eq('the carried keys are exactly the ones a product row has, nothing more',
+  Object.keys(insertedProduct).sort().join(','),
+  ['name', 'name_en', 'description', 'price_minor', 'currency', 'active', 'sort_order'].sort().join(','))
+eq('duration is dropped, not just unused', 'duration_min' in insertedProduct, false)
+eq('capacity is dropped', 'capacity' in insertedProduct, false)
+eq('the deposit fields are dropped', 'deposit_minor' in insertedProduct, false)
+
+// The kind-change guarantee: a row whose unit flips between two parses must
+// leave its old table, or v_catalog lists it twice on the shop's public menu.
+// A restaurant sells both, so the same name can cross from booked to walk-in.
+const kindChangePlan = planCatalogue(
+  'restaurant',
+  [row({ name: 'Table for two', unit: 'walk_in' })],
+  [{ id: 'svc-1', name: 'Table for two', active: true }],
+  [],
+)
+eq('a row that flips from booked to walk-in retires its old service row',
+  kindChangePlan.services.deactivate.join(','), 'svc-1')
+eq('it is never matched as a service update: the name match is table-scoped',
+  kindChangePlan.services.updates.length, 0)
+eq('and it lands as a fresh product insert, not a migrated id', kindChangePlan.products.inserts.length, 1)
+
+// Finding: setup used to retire a product the way it retires a service. A
+// salon's service list IS its description of itself, so a name the
+// description stops mentioning is a real retirement. A product is inventory
+// with its own photograph, stock count and category, kept from a different
+// screen (`/app/products`, `createProduct`, `create_products_bulk`) that a
+// re-parse of the shop's DESCRIPTION never sees, and `ShopSetup` is mounted
+// in secondary-tools.tsx, reachable at any time, not only at onboarding. An
+// owner who builds a photographed menu and then only edits her hours in the
+// description screen must never come back to find that menu emptied.
+const survivorPlan = planCatalogue('cafe', [], [], [{ id: 'prod-1', name: 'Cake', active: true }])
+eq('a re-parse that drops a product from the description queues no deactivation',
+  survivorPlan.products.deactivate.length, 0)
+eq('and queues no update either: an unmentioned product is left alone entirely',
+  survivorPlan.products.updates.length, 0)
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)
