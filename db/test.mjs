@@ -7,7 +7,7 @@
  * Every assertion below is a bug that would otherwise surface on stage.
  */
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHmac } from 'node:crypto'
 import { PGlite } from '@electric-sql/pglite'
@@ -2324,22 +2324,82 @@ eq('the browser can narrow a proposal out of a JSON tool result',
 eq('and cannot mistake an ordinary tool result for one',
   isShopProposal({ added: 'កាហ្វេទឹកកក' }), false)
 
-// The guard that actually catches a regression: the tool's own body. Every
-// other owner tool writes; this one must have no way to. If someone reaches
-// for persistSetup or a table write inside describe_shop, this goes red before
-// a shop is silently overwritten from one sentence.
+// The guard that actually catches a regression, and the reason it is a graph
+// walk rather than a grep.
+//
+// This assertion used to read the TEXT of `describe_shop`'s body inside
+// `owner-tools.ts` and look for `db.from(`, `persistSetup` or `.insert(`. On
+// 3 September 2026 a reviewer defeated it in one line: `owner-tools.ts` already
+// imports `createProduct`, `createProductsBulk`, `updateProduct`,
+// `setPaymentAccount` and `publishShopSite` one scope up, so
+// `await createProduct(businessId, ...)` inside the tool wrote a row and the
+// suite stayed green. A substring cannot express "this function performs no
+// write", because the writer it is looking for can always be spelled another
+// way.
+//
+// So the property is structural now. `describe_shop`'s whole implementation
+// lives in `src/lib/agent/describe-shop.ts`, and what is asserted is that
+// module's REAL import graph: every module it can reach, followed through the
+// actual import statements. Nothing in that graph may reach `src/lib/db.ts`,
+// which is the single database handle every writer in this codebase goes
+// through, so the tool cannot write because it has no writer to import, not
+// because a comment promises it will not. The second assertion closes the other
+// door: `owner-tools.ts` must WIRE that module in, not grow a body of its own
+// again, so there is nowhere for the injected line to go.
+
+/**
+ * Every module a file can actually reach, by following its imports.
+ *
+ * Type-only imports are followed too, deliberately: they are erased at runtime,
+ * but a module that names `db.ts` even in a type position is a module close
+ * enough to the database that this guard should ask why.
+ */
+function importGraph(entry) {
+  const root = join(here, '..')
+  const seen = new Set()
+  const packages = new Set()
+  const queue = [join(root, entry)]
+  while (queue.length > 0) {
+    const file = queue.pop()
+    const key = relative(root, file)
+    if (seen.has(key)) continue
+    seen.add(key)
+    const source = readFileSync(file, 'utf8')
+    for (const [, spec] of source.matchAll(/(?:^|[\s;}])(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)) {
+      if (spec.startsWith('.')) queue.push(join(dirname(file), spec))
+      else if (spec.startsWith('@/')) queue.push(join(root, 'src', spec.slice(2)))
+      else packages.add(spec)
+    }
+  }
+  return { modules: [...seen], packages: [...packages] }
+}
+
+const describeGraph = importGraph('src/lib/agent/describe-shop.ts')
+eq('describe_shop reaches only the parser and the proposal builder',
+  describeGraph.modules.filter((m) => m.startsWith('src/lib/agent/')).sort().join(' '),
+  'src/lib/agent/describe-shop.ts src/lib/agent/proposal.ts')
+// The one that goes red on an injected writer. `src/lib/db.ts` is the only
+// database handle in the codebase, and `products/write.ts`, `setup/persist.ts`,
+// `payments/account.ts` and `storefront/generate.ts` all import it, so reaching
+// any of them puts it in this graph.
+eq('nothing describe_shop can reach imports the database handle',
+  describeGraph.modules.includes('src/lib/db.ts'), false)
+eq('and nothing it can reach is a writer at all',
+  describeGraph.modules.filter((m) => /\/(write|persist|generate|account)\.ts$/.test(m)).join(','), '')
+eq('it does not even reach the Supabase client through a package',
+  describeGraph.packages.includes('@supabase/supabase-js'), false)
+eq('describe_shop hands back a proposal instead',
+  describeGraph.modules.includes('src/lib/agent/proposal.ts'), true)
+
 const ownerToolsSource = readFileSync(join(here, '../src/lib/agent/owner-tools.ts'), 'utf8')
 eq('the owner tool module never imports the setup writer',
   /setup\/persist/.test(ownerToolsSource), false)
-const describeStart = ownerToolsSource.indexOf('describe_shop: tool({')
-const describeEnd = ownerToolsSource.indexOf('report_setup_status: tool({', describeStart)
-eq('describe_shop is findable in the owner tool set', describeStart > 0 && describeEnd > describeStart, true)
-const describeBody = ownerToolsSource.slice(describeStart, describeEnd)
-eq('describe_shop touches no table',
-  /db\s*\.?\s*from\(|persistSetup|\.insert\(|\.upsert\(|\.update\(/.test(describeBody), false)
-eq('describe_shop hands back a proposal instead',
-  /buildShopProposal\(/.test(describeBody), true)
-
+// A delegation, not a body: an inline `describe_shop: tool({ ... })` would sit
+// in the one file where every writer is already in scope, which is exactly the
+// arrangement the graph walk above cannot see into.
+const wiring = ownerToolsSource.match(/^\s*describe_shop:.*$/m)?.[0].trim()
+eq('the owner tool set wires that module in rather than declaring a body',
+  wiring, 'describe_shop: describeShopTool,')
 
 // ── result ────────────────────────────────────────────────────────────────
 console.log(`\n${fail === 0 ? '\x1b[32m' : '\x1b[31m'}${pass} passed, ${fail} failed\x1b[0m\n`)

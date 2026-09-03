@@ -9,8 +9,7 @@ import { confirmPayment } from '../payments/confirm.ts'
 import { getPaymentSettings, PaymentAccountError, setPaymentAccount } from '../payments/account.ts'
 import { createProduct, createProductsBulk, ProductError, updateProduct } from '../products/write.ts'
 import { generateProductPhoto } from '../ai/product-photo.ts'
-import { parseShop } from '../ai/parse.ts'
-import { buildShopProposal } from './proposal.ts'
+import { describeShopTool } from './describe-shop.ts'
 import { uploadProductPhoto } from '../media/storage.ts'
 import { listCatalogue } from '../queries/catalogue.ts'
 import { generateShopSiteDraft, publishShopSite } from '../storefront/generate.ts'
@@ -43,48 +42,18 @@ export function ownerTools(businessId: string) {
   return {
     // ────────────────────────────────────────────────────────────────── SETUP
     /**
-     * The one tool that PROPOSES instead of doing.
+     * The one tool that PROPOSES instead of doing, and the only one built
+     * somewhere else.
      *
-     * It is the onboarding pipeline, reached from the same prompt as everything
-     * else: `parseShop` reads her paragraph, `buildShopProposal` shapes exactly
-     * the body `POST /api/setup` takes, and `persistSetup` runs only after she
-     * confirms on the approval card. Note what is NOT imported here: this
-     * function has no write path at all, so "propose" is a property of the code
-     * rather than a promise in a prompt, and `businessId` is deliberately
-     * unused.
-     *
-     * Why this one and nothing else: rewriting a whole business profile, its
-     * hours and its catalogue from one sentence is the widest blast radius in
-     * the product and the only action that can silently overwrite everything at
-     * once. A price change is one row and is visibly wrong. A bad re-parse is
-     * not: it retires services the sentence did not mention and replaces the
-     * hours, under one confident summary.
+     * It is wired in from `./describe-shop.ts`, which imports the parser and
+     * the proposal builder and nothing else. That module is where the reason
+     * is written down: a tool that can rewrite a whole shop from one sentence
+     * must have no writer in scope, and inside THIS file every writer is one
+     * scope up. `db/test.mjs` walks that module's import graph and asserts this
+     * line is a delegation rather than a body, so the guarantee survives
+     * someone editing either end of it.
      */
-    describe_shop: tool({
-      description:
-        'SETUP. The owner describes her whole shop in ordinary language: what she sells, prices, opening hours, how many staff or rooms. Read it into a shop profile, hours and a catalogue. Use for "I run a coffee shop on street 271, iced coffee is 6000 riel, open 7 to 6", or when she is starting from nothing, or when she wants her shop read again from a fresh description. This tool PROPOSES: it saves nothing, and the owner approves the proposal before anything is written. Do not use it to add one item or change one price, those are create_product, create_products_bulk, update_product, update_service and adjust_prices, and those act immediately.',
-      inputSchema: z.object({
-        description: z
-          .string()
-          .trim()
-          .min(8)
-          .max(8_000)
-          .describe("the owner's own words about her shop, verbatim, in her own language and script. Never a summary you wrote"),
-      }),
-      execute: async ({ description }) => {
-        try {
-          const parsed = await parseShop(description)
-          return buildShopProposal({
-            rawDescription: description,
-            parsed: parsed.shop,
-            model: parsed.model,
-            warnings: parsed.warnings,
-          })
-        } catch (error) {
-          return { error: error instanceof Error ? error.message : 'could not read that description' }
-        }
-      },
-    }),
+    describe_shop: describeShopTool,
 
     report_setup_status: tool({
       description:
